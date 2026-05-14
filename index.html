@@ -173,7 +173,7 @@
           </select>
           <span class="arcd" id="acd">5:00</span>
         </div>
-        <button class="btnr" id="btnr" onclick="fetchData()">&#8635; Refresh</button>
+        <button class="btnr" id="btnr" onclick="fetchData()">⟳ Refresh</button>
         <button class="btnso" onclick="signOut()">Sign out</button>
       </div>
     </div>
@@ -387,12 +387,31 @@ async function readDataDump(){
 async function readCRM(){
   try{
     const wb=await downloadAndParse(CFG.crmDriveId,CFG.crmItemId);
-    const ws=wb.Sheets[wb.SheetNames[0]];
+
+    // Use the "Totals" sheet specifically
+    const sheetName=wb.SheetNames.find(n=>n.toLowerCase()==="totals")||wb.SheetNames[0];
+    const ws=wb.Sheets[sheetName];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
-    const row2=rows[1]||[];
-    const callsToday = row2[0]!=null&&row2[0]!==""?Number(row2[0]):0;
-    const dealsToday = row2[1]!=null&&row2[1]!==""?Number(row2[1]):0;
-    const apptToday  = row2[2]!=null&&row2[2]!==""?Number(row2[2]):0;
+
+    // Find header row with Calls, Deals, Appointments
+    let callsCol=-1,dealsCol=-1,apptCol=-1,hdrRow=-1;
+    for(let i=0;i<rows.length;i++){
+      rows[i].forEach((c,ci)=>{
+        if(typeof c==="string"){
+          if(c.toLowerCase()==="calls")        callsCol=ci;
+          if(c.toLowerCase()==="deals")        dealsCol=ci;
+          if(c.toLowerCase()==="appointments") apptCol=ci;
+        }
+      });
+      if(callsCol>=0&&dealsCol>=0&&apptCol>=0){hdrRow=i;break;}
+    }
+
+    // The row immediately after the header contains the totals
+    const totalsRow=rows[hdrRow+1]||[];
+    const callsToday=callsCol>=0?Number(totalsRow[callsCol])||0:null;
+    const dealsToday=dealsCol>=0?Number(totalsRow[dealsCol])||0:null;
+    const apptToday =apptCol>=0 ?Number(totalsRow[apptCol]) ||0:null;
+
     return{callsToday,apptToday,dealsToday};
   }catch(e){
     console.warn("CRM read failed:",e.message);
@@ -403,7 +422,7 @@ async function readCRM(){
 // ── NPS — reads nps.json generated every 30 mins by GitHub Actions ──
 async function readNPS(){
   try{
-    const r=await fetch("/nps.json?t="+Date.now(),{signal:AbortSignal.timeout(5000)});
+    const r=await fetch("./nps.json?t="+Date.now(),{signal:AbortSignal.timeout(5000)});
     if(!r.ok)throw new Error("nps.json "+r.status);
     const j=await r.json();
     // AskNicely returns {"NPS": 66.67}
@@ -503,7 +522,7 @@ async function fetchData(){
   }finally{
     busy=false;
     document.getElementById("btnr").disabled=false;
-    document.getElementById("btnr").textContent="&#8635; Refresh";
+    document.getElementById("btnr").textContent="⟳ Refresh";
     restartCd();
   }
 }
