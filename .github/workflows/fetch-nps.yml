@@ -20,10 +20,13 @@ jobs:
             -H "X-apikey: 97f1e4aadabd14297917a05fd1d39eb2363a55f5b8e" \
             "https://pluspackaging.asknice.ly/api/v1/getnps" \
             -o nps.json
-          echo "NPS data:"
+          echo "NPS data fetched:"
           cat nps.json
 
       - name: Commit and push nps.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nps.json
+          git diff --staged --quiet || git commit -m "Update NPS data [skip ci]"
+          git push
