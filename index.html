@@ -321,9 +321,7 @@ const CFG = {
   outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
   // CRM Data.xlsx — Reports315/General/Output/CRM Data.xlsx (stable item ID)
   crmItemId:      "017WW6KAARD5NC52XSNVH3MPPI4DC5FT3H",
-  // AskNicely
-  anApiKey:       "97f1e4aadabd14297917a05fd1d39eb2363a55f5b8e",
-  anDomain:       "pluspackaging",
+  // AskNicely NPS is fetched server-side via GitHub Actions — no key needed here
 };
 const REDIRECT_URI = location.origin + location.pathname;
 let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
@@ -441,11 +439,12 @@ async function readNPS(){
     const r = await fetch("/nps.json?t="+Date.now(), {signal: AbortSignal.timeout(5000)});
     if(!r.ok) throw new Error("nps.json not found");
     const j = await r.json();
+    // AskNicely returns {"NPS": 66.67} — uppercase key, rounded
     return{
-      score:      j.score      ?? j.nps       ?? null,
-      promoters:  j.promoters  ?? null,
-      passives:   j.passives   ?? null,
-      detractors: j.detractors ?? null,
+      score:      j.NPS        ?? j.score     ?? j.nps  ?? null,
+      promoters:  j.promoters  ?? j.Promoters ?? null,
+      passives:   j.passives   ?? j.Passives  ?? null,
+      detractors: j.detractors ?? j.Detractors?? null,
       total:      j.total      ?? j.responses ?? null,
     };
   }catch(e){
