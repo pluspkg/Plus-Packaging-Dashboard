@@ -196,7 +196,8 @@ const CFG = {
   tenantId:  "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
   scopes:    ["Files.Read.All","Sites.Read.All","User.Read"],
   driveId:   "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
-  itemId:    "017WW6KAHSQTDR3JIUONE2S3YXC4VFYIXY",
+  // Output folder ID — this never changes even when Data Dump.xlsx is replaced
+  outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
   crmDriveId:"b!i5Hc-ONWL0itcj80LwzWZcR8AThXm0ZGp1cGpxnFFzHgXYZeW5BdSY4z07lCyfHd",
   crmItemId: "01I3V64PJIGGMU4F52ZNHK345DDC5GM3FB",
 };
@@ -287,13 +288,19 @@ async function graph(url){
 //  READ DATA DUMP.XLSX
 // ================================================================
 async function readDataDump(){
-  // Use path-based lookup so it always finds the latest file regardless of ID
-  const fileBase="/drives/"+CFG.driveId+"/root:/General/Output/Data Dump.xlsx:";
-  const sheets=await graph(fileBase+"/workbook/worksheets");
+  // Step 1: List the Output folder contents to find current Data Dump.xlsx item ID
+  // The Output folder ID is stable even when the file is replaced by JET
+  const folderContents=await graph("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
+  const dumpFile=folderContents.value.find(f=>f.name==="Data Dump.xlsx");
+  if(!dumpFile) throw new Error("Data Dump.xlsx not found in Output folder");
+  const fileId=dumpFile.id;
+
+  // Step 2: Read worksheets using the current item ID
+  const sheets=await graph("/drives/"+CFG.driveId+"/items/"+fileId+"/workbook/worksheets");
   let flat=[];
   for(const sh of sheets.value){
     try{
-      const d=await graph(fileBase+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
+      const d=await graph("/drives/"+CFG.driveId+"/items/"+fileId+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
       if(d.values) flat=flat.concat(d.values.flat());
     }catch{}
   }
