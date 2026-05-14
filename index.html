@@ -4,13 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Plus Packaging – Sales Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{--nd:#0d1b38;--nm:#162040;--nc:#1c2b52;--nb:#243365;--or:#f47c20;--wh:#ffffff;--ow:#e8eef8;--mu:#7a95be;--gr:#34d399;--am:#fbbf24;--re:#f87171}
   body{background:var(--nd);font-family:"Segoe UI",system-ui,sans-serif;color:var(--wh);min-height:100vh;overflow-x:hidden}
   body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(var(--nb) 1px,transparent 1px);background-size:36px 36px;opacity:.28;pointer-events:none;z-index:0}
   body::after{content:"";position:fixed;top:-300px;right:-200px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(244,124,32,.14),transparent 65%);pointer-events:none;z-index:0}
-  #loginScreen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;background:var(--nd)}
+
+  /* LOGIN */
+  #loginScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;background:var(--nd)}
   .lcard{background:var(--nc);border:1px solid var(--nb);border-radius:20px;padding:44px 52px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5);max-width:480px;width:90%}
   .llogo{height:52px;margin-bottom:28px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
   .ltitle{font-size:22px;font-weight:700;margin-bottom:8px}
@@ -18,6 +21,8 @@
   .btnms{display:inline-flex;align-items:center;gap:10px;background:#0078d4;border:none;color:var(--wh);padding:13px 28px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:opacity .15s}
   .btnms:hover{opacity:.88}
   .lnote{font-size:11px;color:var(--mu);margin-top:18px;line-height:1.6}
+
+  /* HEADER */
   header{position:sticky;top:0;z-index:200;background:rgba(22,32,64,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--nb);box-shadow:0 4px 32px rgba(0,0,0,.4)}
   .hstr{height:3px;background:linear-gradient(90deg,var(--or),rgba(244,124,32,.3),transparent)}
   .hinn{display:flex;align-items:center;justify-content:space-between;padding:0 36px;height:70px}
@@ -43,8 +48,10 @@
   .btnr:disabled{opacity:.45;cursor:default;box-shadow:none}
   .btnso{background:transparent;border:1px solid var(--nb);color:var(--mu);padding:7px 14px;border-radius:8px;font-size:12px;cursor:pointer}
   .btnso:hover{border-color:var(--mu);color:var(--wh)}
-  main{position:relative;z-index:5;padding:30px 36px 56px;max-width:1400px;margin:0 auto}
-  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px}
+
+  /* MAIN */
+  main{position:relative;z-index:5;padding:28px 36px 56px;max-width:1400px;margin:0 auto}
+  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
   .sdt{font-size:13px;color:var(--mu)}
   .slv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
   .sdot{width:7px;height:7px;border-radius:50%;background:var(--gr);box-shadow:0 0 8px var(--gr);animation:pulse 2s ease-in-out infinite}
@@ -54,40 +61,64 @@
   .slbl{display:flex;align-items:center;gap:14px;margin-bottom:18px}
   .slbl span{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;white-space:nowrap}
   .slbll{flex:1;height:1px;background:linear-gradient(90deg,var(--nb),transparent)}
-  .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:14px;margin-bottom:34px}
-  .kcard{background:var(--nc);border:1px solid var(--nb);border-radius:16px;padding:22px 20px 18px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(22px);transition:opacity .45s ease,transform .45s ease}
+
+  /* ── HERO METRICS (Sales + PM) ── */
+  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+  @media(max-width:800px){.hero-grid{grid-template-columns:1fr}}
+  .hero-card{border-radius:18px;padding:28px 30px;position:relative;overflow:hidden;border:1px solid transparent;transition:opacity .5s ease,transform .5s ease;opacity:0;transform:translateY(20px)}
+  .hero-card.vis{opacity:1;transform:translateY(0)}
+  .hero-card.green{background:linear-gradient(135deg,#0d2e1a,#0f3d20);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.15)}
+  .hero-card.red{background:linear-gradient(135deg,#2e0d0d,#3d1010);border-color:rgba(248,113,113,.35);box-shadow:0 8px 40px rgba(248,113,113,.15)}
+  .hero-card.neutral{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .hero-glow{position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;pointer-events:none}
+  .hero-card.green .hero-glow{background:radial-gradient(circle,rgba(52,211,153,.2),transparent 70%)}
+  .hero-card.red .hero-glow{background:radial-gradient(circle,rgba(248,113,113,.2),transparent 70%)}
+  .hero-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;margin-bottom:14px;opacity:.7}
+  .hero-main{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+  .hero-value{font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1}
+  .hero-card.green .hero-value{color:var(--gr)}
+  .hero-card.red .hero-value{color:var(--re)}
+  .hero-card.neutral .hero-value{color:var(--or)}
+  .hero-target-block{text-align:right}
+  .hero-target-label{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.5px;font-family:monospace;margin-bottom:4px}
+  .hero-target-value{font-size:22px;font-weight:700;color:var(--ow);opacity:.85}
+  .hero-pct-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .hero-pct{font-size:28px;font-weight:800;letter-spacing:-1px}
+  .hero-card.green .hero-pct{color:var(--gr)}
+  .hero-card.red .hero-pct{color:var(--re)}
+  .hero-badge{padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .hero-card.green .hero-badge{background:rgba(52,211,153,.15);color:var(--gr);border:1px solid rgba(52,211,153,.3)}
+  .hero-card.red .hero-badge{background:rgba(248,113,113,.15);color:var(--re);border:1px solid rgba(248,113,113,.3)}
+  .hero-bar-track{height:6px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+  .hero-bar-fill{height:100%;border-radius:99px;width:0%;transition:width 1.3s cubic-bezier(.4,0,.2,1)}
+  .hero-card.green .hero-bar-fill{background:linear-gradient(90deg,#1a8a5a,var(--gr))}
+  .hero-card.red .hero-bar-fill{background:linear-gradient(90deg,#8a1a1a,var(--re))}
+  .hero-var{font-size:12px;margin-top:10px;opacity:.75}
+  .hero-card.green .hero-var{color:var(--gr)}
+  .hero-card.red .hero-var{color:var(--re)}
+
+  /* ── KPI CARDS ── */
+  .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px;margin-bottom:28px}
+  .kcard{background:var(--nc);border:1px solid var(--nb);border-radius:16px;padding:20px 18px 16px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(22px);transition:opacity .45s ease,transform .45s ease}
   .kcard.vis{opacity:1;transform:translateY(0)}
-  .kcard.ac{background:linear-gradient(145deg,var(--nc) 40%,rgba(244,124,32,.12));border-color:rgba(244,124,32,.35);box-shadow:0 8px 32px rgba(244,124,32,.15),0 2px 8px rgba(0,0,0,.3)}
+  .kcard.ac{background:linear-gradient(145deg,var(--nc) 40%,rgba(244,124,32,.12));border-color:rgba(244,124,32,.35);box-shadow:0 8px 32px rgba(244,124,32,.15)}
   .kcard.ac::before{content:"";position:absolute;top:-30px;right:-30px;width:100px;height:100px;border-radius:50%;background:rgba(244,124,32,.18)}
   .kcard.ac::after{content:"";position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--or),transparent)}
   .kico{font-size:20px;margin-bottom:10px;line-height:1}
-  .kval{font-size:27px;font-weight:800;color:var(--ow);letter-spacing:-.5px;line-height:1;margin-bottom:8px}
+  .kval{font-size:24px;font-weight:800;color:var(--ow);letter-spacing:-.5px;line-height:1;margin-bottom:7px}
   .kcard.ac .kval{color:var(--or)}
-  .klbl{font-size:10.5px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
-  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;margin-bottom:34px}
-  .pcard{background:var(--nc);border:1px solid var(--nb);border-radius:16px;padding:22px 24px;box-shadow:0 4px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .5s ease .5s}
-  .pcard.vis{opacity:1}
-  .ptop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
-  .plbl{font-size:14px;font-weight:700;color:var(--ow);margin-bottom:2px}
-  .psub{font-size:11px;color:var(--mu);font-style:italic;margin-bottom:4px}
-  .pvals{font-size:12px;color:var(--mu)}
-  .pvals em{color:var(--nb);margin:0 6px;font-style:normal}
-  .ppct{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1;text-align:right}
-  .psts{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-family:monospace;margin-top:2px;text-align:right}
-  .ptrk{height:8px;background:var(--nd);border-radius:99px;overflow:hidden;margin-bottom:6px}
-  .pfil{height:100%;border-radius:99px;width:0%;transition:width 1.3s cubic-bezier(.4,0,.2,1);position:relative}
-  .pfil::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15));border-radius:99px}
-  .ptks{display:flex;justify-content:space-between}
-  .ptks span{font-size:9px;color:var(--nb);font-family:monospace}
-  .fnote{display:flex;align-items:center;gap:12px;background:var(--nc);border:1px solid var(--nb);border-radius:12px;padding:13px 18px;font-size:12px;color:var(--mu);line-height:1.7;opacity:0;transition:opacity .5s ease .7s}
-  .fnote.vis{opacity:1}
-  .fico{width:28px;height:28px;border-radius:8px;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
+
+  /* LOAD/ERR */
   .lwrap{display:flex;flex-direction:column;align-items:center;padding:90px 0;gap:20px}
   .spin{width:44px;height:44px;border:3px solid var(--nc);border-top-color:var(--or);border-radius:50%;animation:spin .85s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   .ltxt{color:var(--mu);font-size:14px}
   .errb{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:16px 22px;color:#fca5a5;margin-bottom:28px;font-size:13px;line-height:1.8}
-  @media(max-width:700px){.hinn{padding:0 18px}main{padding:20px 18px 40px}.kgrid{grid-template-columns:repeat(2,1fr)}.pgrid{grid-template-columns:1fr}.arpl{display:none}}
+  .fnote{display:flex;align-items:center;gap:12px;background:var(--nc);border:1px solid var(--nb);border-radius:12px;padding:13px 18px;font-size:12px;color:var(--mu);line-height:1.7;opacity:0;transition:opacity .5s ease .8s}
+  .fnote.vis{opacity:1}
+  .fico{width:28px;height:28px;border-radius:8px;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  @media(max-width:700px){.hinn{padding:0 18px}main{padding:20px 18px 40px}.kgrid{grid-template-columns:repeat(2,1fr)}.arpl{display:none}}
   select option{background:#162040}
 </style>
 </head>
@@ -148,69 +179,79 @@
     </div>
     <div id="errb" class="errb" style="display:none"></div>
     <div id="lwrap" class="lwrap"><div class="spin"></div><div class="ltxt">Fetching live data from SharePoint&hellip;</div></div>
+
     <div id="content" style="display:none">
-      <div class="slbl"><span>Key Performance Indicators</span><div class="slbll"></div></div>
+
+      <!-- HERO: Sales + PM -->
+      <div class="slbl"><span>MTD Performance</span><div class="slbll"></div></div>
+      <div class="hero-grid">
+        <div class="hero-card neutral" id="heroSales">
+          <div class="hero-glow"></div>
+          <div class="hero-label">Sales MTD</div>
+          <div class="hero-main">
+            <div class="hero-value" id="hSalesVal">&#8212;</div>
+            <div class="hero-target-block">
+              <div class="hero-target-label">MTD Target</div>
+              <div class="hero-target-value" id="hSalesTgt">&#8212;</div>
+            </div>
+          </div>
+          <div class="hero-pct-row">
+            <div class="hero-pct" id="hSalesPct">&#8212;</div>
+            <div class="hero-badge" id="hSalesBadge">&#8212;</div>
+          </div>
+          <div class="hero-bar-track"><div class="hero-bar-fill" id="hSalesBar"></div></div>
+          <div class="hero-var" id="hSalesVar"></div>
+        </div>
+        <div class="hero-card neutral" id="heroPM">
+          <div class="hero-glow"></div>
+          <div class="hero-label">Product Margin MTD</div>
+          <div class="hero-main">
+            <div class="hero-value" id="hPMVal">&#8212;</div>
+            <div class="hero-target-block">
+              <div class="hero-target-label">MTD Target</div>
+              <div class="hero-target-value" id="hPMTgt">&#8212;</div>
+            </div>
+          </div>
+          <div class="hero-pct-row">
+            <div class="hero-pct" id="hPMPct">&#8212;</div>
+            <div class="hero-badge" id="hPMBadge">&#8212;</div>
+          </div>
+          <div class="hero-bar-track"><div class="hero-bar-fill" id="hPMBar"></div></div>
+          <div class="hero-var" id="hPMVar"></div>
+        </div>
+      </div>
+
+      <!-- KPI CARDS -->
+      <div class="slbl"><span>Today's Activity</span><div class="slbll"></div></div>
       <div class="kgrid">
-        <div class="kcard ac"><div class="kico">&#128200;</div><div class="kval" id="k0">&#8212;</div><div class="klbl">Sales MTD</div></div>
-        <div class="kcard">   <div class="kico">&#128176;</div><div class="kval" id="k1">&#8212;</div><div class="klbl">Product Margin MTD</div></div>
-        <div class="kcard">   <div class="kico">&#127919;</div><div class="kval" id="k2">&#8212;</div><div class="klbl">Sales MTD Target</div></div>
-        <div class="kcard">   <div class="kico">&#128202;</div><div class="kval" id="k3">&#8212;</div><div class="klbl">PM MTD Target</div></div>
-        <div class="kcard ac"><div class="kico">&#128230;</div><div class="kval" id="k4">&#8212;</div><div class="klbl">Orders In Today</div></div>
-        <div class="kcard">   <div class="kico">&#128222;</div><div class="kval" id="k5">&#8212;</div><div class="klbl">Calls Today</div></div>
-        <div class="kcard">   <div class="kico">&#128197;</div><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div>
-        <div class="kcard ac"><div class="kico">&#129309;</div><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div>
+        <div class="kcard ac" data-i="0"><div class="kico">&#128230;</div><div class="kval" id="k4">&#8212;</div><div class="klbl">Orders In Today</div></div>
+        <div class="kcard"    data-i="1"><div class="kico">&#128222;</div><div class="kval" id="k5">&#8212;</div><div class="klbl">Calls Today</div></div>
+        <div class="kcard"    data-i="2"><div class="kico">&#128197;</div><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div>
+        <div class="kcard ac" data-i="3"><div class="kico">&#129309;</div><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div>
       </div>
-      <div class="slbl"><span>Performance vs MTD Target</span><div class="slbll"></div></div>
-      <div class="pgrid">
-        <div class="pcard" id="pb1">
-          <div class="ptop">
-            <div><div class="plbl">Sales MTD vs Sales MTD Target</div><div class="psub">Pro-rated target to today&apos;s working day</div><div class="pvals"><span id="p1v">&#8212;</span><em>/</em><span id="p1t">&#8212;</span></div></div>
-            <div><div class="ppct" id="p1p" style="color:var(--mu)">&#8212;</div><div class="psts" id="p1s"></div></div>
-          </div>
-          <div class="ptrk"><div class="pfil" id="p1f"></div></div>
-          <div class="ptks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
-        </div>
-        <div class="pcard" id="pb2">
-          <div class="ptop">
-            <div><div class="plbl">Product Margin vs PM MTD Target</div><div class="psub">Pro-rated target to today&apos;s working day</div><div class="pvals"><span id="p2v">&#8212;</span><em>/</em><span id="p2t">&#8212;</span></div></div>
-            <div><div class="ppct" id="p2p" style="color:var(--mu)">&#8212;</div><div class="psts" id="p2s"></div></div>
-          </div>
-          <div class="ptrk"><div class="pfil" id="p2f"></div></div>
-          <div class="ptks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
-        </div>
-      </div>
+
       <div class="fnote" id="fnote">
         <div class="fico">i</div>
-        <span>Live data from <strong style="color:var(--wh)">Data Dump.xlsx</strong> on SharePoint. Targets are <strong style="color:var(--wh)">MTD pro-rated to today</strong>. <span id="farN">Auto-refreshes every 5 minutes.</span></span>
+        <span>Live data from <strong style="color:var(--wh)">Data Dump.xlsx</strong> on SharePoint (Reports315 &rsaquo; General &rsaquo; Output). Targets read from cells C22 &amp; C23. <span id="farN">Auto-refreshes every 5 minutes.</span></span>
       </div>
     </div>
   </main>
 </div>
 
 <script>
-// ================================================================
-//  CONFIG
-// ================================================================
 const CFG = {
-  clientId:  "984139d6-9a6c-4da1-894d-34148ff1d570",
-  tenantId:  "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
-  scopes:    ["Files.Read.All","Sites.Read.All","User.Read"],
-  driveId:   "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
-  // Output folder ID — this never changes even when Data Dump.xlsx is replaced
+  clientId:       "984139d6-9a6c-4da1-894d-34148ff1d570",
+  tenantId:       "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
+  scopes:         ["Files.Read.All","Sites.Read.All","User.Read"],
+  driveId:        "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
   outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
-  crmDriveId:"b!i5Hc-ONWL0itcj80LwzWZcR8AThXm0ZGp1cGpxnFFzHgXYZeW5BdSY4z07lCyfHd",
-  crmItemId: "01I3V64PJIGGMU4F52ZNHK345DDC5GM3FB",
+  crmDriveId:     "b!i5Hc-ONWL0itcj80LwzWZcR8AThXm0ZGp1cGpxnFFzHgXYZeW5BdSY4z07lCyfHd",
+  crmItemId:      "01I3V64PJIGGMU4F52ZNHK345DDC5GM3FB",
 };
-
-// Redirect URI = exactly this page's URL, stripped of query/hash
-// This works whether running on localhost:8765 or anywhere else
 const REDIRECT_URI = location.origin + location.pathname;
-
 let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
 
-// ================================================================
-//  PKCE AUTH
-// ================================================================
+// ── AUTH ──────────────────────────────────────────────────────
 async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
 function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
 function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return b64url(a);}
@@ -219,11 +260,9 @@ async function signIn(){
   const btn=document.getElementById("signInBtn");
   btn.disabled=true;btn.textContent="Redirecting to Microsoft...";
   const ver=rnd(43),ch=b64url(await sha256(ver)),st=rnd(16);
-  sessionStorage.setItem("pkce_ver",ver);
-  sessionStorage.setItem("pkce_st",st);
+  sessionStorage.setItem("pkce_ver",ver);sessionStorage.setItem("pkce_st",st);
   const p=new URLSearchParams({
-    client_id:CFG.clientId,response_type:"code",
-    redirect_uri:REDIRECT_URI,
+    client_id:CFG.clientId,response_type:"code",redirect_uri:REDIRECT_URI,
     scope:CFG.scopes.join(" ")+" offline_access",
     code_challenge:ch,code_challenge_method:"S256",
     state:st,response_mode:"query",prompt:"select_account"
@@ -239,27 +278,21 @@ async function getToken(params){
   token=j.access_token;
   sessionStorage.setItem("tok",token);
   sessionStorage.setItem("exp",Date.now()+j.expires_in*1000);
-  sessionStorage.setItem("ruri",REDIRECT_URI);
   if(j.refresh_token) sessionStorage.setItem("rt",j.refresh_token);
 }
 
 async function handleCallback(code,state){
   if(state!==sessionStorage.getItem("pkce_st")){alert("Auth error. Please try again.");return;}
-  await getToken({
-    client_id:CFG.clientId,grant_type:"authorization_code",
-    code,redirect_uri:REDIRECT_URI,
-    code_verifier:sessionStorage.getItem("pkce_ver"),
-    scope:CFG.scopes.join(" ")
-  });
-  history.replaceState({},document.title,REDIRECT_URI);
-  showDash();
+  await getToken({client_id:CFG.clientId,grant_type:"authorization_code",code,
+    redirect_uri:REDIRECT_URI,code_verifier:sessionStorage.getItem("pkce_ver"),scope:CFG.scopes.join(" ")});
+  history.replaceState({},document.title,REDIRECT_URI);showDash();
 }
 
 async function ensureToken(){
   const exp=+sessionStorage.getItem("exp")||0;
-  if(Date.now()<exp-60000) return true;
+  if(Date.now()<exp-60000)return true;
   const rt=sessionStorage.getItem("rt");
-  if(!rt) return false;
+  if(!rt)return false;
   try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});return true;}
   catch{return false;}
 }
@@ -268,42 +301,48 @@ function signOut(){
   sessionStorage.clear();token=null;clearInterval(ticker);
   document.getElementById("dashScreen").style.display="none";
   document.getElementById("loginScreen").style.display="flex";
-  const btn=document.getElementById("signInBtn");
-  btn.disabled=false;btn.innerHTML='<svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg> Sign in with Microsoft';
 }
 
-// ================================================================
-//  GRAPH
-// ================================================================
-async function graph(url){
-  if(!await ensureToken()){signOut();throw new Error("Session expired — please sign in again.");}
+// ── GRAPH ─────────────────────────────────────────────────────
+async function graphJSON(url){
+  if(!await ensureToken()){signOut();throw new Error("Session expired.");}
   const r=await fetch("https://graph.microsoft.com/v1.0"+url,
     {headers:{Authorization:"Bearer "+(token||sessionStorage.getItem("tok"))}});
   if(r.status===401){signOut();throw new Error("Session expired.");}
-  if(!r.ok) throw new Error("Graph "+r.status+": "+r.statusText);
+  if(!r.ok)throw new Error("Graph "+r.status+": "+r.statusText);
   return r.json();
 }
 
-// ================================================================
-//  READ DATA DUMP.XLSX
-// ================================================================
-async function readDataDump(){
-  // Step 1: List the Output folder contents to find current Data Dump.xlsx item ID
-  // The Output folder ID is stable even when the file is replaced by JET
-  const folderContents=await graph("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
-  const dumpFile=folderContents.value.find(f=>f.name==="Data Dump.xlsx");
-  if(!dumpFile) throw new Error("Data Dump.xlsx not found in Output folder");
-  const fileId=dumpFile.id;
+// ── EXCEL DOWNLOAD + PARSE ────────────────────────────────────
+async function downloadAndParse(driveId, itemId){
+  const meta=await graphJSON("/drives/"+driveId+"/items/"+itemId);
+  const url=meta["@microsoft.graph.downloadUrl"];
+  if(!url)throw new Error("No download URL");
+  const r=await fetch(url);
+  if(!r.ok)throw new Error("Download failed: "+r.status);
+  const buf=await r.arrayBuffer();
+  return XLSX.read(buf,{type:"array"});
+}
 
-  // Step 2: Read worksheets using the current item ID
-  const sheets=await graph("/drives/"+CFG.driveId+"/items/"+fileId+"/workbook/worksheets");
-  let flat=[];
-  for(const sh of sheets.value){
-    try{
-      const d=await graph("/drives/"+CFG.driveId+"/items/"+fileId+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
-      if(d.values) flat=flat.concat(d.values.flat());
-    }catch{}
-  }
+// ── READ DATA DUMP ─────────────────────────────────────────────
+async function readDataDump(){
+  // Find latest Data Dump.xlsx in the Output folder
+  const folder=await graphJSON("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
+  const file=folder.value.find(f=>f.name==="Data Dump.xlsx");
+  if(!file)throw new Error("Data Dump.xlsx not found in Output folder");
+
+  const wb=await downloadAndParse(CFG.driveId,file.id);
+
+  // Read Sheet1 (index 0) for labelled values
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+  const flat=rows.flat();
+
+  // Read C22 and C23 directly for MTD targets (row 21 and 22, col 2, 0-indexed)
+  const salesTarget = rows[21] && rows[21][2] != null ? Math.abs(Number(rows[21][2])) : null;
+  const pmTarget    = rows[22] && rows[22][2] != null ? Math.abs(Number(rows[22][2])) : null;
+
+  // Label scan for actuals
   const find=(...labels)=>{
     for(const lbl of labels){
       const lo=lbl.toLowerCase();
@@ -312,10 +351,10 @@ async function readDataDump(){
         if(typeof cell==="string"&&cell.toLowerCase().includes(lo)){
           for(let j=i+1;j<Math.min(i+10,flat.length);j++){
             const v=flat[j];
-            if(typeof v==="number"&&v!==0) return Math.abs(v);
+            if(typeof v==="number"&&v!==0)return Math.abs(v);
             if(typeof v==="string"&&v.trim()!==""){
               const n=parseFloat(v.replace(/[^0-9.-]/g,""));
-              if(!isNaN(n)&&n!==0) return Math.abs(n);
+              if(!isNaN(n)&&n!==0)return Math.abs(n);
             }
           }
         }
@@ -323,38 +362,35 @@ async function readDataDump(){
     }
     return null;
   };
+
   return{
     sales:       find("Total Sales"),
     pm:          find("Total Margin","Product Margin","Total PM"),
-    salesTarget: find("Sales MTD TARGET","MTD TARGET","Booked Target"),
-    pmTarget:    find("PM MTD Target","PM MTD","Margin MTD Target"),
+    salesTarget,
+    pmTarget,
     ordersToday: find("Orders in Today","Orders Today","Orders In Today"),
   };
 }
 
-// ================================================================
-//  READ CRM KPIs
-// ================================================================
+// ── READ CRM ──────────────────────────────────────────────────
 async function readCRM(){
   try{
-    // Use path-based lookup for CRM file too
-    const crmBase="/drives/"+CFG.crmDriveId+"/root:/MD Development/Dashboards/Sales Dashboard .xlsx:";
-    const sheets=await graph(crmBase+"/workbook/worksheets");
-    let flat=[];
-    for(const sh of sheets.value){
-      try{
-        const d=await graph(crmBase+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
-        if(d.values) flat=flat.concat(d.values.flat());
-      }catch{}
+    // Find latest CRM file
+    const meta=await graphJSON("/drives/"+CFG.crmDriveId+"/items/"+CFG.crmItemId);
+    const wb=await downloadAndParse(CFG.crmDriveId,CFG.crmItemId);
+    const flat=[];
+    for(const n of wb.SheetNames){
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:""});
+      flat.push(...rows.flat());
     }
     const fv=(...lbls)=>{
       for(const lbl of lbls){
         const lo=lbl.toLowerCase();
         const i=flat.findIndex(c=>typeof c==="string"&&c.toLowerCase().includes(lo));
-        if(i<0) continue;
+        if(i<0)continue;
         for(let j=i+1;j<Math.min(i+6,flat.length);j++){
           const v=flat[j];
-          if(typeof v==="number") return v;
+          if(typeof v==="number")return v;
           if(typeof v==="string"){const n=parseFloat(v);if(!isNaN(n))return n;}
         }
       }
@@ -364,41 +400,48 @@ async function readCRM(){
   }catch{return{callsToday:null,apptToday:null,dealsToday:null};}
 }
 
-// ================================================================
-//  RENDER
-// ================================================================
+// ── RENDER ────────────────────────────────────────────────────
 const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
 const INT=v=>(v==null||isNaN(+v))?"—":Number(v).toLocaleString("en-GB");
-const pc=p=>p>=100?"var(--gr)":p>=75?"var(--am)":"var(--re)";
-const ps=p=>p>=100?"Target Met ✓":p>=75?"On Track":"Below Target";
 
-function setPBar(px,val,tgt){
-  const p=val&&tgt?Math.min(100,(val/tgt)*100):null,c=p!=null?pc(p):"var(--mu)";
-  document.getElementById(px+"v").textContent=val!=null?GBP(val):"—";
-  document.getElementById(px+"t").textContent=tgt!=null?GBP(tgt):"—";
-  document.getElementById(px+"p").textContent=p!=null?p.toFixed(1)+"%":"—";
-  document.getElementById(px+"p").style.color=c;
-  document.getElementById(px+"s").textContent=p!=null?ps(p):"";
-  document.getElementById(px+"s").style.color=c;
-  setTimeout(()=>{const f=document.getElementById(px+"f");f.style.background=c;f.style.width=(p??0)+"%";},350);
+function renderHero(cardId,valId,tgtId,pctId,badgeId,barId,varId,value,target){
+  const card=document.getElementById(cardId);
+  const pct=value&&target?Math.min(100,(value/target)*100):null;
+  const onTarget=pct!=null&&pct>=100;
+  const col=pct==null?"neutral":onTarget?"green":"red";
+
+  card.className="hero-card "+col+" vis";
+  document.getElementById(valId).textContent=GBP(value);
+  document.getElementById(tgtId).textContent=GBP(target);
+  document.getElementById(pctId).textContent=pct!=null?pct.toFixed(1)+"%":"—";
+  document.getElementById(badgeId).textContent=pct==null?"—":onTarget?"On Target ✓":"Below Target";
+
+  // Variance
+  if(value!=null&&target!=null){
+    const diff=value-target;
+    const sign=diff>=0?"+":"";
+    document.getElementById(varId).textContent=sign+GBP(diff)+" vs MTD Target";
+  }
+
+  // Animate bar
+  setTimeout(()=>{document.getElementById(barId).style.width=(pct??0)+"%";},400);
 }
 
 function render(d){
-  document.getElementById("k0").textContent=GBP(d.sales);
-  document.getElementById("k1").textContent=GBP(d.pm);
-  document.getElementById("k2").textContent=GBP(d.salesTarget);
-  document.getElementById("k3").textContent=GBP(d.pmTarget);
+  // Hero cards
+  renderHero("heroSales","hSalesVal","hSalesTgt","hSalesPct","hSalesBadge","hSalesBar","hSalesVar",d.sales,d.salesTarget);
+  renderHero("heroPM","hPMVal","hPMTgt","hPMPct","hPMBadge","hPMBar","hPMVar",d.pm,d.pmTarget);
+
+  // KPI cards
   document.getElementById("k4").textContent=GBP(d.ordersToday);
   document.getElementById("k5").textContent=INT(d.callsToday);
   document.getElementById("k6").textContent=INT(d.apptToday);
   document.getElementById("k7").textContent=INT(d.dealsToday);
-  setPBar("p1",d.sales,d.salesTarget);
-  setPBar("p2",d.pm,d.pmTarget);
+
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  document.querySelectorAll(".kcard").forEach((c,i)=>setTimeout(()=>c.classList.add("vis"),i*55));
-  document.querySelectorAll(".pcard").forEach(c=>c.classList.add("vis"));
+  document.querySelectorAll(".kcard").forEach((c,i)=>setTimeout(()=>c.classList.add("vis"),i*80));
   document.getElementById("fnote").classList.add("vis");
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
@@ -416,7 +459,7 @@ async function fetchData(){
   document.getElementById("btnr").textContent="Loading…";
   document.getElementById("lwrap").style.display="flex";
   document.getElementById("content").style.display="none";
-  document.querySelectorAll(".kcard,.pcard").forEach(c=>c.classList.remove("vis"));
+  document.querySelectorAll(".kcard").forEach(c=>c.classList.remove("vis"));
   document.getElementById("fnote").classList.remove("vis");
   try{
     const[dd,crm]=await Promise.all([readDataDump(),readCRM()]);
@@ -437,9 +480,7 @@ async function fetchData(){
   }
 }
 
-// ================================================================
-//  AUTO-REFRESH
-// ================================================================
+// ── AUTO-REFRESH ──────────────────────────────────────────────
 function restartCd(){
   clearInterval(ticker);if(!autoOn)return;
   cdSecs=intMins*60;updCd();
@@ -462,9 +503,7 @@ function toggleAuto(){
 }
 function changeInt(){intMins=parseInt(document.getElementById("asel").value);restartCd();}
 
-// ================================================================
-//  BOOT — auto-detects redirect URI so works anywhere
-// ================================================================
+// ── BOOT ──────────────────────────────────────────────────────
 function showDash(){
   document.getElementById("loginScreen").style.display="none";
   document.getElementById("dashScreen").style.display="block";
@@ -479,13 +518,9 @@ async function boot(){
   const t=sessionStorage.getItem("tok"),exp=+sessionStorage.getItem("exp")||0;
   if(t&&Date.now()<exp-30000){token=t;showDash();return;}
   const rt=sessionStorage.getItem("rt");
-  if(rt){
-    try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});showDash();return;}
-    catch{}
-  }
+  if(rt){try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});showDash();return;}catch{}}
   document.getElementById("loginScreen").style.display="flex";
 }
-
 boot();
 </script>
 </body>
