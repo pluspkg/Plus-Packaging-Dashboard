@@ -17,11 +17,10 @@ jobs:
       - name: Fetch AskNicely NPS
         run: |
           curl -s \
-            -H "X-apikey: 97f1e4aadabd14297917a05fd1d39eb2363a55f5b8e" \
-            "https://pluspackaging.asknice.ly/api/v1/getnps" \
+            -H "X-apikey: ${{ secrets.ASKNICELY_API_KEY }}" \
+            "https://pluspackaging.asknice.ly/api/v1/getnps?days=30" \
             -o nps.json
-          echo "NPS data fetched:"
-          cat nps.json
+          echo "NPS fetched"
 
       - name: Commit and push nps.json
         run: |
