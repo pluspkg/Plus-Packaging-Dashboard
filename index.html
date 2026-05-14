@@ -196,7 +196,7 @@ const CFG = {
   tenantId:  "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
   scopes:    ["Files.Read.All","Sites.Read.All","User.Read"],
   driveId:   "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
-  itemId:    "017WW6KAFR3WTIFUWQZVAZPOFGUICPGLDL",
+  itemId:    "017WW6KAHSQTDR3JIUONE2S3YXC4VFYIXY",
   crmDriveId:"b!i5Hc-ONWL0itcj80LwzWZcR8AThXm0ZGp1cGpxnFFzHgXYZeW5BdSY4z07lCyfHd",
   crmItemId: "01I3V64PJIGGMU4F52ZNHK345DDC5GM3FB",
 };
@@ -287,11 +287,13 @@ async function graph(url){
 //  READ DATA DUMP.XLSX
 // ================================================================
 async function readDataDump(){
-  const sheets=await graph("/drives/"+CFG.driveId+"/items/"+CFG.itemId+"/workbook/worksheets");
+  // Use path-based lookup so it always finds the latest file regardless of ID
+  const fileBase="/drives/"+CFG.driveId+"/root:/General/Output/Data Dump.xlsx:";
+  const sheets=await graph(fileBase+"/workbook/worksheets");
   let flat=[];
   for(const sh of sheets.value){
     try{
-      const d=await graph("/drives/"+CFG.driveId+"/items/"+CFG.itemId+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
+      const d=await graph(fileBase+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
       if(d.values) flat=flat.concat(d.values.flat());
     }catch{}
   }
@@ -328,11 +330,13 @@ async function readDataDump(){
 // ================================================================
 async function readCRM(){
   try{
-    const sheets=await graph("/drives/"+CFG.crmDriveId+"/items/"+CFG.crmItemId+"/workbook/worksheets");
+    // Use path-based lookup for CRM file too
+    const crmBase="/drives/"+CFG.crmDriveId+"/root:/MD Development/Dashboards/Sales Dashboard .xlsx:";
+    const sheets=await graph(crmBase+"/workbook/worksheets");
     let flat=[];
     for(const sh of sheets.value){
       try{
-        const d=await graph("/drives/"+CFG.crmDriveId+"/items/"+CFG.crmItemId+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
+        const d=await graph(crmBase+"/workbook/worksheets('"+encodeURIComponent(sh.name)+"')/usedRange");
         if(d.values) flat=flat.concat(d.values.flat());
       }catch{}
     }
