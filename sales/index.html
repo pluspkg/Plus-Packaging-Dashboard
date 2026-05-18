@@ -91,15 +91,15 @@
   .hero-var{font-size:12px;margin-top:8px;opacity:.75}
   .hero-card.green .hero-var{color:var(--gr)}
   .hero-card.red .hero-var{color:var(--re)}
-  .nps-card{background:linear-gradient(135deg,#1a1040,#241558);border:1px solid rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.15);border-radius:18px;padding:28px 30px;opacity:0;transform:translateY(20px);transition:opacity .5s ease .1s,transform .5s ease .1s;display:flex;flex-direction:column;justify-content:center}
+  .nps-card{background:linear-gradient(135deg,#1a1040,#241558);border:1px solid rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.15);border-radius:18px;padding:16px 22px;opacity:0;transform:translateY(20px);transition:opacity .5s ease .1s,transform .5s ease .1s;display:flex;flex-direction:row;align-items:center;gap:20px}
   .nps-card.vis{opacity:1;transform:translateY(0)}
-  .nps-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:6px}
-  .nps-sub{font-size:12px;color:var(--mu);margin-bottom:20px}
-  .nps-score{font-size:80px;font-weight:800;letter-spacing:-4px;line-height:1;color:var(--pu)}
-  .nps-period{font-size:11px;color:var(--mu);margin-top:8px;font-style:italic}
-  .bottom-grid{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px}
-  @media(max-width:1000px){.bottom-grid{grid-template-columns:1fr}}
-  .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .nps-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:2px}
+  .nps-sub{font-size:11px;color:var(--mu)}
+  .nps-score{font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--pu);flex-shrink:0}
+  .nps-period{font-size:10px;color:var(--mu);margin-top:2px;font-style:italic}
+  .nps-text{display:flex;flex-direction:column;}
+  .bottom-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:20px}
+  .kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   .kcard{background:var(--nc);border:1px solid var(--nb);border-radius:16px;padding:24px 22px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:18px}
   .kcard.vis{opacity:1;transform:translateY(0)}
   .kcard.ac{background:linear-gradient(135deg,var(--nc) 40%,rgba(244,124,32,.1));border-color:rgba(244,124,32,.35)}
@@ -231,24 +231,19 @@
       <div class="slbl"><span>Customer Experience &amp; Today's Activity</span><div class="slbll"></div></div>
       <div class="bottom-grid">
         <div class="nps-card" id="npsCard">
-          <div class="nps-label">NPS Score</div>
-          <div class="nps-sub" id="npsSub">Loading&hellip;</div>
           <div class="nps-score" id="npsScore">&#8212;</div>
-          <div class="nps-period">Last 30 days &bull; AskNicely</div>
+          <div class="nps-text">
+            <div class="nps-label">NPS Score</div>
+            <div class="nps-sub" id="npsSub">Loading&hellip;</div>
+            <div class="nps-period">Last 30 days &bull; AskNicely</div>
+          </div>
         </div>
         <div class="kgrid">
           <div class="kcard ac" id="kc0"><div class="kico">&#128222;</div><div class="kinfo"><div class="kval" id="k5">&#8212;</div><div class="klbl">Calls Today</div></div></div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
           <div class="kcard"    id="kc3"><div class="kico">&#128200;</div><div class="kinfo"><div class="kval" id="k8">&#8212;</div><div class="klbl">Orders In Today</div></div></div>
-        </div>
-      </div>
-
-      <div class="slbl"><span>Shipped Today</span><div class="slbll"></div></div>
-      <div class="orders-row">
-        <div class="ocard ac" id="oc0">
-          <div class="kico">&#128666;</div>
-          <div class="kinfo"><div class="kval" id="k9">&#8212;</div><div class="klbl">Shipped Today</div></div>
+          <div class="kcard ac" id="kc4"><div class="kico">&#128666;</div><div class="kinfo"><div class="kval" id="k9">&#8212;</div><div class="klbl">Shipped Today</div></div></div>
         </div>
       </div>
 
@@ -417,7 +412,7 @@ function render(d){
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["kc0","kc1","kc2","kc3","oc0"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
+  ["kc0","kc1","kc2","kc3","kc4"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
   document.getElementById("fnote").classList.add("vis");
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
