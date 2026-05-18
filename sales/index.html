@@ -47,20 +47,20 @@
   .btnso:hover{border-color:var(--mu);color:var(--wh)}
   .btnhome{background:transparent;border:1px solid var(--nb);color:var(--mu);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
   .btnhome:hover{border-color:var(--mu);color:var(--wh)}
-  main{position:relative;z-index:5;padding:18px 36px 24px;max-width:1400px;margin:0 auto}
-  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  main{position:relative;z-index:5;padding:12px 36px 16px;max-width:1400px;margin:0 auto}
+  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .sdt{font-size:12px;color:var(--mu)}
   .slv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
   .sdot{width:7px;height:7px;border-radius:50%;background:var(--gr);box-shadow:0 0 8px var(--gr);animation:pulse 2s ease-in-out infinite}
   .sdot.ld{background:var(--am);box-shadow:0 0 8px var(--am)}
   .sdot.er{background:var(--re);box-shadow:0 0 8px var(--re);animation:none}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-  .slbl{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .slbl{display:flex;align-items:center;gap:14px;margin-bottom:10px}
   .slbl span{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;white-space:nowrap}
   .slbll{flex:1;height:1px;background:linear-gradient(90deg,var(--nb),transparent)}
-  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
   @media(max-width:900px){.hero-grid{grid-template-columns:1fr}}
-  .hero-card{border-radius:16px;padding:22px 24px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+  .hero-card{border-radius:16px;padding:18px 22px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
   .hero-card.vis{opacity:1;transform:translateY(0)}
   .hero-card.green{background:linear-gradient(135deg,#0d2e1a,#0f3d20);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.15)}
   .hero-card.red{background:linear-gradient(135deg,#2e0d0d,#3d1010);border-color:rgba(248,113,113,.35);box-shadow:0 8px 40px rgba(248,113,113,.15)}
@@ -98,8 +98,8 @@
   .nps-score{font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--pu);flex-shrink:0}
   .nps-period{font-size:10px;color:var(--mu);margin-top:2px;font-style:italic}
   .nps-text{display:flex;flex-direction:column;}
-  .bottom-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}
-  .kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .bottom-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
+  .kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .kcard{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:18px 20px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:16px}
   .kcard.vis{opacity:1;transform:translateY(0)}
   .kcard.ac{background:linear-gradient(135deg,var(--nc) 40%,rgba(244,124,32,.1));border-color:rgba(244,124,32,.35)}
