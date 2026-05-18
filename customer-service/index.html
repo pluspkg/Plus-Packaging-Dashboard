@@ -290,10 +290,12 @@
 
       </div>
 
-      <!-- NPS -->
+      <!-- NPS + Leaderboards -->
       <div class="slbl"><span>Customer Experience</span><div class="slbll"></div></div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;align-items:flex-start;">
-        <div style="min-width:280px;">
+
+        <!-- NPS -->
+        <div style="min-width:240px;">
           <div class="stat-card nps" id="sc3">
             <div class="stat-label">NPS Score</div>
             <div class="stat-sub" id="sNpsSub">Loading&hellip;</div>
@@ -301,21 +303,32 @@
             <div class="stat-period">Last 30 days &bull; AskNicely</div>
           </div>
         </div>
-        <div style="flex:1;min-width:300px;">
-          <div class="stat-label" style="margin-bottom:14px;">Order Processors Today</div>
+
+        <!-- Order Processors -->
+        <div style="flex:1;min-width:260px;">
+          <div class="stat-label" style="margin-bottom:10px;">Order Processors Today</div>
           <div class="lb-card" id="sc4">
             <div class="lb-total" id="lbTotal">&#8212;</div>
             <div class="lb-total-label">Total Orders Processed Today</div>
-            <div class="lb-list" id="lbList">
-              <div class="lb-empty">Loading&hellip;</div>
-            </div>
+            <div class="lb-list" id="lbList"><div class="lb-empty">Loading&hellip;</div></div>
           </div>
         </div>
+
+        <!-- Calls by Person -->
+        <div style="flex:1;min-width:260px;">
+          <div class="stat-label" style="margin-bottom:10px;">Top Callers Today</div>
+          <div class="lb-card" id="sc5" style="border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.1);">
+            <div class="lb-total" id="rcTotal" style="color:var(--cy);">&#8212;</div>
+            <div class="lb-total-label">Total Inbound Calls Today</div>
+            <div class="lb-list" id="rcList"><div class="lb-empty">Loading&hellip;</div></div>
+          </div>
+        </div>
+
       </div>
 
       <div class="fnote" id="fnote">
         <div class="fico">i</div>
-        <span>Sales &amp; targets from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (SALES sheet). Order processors from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (Customer Service sheet). OTIF from <strong style="color:var(--wh)">OTIF Report.xlsx</strong>. Catalogue stock from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (OPS sheet). NPS via GitHub Actions every 30 mins. <span id="farN">Auto-refreshes every 5 minutes.</span></span>
+        <span>Sales &amp; targets from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (SALES sheet). Order processors from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (Customer Service sheet). OTIF from <strong style="color:var(--wh)">OTIF Report.xlsx</strong>. Catalogue stock from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (OPS sheet). Inbound calls from <strong style="color:var(--wh)">RingCentral</strong> via Cloudflare Worker. NPS via GitHub Actions every 30 mins. <span id="farN">Auto-refreshes every 5 minutes.</span></span>
       </div>
     </div>
   </main>
@@ -474,6 +487,15 @@ async function readOTIF(){
   }catch(e){console.warn("OTIF:",e.message);return{otif:null};}
 }
 
+async function readCallsByPerson(){
+  try{
+    const r=await fetch("https://rc-answer-time.darren-clayson.workers.dev/calls-by-person",{signal:AbortSignal.timeout(8000)});
+    if(!r.ok)throw new Error("RC worker "+r.status);
+    const j=await r.json();
+    return{rcTotal:j.total??null,rcTop3:j.top3??[]};
+  }catch(e){console.warn("RingCentral calls-by-person:",e.message);return{rcTotal:null,rcTop3:[]};}
+}
+
 async function readNPS(){
   try{
     const r=await fetch("../nps.json?t="+Date.now(),{signal:AbortSignal.timeout(5000)});
@@ -537,11 +559,27 @@ function render(d){
     lbList.innerHTML='<div class="lb-empty">No orders processed yet today</div>';
   }
 
+  // RingCentral calls by person leaderboard
+  document.getElementById("rcTotal").textContent=d.rcTotal!=null?d.rcTotal:"—";
+  const rcList=document.getElementById("rcList");
+  const ranks=["gold","silver","bronze"];
+  const medals=["🥇","🥈","🥉"];
+  if(d.rcTop3&&d.rcTop3.length>0){
+    rcList.innerHTML=d.rcTop3.map((p,i)=>`
+      <div class="lb-row">
+        <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-count" style="color:var(--cy)">${p.count}</div><div class="lb-orders-lbl">calls</div>
+      </div>`).join("");
+  }else{
+    rcList.innerHTML='<div class="lb-empty">No inbound calls yet today</div>';
+  }
+
   // Show content
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["sc0","sc1","sc2","sc3","sc4"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
+  ["sc0","sc1","sc2","sc3","sc4","sc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
   document.getElementById("fnote").classList.add("vis");
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
@@ -556,8 +594,8 @@ async function fetchData(){
   document.querySelectorAll(".hero-card,.stat-card").forEach(c=>c.classList.remove("vis"));
   document.getElementById("fnote").classList.remove("vis");
   try{
-    const[dd,otif,nps]=await Promise.all([readDataDump(),readOTIF(),readNPS()]);
-    render({...dd,...otif,...nps});setStatus("ok");document.getElementById("errb").style.display="none";
+    const[dd,otif,nps,rc]=await Promise.all([readDataDump(),readOTIF(),readNPS(),readCallsByPerson()]);
+    render({...dd,...otif,...nps,...rc});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
