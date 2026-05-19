@@ -128,14 +128,16 @@
     }
 
     .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.2s; }
 
     .card:hover {
       transform: translateY(-5px);
       box-shadow: 0 14px 36px rgba(45,58,122,0.13);
     }
 
-    .card--sales:hover { border-color: var(--amber); }
-    .card--cs:hover    { border-color: var(--navy); }
+    .card--sales:hover      { border-color: var(--amber); }
+    .card--cs:hover         { border-color: var(--navy); }
+    .card--warehouse:hover  { border-color: #34d399; }
 
     .card-top {
       background: var(--navy);
@@ -145,7 +147,8 @@
       gap: 14px;
     }
 
-    .card--cs .card-top { background: var(--navy-dark); }
+    .card--cs .card-top        { background: var(--navy-dark); }
+    .card--warehouse .card-top { background: #0f3d20; }
 
     .card-icon {
       width: 42px;
@@ -297,13 +300,16 @@
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">Month-to-date sales performance, margin, CRM activity, orders in, and NPS score.</p>
+          <p class="card-desc">Month-to-date sales &amp; margin vs target, NPS score, margin %, CRM calls/deals/appointments, orders in and shipped today.</p>
           <div class="card-tags">
             <span class="tag">MTD Sales</span>
             <span class="tag">Margin</span>
-            <span class="tag">Orders In</span>
+            <span class="tag">Margin %</span>
             <span class="tag">NPS</span>
             <span class="tag">CRM</span>
+            <span class="tag">Orders In</span>
+            <span class="tag">Shipped Today</span>
+            <span class="tag">New Customers</span>
           </div>
         </div>
         <div class="card-cta">
@@ -323,11 +329,40 @@
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">NPS score and RingCentral average answer time for the main line.</p>
+          <p class="card-desc">MTD sales &amp; margin, NPS, OTIF, catalogue in stock, orders in, top inbound callers and order processors today.</p>
           <div class="card-tags">
+            <span class="tag">MTD Sales</span>
             <span class="tag">NPS</span>
-            <span class="tag">Avg Answer Time</span>
-            <span class="tag">RingCentral</span>
+            <span class="tag">OTIF</span>
+            <span class="tag">Catalogue Stock</span>
+            <span class="tag">Top Callers</span>
+            <span class="tag">Order Processors</span>
+          </div>
+        </div>
+        <div class="card-cta">
+          Open Dashboard
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+      <a class="card card--warehouse" href="./warehouse/">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+          <div>
+            <div class="card-num">Dashboard 03</div>
+            <div class="card-title">Warehouse</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="card-desc">MTD sales &amp; margin, orders processed today, total shipments, and top pickers leaderboard.</p>
+          <div class="card-tags">
+            <span class="tag">MTD Sales</span>
+            <span class="tag">Margin</span>
+            <span class="tag">Orders Processed</span>
+            <span class="tag">Shipments</span>
+            <span class="tag">Top Pickers</span>
           </div>
         </div>
         <div class="card-cta">
