@@ -415,7 +415,7 @@ async function readCRM(){
     const to=todayEnd.toISOString();
 
     // ── PHONE CALLS — outbound, today, Meaningful Sales Interaction = Yes ──
-    const MEANINGFUL_FIELD = "new_leadapp"; // Meaningful Sales Interaction
+    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction"; // Meaningful Sales Interaction
     const callsRes = await dynFetch(
       `/phonecalls?$select=activityid,subject,${MEANINGFUL_FIELD},_ownerid_value&$expand=ownerid($select=fullname)`+
       `&$filter=directioncode eq true`+
@@ -449,7 +449,7 @@ async function readCRM(){
     // ── APPOINTMENTS ──
     // Filter: today, Customer Expecting = Yes
     // PLACEHOLDER field name: replace 'cr9b2_customerexpecting' with actual field name from IT
-    const CUSTOMER_EXPECTING_FIELD = "new_meaningfulsalesinteraction"; // Customer Expecting
+    const CUSTOMER_EXPECTING_FIELD = "new_fixed"; // Customer Expecting
     const apptRes = await dynFetch(
       `/appointments?$select=activityid,subject,${CUSTOMER_EXPECTING_FIELD}`+
       `&$filter=scheduledstart ge ${from} and scheduledstart le ${to}`+
