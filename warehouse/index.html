@@ -101,17 +101,20 @@
   .hero-card.red .hero-var{color:var(--re)}
 
   /* Stat cards */
-  .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
-  .stat-card{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  .stat-card{border-radius:14px;padding:14px 18px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
   .stat-card.vis{opacity:1;transform:translateY(0)}
   .stat-card.orders{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
   .stat-card.shipped{background:linear-gradient(135deg,#0d2234,#0f3045);border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.12)}
+  .stat-card.shipped-sales{background:linear-gradient(135deg,#0d2e1a,#0f3d20);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.12)}
+  .stat-card.shipped-sales.red{background:linear-gradient(135deg,#2e0d0d,#3d1010);border-color:rgba(248,113,113,.35);box-shadow:0 8px 40px rgba(248,113,113,.12)}
   .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:3px}
-  .stat-sub{font-size:11px;color:var(--mu);margin-bottom:10px}
-  .stat-value{font-size:56px;font-weight:800;letter-spacing:-3px;line-height:1}
-  .stat-period{font-size:10px;color:var(--mu);margin-top:4px;font-style:italic}
+  .stat-sub{font-size:11px;color:var(--mu);margin-bottom:8px}
+  .stat-value{font-size:42px;font-weight:800;letter-spacing:-2px;line-height:1}
   .stat-card.orders .stat-value{color:var(--or)}
   .stat-card.shipped .stat-value{color:var(--cy)}
+  .stat-card.shipped-sales .stat-value{color:var(--gr)}
+  .stat-card.shipped-sales.red .stat-value{color:var(--re)}
 
   /* Leaderboard */
   .lb-card{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:14px 18px;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
@@ -250,13 +253,20 @@
           <div class="stat-label">Orders Processed Today</div>
           <div class="stat-sub">Total orders handled</div>
           <div class="stat-value" id="sOrders">&#8212;</div>
-          <div class="stat-period">Data Dump &bull; Customer Service sheet</div>
         </div>
         <div class="stat-card shipped" id="sc1">
           <div class="stat-label">Total Shipments Today</div>
           <div class="stat-sub">Dispatched today</div>
           <div class="stat-value" id="sShipped">&#8212;</div>
-          <div class="stat-period">Data Dump &bull; OPS sheet C7</div>
+        </div>
+        <div class="stat-card shipped-sales" id="sc3">
+          <div class="stat-label">Shipped Today</div>
+          <div class="stat-sub" id="sShippedSalesSub">vs daily target</div>
+          <div class="stat-value" id="sShippedSales">&#8212;</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+            <div style="font-size:18px;font-weight:800;letter-spacing:-0.5px;" id="sShippedPct">&#8212;</div>
+            <div style="font-size:10px;color:var(--mu);font-family:'Courier New',monospace;" id="sShippedTgt"></div>
+          </div>
         </div>
       </div>
 
@@ -346,6 +356,8 @@ async function readDataDump(){
   const rowsSales=XLSX.utils.sheet_to_json(wsSales,{header:1,defval:""});
   const salesTarget =rowsSales[21]?.[2]!=null&&rowsSales[21][2]!==""?Math.abs(Number(rowsSales[21][2])):null;
   const pmTarget    =rowsSales[22]?.[2]!=null&&rowsSales[22][2]!==""?Math.abs(Number(rowsSales[22][2])):null;
+  const shippedToday=rowsSales[16]?.[2]!=null&&rowsSales[16][2]!==""?Math.abs(Number(rowsSales[16][2])):null;
+  const shippedTarget=rowsSales[20]?.[2]!=null&&rowsSales[20][2]!==""?Math.abs(Number(rowsSales[20][2])):null;
   const flatSales=rowsSales.flat();
   const find=(...labels)=>{
     for(const lbl of labels){
@@ -399,7 +411,7 @@ async function readDataDump(){
     top3Pickers=pickers.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
   }
 
-  return{sales,pm,salesTarget,pmTarget,shipmentsToday,csOrdersTotal,top3Pickers};
+  return{sales,pm,salesTarget,pmTarget,shipmentsToday,shippedToday,shippedTarget,csOrdersTotal,top3Pickers};
 }
 
 const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -427,6 +439,16 @@ function render(d){
   // Shipments today
   document.getElementById("sShipped").textContent=d.shipmentsToday!=null?d.shipmentsToday:"—";
 
+  // Shipped Today from Sales C17 with target C21 and %
+  const sc3=document.getElementById("sc3");
+  document.getElementById("sShippedSales").textContent=GBP(d.shippedToday);
+  const shippedPct=d.shippedToday&&d.shippedTarget?(d.shippedToday/d.shippedTarget*100):null;
+  const onTarget=shippedPct!=null&&shippedPct>=100;
+  sc3.className="stat-card shipped-sales"+(onTarget?"":" red");
+  document.getElementById("sShippedPct").textContent=shippedPct!=null?shippedPct.toFixed(1)+"%":"—";
+  document.getElementById("sShippedPct").style.color=onTarget?"var(--gr)":"var(--re)";
+  document.getElementById("sShippedTgt").textContent=d.shippedTarget!=null?"Target: "+GBP(d.shippedTarget):"";
+
   // Top pickers leaderboard
   const ranks=["gold","silver","bronze"];
   const medals=["🥇","🥈","🥉"];
@@ -446,7 +468,7 @@ function render(d){
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["sc0","sc1","sc2"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
+  ["sc0","sc1","sc2","sc3"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
 }
