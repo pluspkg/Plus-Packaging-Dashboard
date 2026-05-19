@@ -111,11 +111,12 @@
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
   .calls-lb{grid-column:1 / -1;flex-direction:column;align-items:flex-start;}
-  .clb-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;background:rgba(255,255,255,.04);}
-  .clb-rank{font-size:12px;width:18px;flex-shrink:0;text-align:center;}
-  .clb-name{flex:1;font-size:12px;font-weight:500;color:var(--ow);}
-  .clb-count{font-size:14px;font-weight:800;color:var(--or);letter-spacing:-.5px;}
-  .clb-lbl{font-size:10px;color:var(--mu);margin-left:2px;font-family:"Courier New",monospace;text-transform:uppercase;letter-spacing:1px;}
+  .clb-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%;}
+  .clb-row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:6px;background:rgba(255,255,255,.04);}
+  .clb-rank{font-size:11px;width:16px;flex-shrink:0;text-align:center;}
+  .clb-name{flex:1;font-size:11px;font-weight:500;color:var(--ow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .clb-count{font-size:13px;font-weight:800;color:var(--or);letter-spacing:-.5px;flex-shrink:0;}
+  .clb-lbl{font-size:9px;color:var(--mu);margin-left:2px;font-family:"Courier New",monospace;text-transform:uppercase;letter-spacing:1px;flex-shrink:0;}
   .orders-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
   .ocard{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:20px 22px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:16px}
   .ocard.vis{opacity:1;transform:translateY(0)}
@@ -235,37 +236,19 @@
         </div>
       </div>
 
-      <div class="slbl"><span>Customer Experience &amp; Today's Activity</span><div class="slbll"></div></div>
+      <div class="slbl"><span>Today's Activity</span><div class="slbll"></div></div>
       <div class="bottom-grid">
-        <div style="display:flex;gap:14px;">
-          <div class="nps-card" id="npsCard">
-            <div class="nps-score" id="npsScore">&#8212;</div>
-            <div class="nps-text">
-              <div class="nps-label">NPS Score</div>
-              <div class="nps-sub" id="npsSub">Loading&hellip;</div>
-              <div class="nps-period">Last 30 days &bull; AskNicely</div>
-            </div>
-          </div>
-          <div class="nps-card" id="marginPctCard" style="background:linear-gradient(135deg,#0d2438,#102e4a);border-color:rgba(251,191,36,.35);box-shadow:0 8px 40px rgba(251,191,36,.1);">
-            <div class="nps-score" id="marginPctScore" style="color:var(--am);">&#8212;</div>
-            <div class="nps-text">
-              <div class="nps-label">Margin %</div>
-              <div class="nps-sub">Product Margin MTD</div>
-              <div class="nps-period">PM MTD &divide; Sales MTD</div>
-            </div>
-          </div>
-        </div>
         <div class="kgrid">
           <div class="kcard calls-lb" id="kc0">
             <div class="kinfo" style="width:100%">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
                 <div class="kico">&#128222;</div>
                 <div>
                   <div class="kval" id="k5">&#8212;</div>
                   <div class="klbl">Total Outbound Calls Today</div>
                 </div>
               </div>
-              <div id="callsLbList" style="display:flex;flex-direction:column;gap:5px;"></div>
+              <div id="callsLbList"></div>
             </div>
           </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
@@ -273,6 +256,14 @@
           <div class="kcard"    id="kc3"><div class="kico">&#128200;</div><div class="kinfo"><div class="kval" id="k8">&#8212;</div><div class="klbl">Orders In Today</div><div class="ktgt" id="k8tgt"></div></div></div>
           <div class="kcard ac" id="kc4"><div class="kico">&#128666;</div><div class="kinfo"><div class="kval" id="k9">&#8212;</div><div class="klbl">Shipped Today</div></div></div>
           <div class="kcard"    id="kc5"><div class="kico">&#127381;</div><div class="kinfo"><div class="kval" id="k10">&#8212;</div><div class="klbl">New Customers This Month</div></div></div>
+          <div class="nps-card" id="marginPctCard" style="background:linear-gradient(135deg,#0d2438,#102e4a);border-color:rgba(251,191,36,.35);box-shadow:0 8px 40px rgba(251,191,36,.1);border-radius:14px;padding:14px 18px;">
+            <div class="nps-score" id="marginPctScore" style="color:var(--am);font-size:32px;">&#8212;</div>
+            <div class="nps-text">
+              <div class="nps-label">Margin %</div>
+              <div class="nps-sub">Product Margin MTD</div>
+              <div class="nps-period">PM MTD &divide; Sales MTD</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -495,18 +486,9 @@ function renderHero(cardId,valId,tgtId,pctId,badgeId,barId,varId,value,target){
   if(value!=null&&target!=null){const diff=value-target,sign=diff>=0?"+":"";document.getElementById(varId).textContent=sign+GBP(diff)+" vs MTD Target";}
   setTimeout(()=>{document.getElementById(barId).style.width=(pct??0)+"%";},400);
 }
-function renderNPS(d){
-  document.getElementById("npsCard").classList.add("vis");
-  const score=d.score!=null?Math.round(d.score):null;
-  const el=document.getElementById("npsScore");
-  el.textContent=score!=null?score:"—";
-  el.style.color=score==null?"var(--pu)":score>=50?"var(--gr)":score>=0?"var(--am)":"var(--re)";
-  document.getElementById("npsSub").textContent=score!=null?"AskNicely NPS":"Data unavailable";
-}
 function render(d){
   renderHero("heroSales","hSalesVal","hSalesTgt","hSalesPct","hSalesBadge","hSalesBar","hSalesVar",d.sales,d.salesTarget);
   renderHero("heroPM","hPMVal","hPMTgt","hPMPct","hPMBadge","hPMBar","hPMVar",d.pm,d.pmTarget);
-  renderNPS(d);
   // Margin %
   const marginPct=(d.sales&&d.pm)?((d.pm/d.sales)*100):null;
   document.getElementById("marginPctCard").classList.add("vis");
@@ -515,12 +497,12 @@ function render(d){
   const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣"];
   const lbList=document.getElementById("callsLbList");
   if(d.top6Callers&&d.top6Callers.length>0){
-    lbList.innerHTML=d.top6Callers.map((p,i)=>`
+    lbList.innerHTML='<div class="clb-grid">'+d.top6Callers.map((p,i)=>`
       <div class="clb-row">
         <div class="clb-rank">${medals[i]||i+1}</div>
         <div class="clb-name">${p.name}</div>
         <div class="clb-count">${p.count}</div><div class="clb-lbl">calls</div>
-      </div>`).join("");
+      </div>`).join("")+'</div>';
   }else{
     lbList.innerHTML='<div style="font-size:11px;color:var(--mu);font-style:italic;">No calls recorded yet today</div>';
   }
@@ -546,8 +528,8 @@ async function fetchData(){
   document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
   document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
   try{
-    const[dd,crm,nps]=await Promise.all([readDataDump(),readCRM(),readNPS()]);
-    render({...dd,...crm,...nps});setStatus("ok");document.getElementById("errb").style.display="none";
+    const[dd,crm]=await Promise.all([readDataDump(),readCRM()]);
+    render({...dd,...crm});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
