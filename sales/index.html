@@ -110,6 +110,12 @@
   .kcard.ac .kval{color:var(--or)}
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
+  .calls-lb{grid-column:1 / -1;flex-direction:column;align-items:flex-start;}
+  .clb-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;background:rgba(255,255,255,.04);}
+  .clb-rank{font-size:12px;width:18px;flex-shrink:0;text-align:center;}
+  .clb-name{flex:1;font-size:12px;font-weight:500;color:var(--ow);}
+  .clb-count{font-size:14px;font-weight:800;color:var(--or);letter-spacing:-.5px;}
+  .clb-lbl{font-size:10px;color:var(--mu);margin-left:2px;font-family:"Courier New",monospace;text-transform:uppercase;letter-spacing:1px;}
   .orders-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
   .ocard{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:20px 22px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:16px}
   .ocard.vis{opacity:1;transform:translateY(0)}
@@ -250,7 +256,18 @@
           </div>
         </div>
         <div class="kgrid">
-          <div class="kcard ac" id="kc0"><div class="kico">&#128222;</div><div class="kinfo"><div class="kval" id="k5">&#8212;</div><div class="klbl">Calls Today</div></div></div>
+          <div class="kcard calls-lb" id="kc0">
+            <div class="kinfo" style="width:100%">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div class="kico">&#128222;</div>
+                <div>
+                  <div class="kval" id="k5">&#8212;</div>
+                  <div class="klbl">Total Outbound Calls Today</div>
+                </div>
+              </div>
+              <div id="callsLbList" style="display:flex;flex-direction:column;gap:5px;"></div>
+            </div>
+          </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
           <div class="kcard"    id="kc3"><div class="kico">&#128200;</div><div class="kinfo"><div class="kval" id="k8">&#8212;</div><div class="klbl">Orders In Today</div><div class="ktgt" id="k8tgt"></div></div></div>
@@ -406,18 +423,28 @@ async function readCRM(){
     const from=todayStart.toISOString();
     const to=todayEnd.toISOString();
 
-    // ── PHONE CALLS ──
-    // Filter: today, completed (statecode=1), Meaningful Sales Interaction = Yes
-    // PLACEHOLDER field name: replace 'cr9b2_meaningfulsalesinteraction' with actual field name from IT
+    // ── PHONE CALLS — outbound, today, Meaningful Sales Interaction = Yes ──
     const MEANINGFUL_FIELD = "new_leadapp"; // Meaningful Sales Interaction
     const callsRes = await dynFetch(
-      `/phonecalls?$select=activityid,subject,${MEANINGFUL_FIELD}`+
-      `&$filter=statecode eq 1`+
+      `/phonecalls?$select=activityid,subject,${MEANINGFUL_FIELD},_ownerid_value&$expand=ownerid($select=fullname)`+
+      `&$filter=directioncode eq true`+
       ` and actualend ge ${from} and actualend le ${to}`+
-      ` and ${MEANINGFUL_FIELD} eq true`+
-      `&$count=true&$top=1`
+      ` and statecode eq 1`+
+      ` and ${MEANINGFUL_FIELD} eq true`
     );
-    const callsToday = callsRes["@odata.count"]??callsRes.value?.length??0;
+    const callRecords = callsRes.value || [];
+    const callsToday = callRecords.length;
+
+    // Count by caller name, get top 6
+    const callerCounts = {};
+    for(const c of callRecords){
+      const name = c["ownerid@OData.Community.Display.V1.FormattedValue"] || c.ownerid?.fullname || "Unknown";
+      callerCounts[name] = (callerCounts[name]||0) + 1;
+    }
+    const top6Callers = Object.entries(callerCounts)
+      .map(([name,count])=>({name,count}))
+      .sort((a,b)=>b.count-a.count)
+      .slice(0,6);
 
     // ── DEALS (Opportunities) ──
     // Filter: created today
@@ -440,10 +467,10 @@ async function readCRM(){
     );
     const apptToday = apptRes["@odata.count"]??apptRes.value?.length??0;
 
-    return{callsToday,dealsToday,apptToday};
+    return{callsToday,top6Callers,dealsToday,apptToday};
   }catch(e){
     console.warn("Dynamics CRM:",e.message);
-    return{callsToday:null,dealsToday:null,apptToday:null};
+    return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};
   }
 }
 async function readNPS(){
@@ -485,6 +512,18 @@ function render(d){
   document.getElementById("marginPctCard").classList.add("vis");
   document.getElementById("marginPctScore").textContent=marginPct!=null?marginPct.toFixed(1)+"%":"—";
   document.getElementById("k5").textContent=INT(d.callsToday);
+  const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣"];
+  const lbList=document.getElementById("callsLbList");
+  if(d.top6Callers&&d.top6Callers.length>0){
+    lbList.innerHTML=d.top6Callers.map((p,i)=>`
+      <div class="clb-row">
+        <div class="clb-rank">${medals[i]||i+1}</div>
+        <div class="clb-name">${p.name}</div>
+        <div class="clb-count">${p.count}</div><div class="clb-lbl">calls</div>
+      </div>`).join("");
+  }else{
+    lbList.innerHTML='<div style="font-size:11px;color:var(--mu);font-style:italic;">No calls recorded yet today</div>';
+  }
   document.getElementById("k6").textContent=INT(d.apptToday);
   document.getElementById("k7").textContent=INT(d.dealsToday);
   document.getElementById("k8").textContent=GBP(d.ordersToday);
