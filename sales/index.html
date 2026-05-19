@@ -409,7 +409,7 @@ async function readCRM(){
     // ── PHONE CALLS ──
     // Filter: today, completed (statecode=1), Meaningful Sales Interaction = Yes
     // PLACEHOLDER field name: replace 'cr9b2_meaningfulsalesinteraction' with actual field name from IT
-    const MEANINGFUL_FIELD = "cr9b2_meaningfulsalesinteraction"; // ← REPLACE WITH ACTUAL FIELD NAME
+    const MEANINGFUL_FIELD = "new_leadapp"; // Meaningful Sales Interaction
     const callsRes = await dynFetch(
       `/phonecalls?$select=activityid,subject,${MEANINGFUL_FIELD}`+
       `&$filter=statecode eq 1`+
@@ -431,7 +431,7 @@ async function readCRM(){
     // ── APPOINTMENTS ──
     // Filter: today, Customer Expecting = Yes
     // PLACEHOLDER field name: replace 'cr9b2_customerexpecting' with actual field name from IT
-    const CUSTOMER_EXPECTING_FIELD = "cr9b2_customerexpecting"; // ← REPLACE WITH ACTUAL FIELD NAME
+    const CUSTOMER_EXPECTING_FIELD = "new_meaningfulsalesinteraction"; // Customer Expecting
     const apptRes = await dynFetch(
       `/appointments?$select=activityid,subject,${CUSTOMER_EXPECTING_FIELD}`+
       `&$filter=scheduledstart ge ${from} and scheduledstart le ${to}`+
