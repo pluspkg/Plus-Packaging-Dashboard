@@ -497,7 +497,6 @@ function render(d){
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
   ["kc0","kc1","kc2","kc3","kc4","kc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
-  document.getElementById("fnote").classList.add("vis");
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
 }
@@ -507,7 +506,6 @@ async function fetchData(){
   document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";
   document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
   document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
-  document.getElementById("fnote").classList.remove("vis");
   try{
     const[dd,crm,nps]=await Promise.all([readDataDump(),readCRM(),readNPS()]);
     render({...dd,...crm,...nps});setStatus("ok");document.getElementById("errb").style.display="none";
@@ -518,7 +516,7 @@ async function fetchData(){
   }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";restartCd();}
 }
 function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
-function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,"0");document.getElementById("acd").textContent=m+":"+s;document.getElementById("farN").textContent=autoOn?"Auto-refreshes every "+intMins+"m. Next in "+m+":"+s+".":"Auto-refresh paused.";}
+function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,"0");document.getElementById("acd").textContent=m+":"+s;}
 function toggleAuto(){autoOn=!autoOn;document.getElementById("atog").classList.toggle("off",!autoOn);const l=document.getElementById("arl");l.style.color=autoOn?"var(--or)":"var(--mu)";l.textContent=autoOn?"Auto":"Paused";document.getElementById("acd").style.display=autoOn?"":"none";document.getElementById("asel").style.display=autoOn?"":"none";autoOn?restartCd():clearInterval(ticker);updCd();}
 function changeInt(){intMins=parseInt(document.getElementById("asel").value);restartCd();}
 function showDash(){document.getElementById("loginScreen").style.display="none";document.getElementById("dashScreen").style.display="block";document.getElementById("sdt").textContent=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});fetchData();}
