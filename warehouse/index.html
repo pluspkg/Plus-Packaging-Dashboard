@@ -263,9 +263,12 @@
           <div class="stat-label">Shipped Today</div>
           <div class="stat-sub" id="sShippedSalesSub">vs daily target</div>
           <div class="stat-value" id="sShippedSales">&#8212;</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
-            <div style="font-size:18px;font-weight:800;letter-spacing:-0.5px;" id="sShippedPct">&#8212;</div>
-            <div style="font-size:10px;color:var(--mu);font-family:'Courier New',monospace;" id="sShippedTgt"></div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px;flex-wrap:wrap;gap:4px;">
+            <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;" id="sShippedPct">&#8212;</div>
+            <div>
+              <div style="font-size:9px;color:var(--mu);font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Daily Target</div>
+              <div style="font-size:18px;font-weight:700;color:var(--ow);opacity:.85;" id="sShippedTgt"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -447,7 +450,7 @@ function render(d){
   sc3.className="stat-card shipped-sales"+(onTarget?"":" red");
   document.getElementById("sShippedPct").textContent=shippedPct!=null?shippedPct.toFixed(1)+"%":"—";
   document.getElementById("sShippedPct").style.color=onTarget?"var(--gr)":"var(--re)";
-  document.getElementById("sShippedTgt").textContent=d.shippedTarget!=null?"Target: "+GBP(d.shippedTarget):"";
+  document.getElementById("sShippedTgt").textContent=d.shippedTarget!=null?GBP(d.shippedTarget):"";
 
   // Top pickers leaderboard
   const ranks=["gold","silver","bronze"];
