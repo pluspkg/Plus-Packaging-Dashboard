@@ -255,6 +255,7 @@
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
           <div class="kcard"    id="kc3"><div class="kico">&#128200;</div><div class="kinfo"><div class="kval" id="k8">&#8212;</div><div class="klbl">Orders In Today</div><div class="ktgt" id="k8tgt"></div></div></div>
           <div class="kcard ac" id="kc4"><div class="kico">&#128666;</div><div class="kinfo"><div class="kval" id="k9">&#8212;</div><div class="klbl">Shipped Today</div></div></div>
+          <div class="kcard"    id="kc5"><div class="kico">&#127381;</div><div class="kinfo"><div class="kval" id="k10">&#8212;</div><div class="klbl">New Customers This Month</div></div></div>
         </div>
       </div>
 
@@ -341,6 +342,7 @@ async function readDataDump(){
   const salesTarget=rows[21]&&rows[21][2]!=null&&rows[21][2]!==""?Math.abs(Number(rows[21][2])):null;
   const pmTarget   =rows[22]&&rows[22][2]!=null&&rows[22][2]!==""?Math.abs(Number(rows[22][2])):null;
   const ordersTarget=rows[23]&&rows[23][2]!=null&&rows[23][2]!==""?Math.abs(Number(rows[23][2])):null;
+  const newCustomers=rows[63]&&rows[63][2]!=null&&rows[63][2]!==""?Math.abs(Number(rows[63][2])):null;
   const shippedToday=rows[16]&&rows[16][2]!=null&&rows[16][2]!==""?Math.abs(Number(rows[16][2])):null;
   const find=(...labels)=>{
     for(const lbl of labels){
@@ -358,7 +360,7 @@ async function readDataDump(){
     }
     return null;
   };
-  return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,ordersTarget,shippedToday,ordersToday:find("Orders in Today","Orders Today","Orders In Today")};
+  return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,ordersTarget,newCustomers,shippedToday,ordersToday:find("Orders in Today","Orders Today","Orders In Today")};
 }
 async function readCRM(){
   try{
@@ -428,10 +430,11 @@ function render(d){
   const tgtEl=document.getElementById("k8tgt");
   if(d.ordersTarget!=null){tgtEl.textContent="Target: "+GBP(d.ordersTarget);}else{tgtEl.textContent="";}
   document.getElementById("k9").textContent=GBP(d.shippedToday);
+  document.getElementById("k10").textContent=d.newCustomers!=null?d.newCustomers:"—";
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["kc0","kc1","kc2","kc3","kc4"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
+  ["kc0","kc1","kc2","kc3","kc4","kc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
   document.getElementById("fnote").classList.add("vis");
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
