@@ -110,13 +110,13 @@
   .kcard.ac .kval{color:var(--or)}
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
-  .calls-lb{grid-column:1 / -1;flex-direction:column;align-items:flex-start;}
+  .calls-lb{grid-column:1 / -1;flex-direction:row;align-items:center;gap:0;}
   .clb-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%;}
-  .clb-row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:6px;background:rgba(255,255,255,.04);}
-  .clb-rank{font-size:11px;width:16px;flex-shrink:0;text-align:center;}
-  .clb-name{flex:1;font-size:11px;font-weight:500;color:var(--ow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .clb-count{font-size:13px;font-weight:800;color:var(--or);letter-spacing:-.5px;flex-shrink:0;}
-  .clb-lbl{font-size:9px;color:var(--mu);margin-left:2px;font-family:"Courier New",monospace;text-transform:uppercase;letter-spacing:1px;flex-shrink:0;}
+  .clb-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.04);}
+  .clb-rank{font-size:13px;width:20px;flex-shrink:0;text-align:center;}
+  .clb-name{flex:1;font-size:13px;font-weight:600;color:var(--ow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .clb-count{font-size:15px;font-weight:800;color:var(--or);letter-spacing:-.5px;flex-shrink:0;}
+  .clb-lbl{font-size:10px;color:var(--mu);margin-left:3px;font-family:"Courier New",monospace;text-transform:uppercase;letter-spacing:1px;flex-shrink:0;}
   .orders-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
   .ocard{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:20px 22px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:16px}
   .ocard.vis{opacity:1;transform:translateY(0)}
@@ -272,16 +272,14 @@
       <div class="bottom-grid">
         <div class="kgrid">
           <div class="kcard calls-lb" id="kc0">
-            <div class="kinfo" style="width:100%">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <div class="kico">&#128222;</div>
-                <div>
-                  <div class="kval" id="k5">&#8212;</div>
-                  <div class="klbl">Total Outbound Calls Today</div>
-                </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div class="kico">&#128222;</div>
+              <div>
+                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
+                <div class="klbl">Total Outbound Calls Today</div>
               </div>
-              <div id="callsLbList"></div>
             </div>
+            <div id="callsLbList" style="flex:1;margin-left:24px;"></div>
           </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
@@ -540,7 +538,7 @@ function render(d){
   const marginPct=(d.sales&&d.pm)?((d.pm/d.sales)*100):null;
   document.getElementById("marginPctCard").classList.add("vis");
   document.getElementById("marginPctScore").textContent=marginPct!=null?marginPct.toFixed(1)+"%":"—";
-  document.getElementById("k5").textContent=INT(d.callsToday);
+  document.getElementById("k5").textContent=d.callsToday??0;
   const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣"];
   const lbList=document.getElementById("callsLbList");
   if(d.top6Callers&&d.top6Callers.length>0){
