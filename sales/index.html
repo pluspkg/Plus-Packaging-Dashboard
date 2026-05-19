@@ -442,7 +442,7 @@ async function dynFetch(path){
     "Accept":"application/json",
     "OData-MaxVersion":"4.0",
     "OData-Version":"4.0",
-    "Prefer":"odata.include-annotations=OData.Community.Display.V1.FormattedValue"
+    "Prefer":'odata.include-annotations="OData.Community.Display.V1.FormattedValue,Microsoft.Dynamics.CRM.associatednavigationproperty"'
   }});
   if(!r.ok)throw new Error("Dynamics "+r.status+": "+await r.text());
   return r.json();
@@ -458,9 +458,9 @@ async function readCRM(){
     const to=todayEnd.toISOString();
 
     // ── PHONE CALLS — outbound, today, Meaningful Sales Interaction = Yes ──
-    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction"; // Meaningful Sales Interaction
+    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction";
     const callsRes = await dynFetch(
-      `/phonecalls?$select=activityid,subject,${MEANINGFUL_FIELD},_ownerid_value&$expand=ownerid($select=fullname)`+
+      `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
       `&$filter=directioncode eq true`+
       ` and actualend ge ${from} and actualend le ${to}`+
       ` and statecode eq 1`+
@@ -472,7 +472,9 @@ async function readCRM(){
     // Count by caller name, get top 6
     const callerCounts = {};
     for(const c of callRecords){
-      const name = c["ownerid@OData.Community.Display.V1.FormattedValue"] || c.ownerid?.fullname || "Unknown";
+      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"]
+                || c._ownerid_value
+                || "Unknown";
       callerCounts[name] = (callerCounts[name]||0) + 1;
     }
     const top6Callers = Object.entries(callerCounts)
@@ -489,13 +491,11 @@ async function readCRM(){
     );
     const dealsToday = dealsRes["@odata.count"]??dealsRes.value?.length??0;
 
-    // ── APPOINTMENTS ──
-    // Filter: today, Customer Expecting = Yes
-    // PLACEHOLDER field name: replace 'cr9b2_customerexpecting' with actual field name from IT
+    // ── APPOINTMENTS — created today, Customer Expecting = Yes ──
     const CUSTOMER_EXPECTING_FIELD = "new_fixed"; // Customer Expecting
     const apptRes = await dynFetch(
-      `/appointments?$select=activityid,subject,${CUSTOMER_EXPECTING_FIELD}`+
-      `&$filter=scheduledstart ge ${from} and scheduledstart le ${to}`+
+      `/appointments?$select=activityid,${CUSTOMER_EXPECTING_FIELD}`+
+      `&$filter=createdon ge ${from} and createdon le ${to}`+
       ` and ${CUSTOMER_EXPECTING_FIELD} eq true`+
       `&$count=true&$top=1`
     );
