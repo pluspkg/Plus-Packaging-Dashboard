@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plus Packaging – Warehouse Dashboard</title>
+<link rel="icon" type="image/png" href="/Plus-Packaging-Dashboard/favicon.png" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--nd:#0d1b38;--nm:#162040;--nc:#1c2b52;--nb:#243365;--or:#f47c20;--wh:#ffffff;--ow:#e8eef8;--mu:#7a95be;--gr:#34d399;--am:#fbbf24;--re:#f87171;--pu:#a78bfa;--cy:#38bdf8}
+  body{background:var(--nd);font-family:"Segoe UI",system-ui,sans-serif;color:var(--wh);min-height:100vh;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(var(--nb) 1px,transparent 1px);background-size:36px 36px;opacity:.28;pointer-events:none;z-index:0}
+  body::after{content:"";position:fixed;top:-300px;right:-200px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(52,211,153,.08),transparent 65%);pointer-events:none;z-index:0}
+
+  /* Login */
+  #loginScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;background:var(--nd)}
+  .lcard{background:var(--nc);border:1px solid var(--nb);border-radius:20px;padding:44px 52px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5);max-width:480px;width:90%}
+  .llogo{height:52px;margin-bottom:28px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .ltitle{font-size:22px;font-weight:700;margin-bottom:8px}
+  .lsub{font-size:13px;color:var(--mu);margin-bottom:32px;line-height:1.6}
+  .btnms{display:inline-flex;align-items:center;gap:10px;background:#0078d4;border:none;color:var(--wh);padding:13px 28px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:opacity .15s}
+  .btnms:hover{opacity:.88}
+  .lnote{font-size:11px;color:var(--mu);margin-top:18px;line-height:1.6}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:200;background:rgba(22,32,64,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--nb);box-shadow:0 4px 32px rgba(0,0,0,.4)}
+  .hstr{height:3px;background:linear-gradient(90deg,var(--gr),rgba(52,211,153,.3),transparent)}
+  .hinn{display:flex;align-items:center;justify-content:space-between;padding:0 36px;height:60px}
+  .hlft{display:flex;align-items:center;gap:20px}
+  .hlog{height:38px;width:auto;display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .hdiv{width:1px;height:30px;background:var(--nb)}
+  .htop{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;margin-bottom:2px}
+  .hbot{font-size:15px;font-weight:700}
+  .hrgt{display:flex;align-items:center;gap:14px}
+  .lupd{text-align:right;font-size:11px}
+  .lupd span{color:var(--mu);display:block}
+  .lupd strong{color:var(--wh)}
+  .arpl{display:flex;align-items:center;gap:9px;background:var(--nc);border:1px solid var(--nb);border-radius:10px;padding:6px 12px;font-size:12px}
+  .arl{font-weight:600}
+  .tog{width:38px;height:21px;border-radius:99px;background:var(--or);cursor:pointer;position:relative;transition:background .2s;border:1px solid transparent;flex-shrink:0}
+  .tog.off{background:var(--nm);border-color:var(--nb)}
+  .togk{position:absolute;top:2px;left:19px;width:15px;height:15px;border-radius:50%;background:var(--wh);transition:left .2s;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .tog.off .togk{left:2px}
+  .arsl{background:transparent;border:none;color:var(--wh);font-size:12px;cursor:pointer;outline:none}
+  .arcd{font-family:"Courier New",monospace;font-size:13px;color:var(--or);min-width:36px;text-align:right}
+  .btnr{background:var(--or);border:none;color:var(--wh);padding:7px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 18px rgba(244,124,32,.35);transition:opacity .15s}
+  .btnr:hover{opacity:.85}
+  .btnr:disabled{opacity:.45;cursor:default;box-shadow:none}
+  .btnso{background:transparent;border:1px solid var(--nb);color:var(--mu);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+  .btnso:hover{border-color:var(--mu);color:var(--wh)}
+  .btnhome{background:transparent;border:1px solid var(--nb);color:var(--mu);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  .btnhome:hover{border-color:var(--mu);color:var(--wh)}
+
+  /* Main */
+  main{position:relative;z-index:5;padding:12px 36px 16px;max-width:1400px;margin:0 auto}
+  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .sdt{font-size:12px;color:var(--mu)}
+  .slv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
+  .sdot{width:7px;height:7px;border-radius:50%;background:var(--gr);box-shadow:0 0 8px var(--gr);animation:pulse 2s ease-in-out infinite}
+  .sdot.ld{background:var(--am);box-shadow:0 0 8px var(--am)}
+  .sdot.er{background:var(--re);box-shadow:0 0 8px var(--re);animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .slbl{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .slbl span{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;white-space:nowrap}
+  .slbll{flex:1;height:1px;background:linear-gradient(90deg,var(--nb),transparent)}
+
+  /* Hero cards */
+  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr}}
+  .hero-card{border-radius:16px;padding:18px 22px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+  .hero-card.vis{opacity:1;transform:translateY(0)}
+  .hero-card.green{background:linear-gradient(135deg,#0d2e1a,#0f3d20);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.15)}
+  .hero-card.red{background:linear-gradient(135deg,#2e0d0d,#3d1010);border-color:rgba(248,113,113,.35);box-shadow:0 8px 40px rgba(248,113,113,.15)}
+  .hero-card.neutral{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .hero-glow{position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;pointer-events:none}
+  .hero-card.green .hero-glow{background:radial-gradient(circle,rgba(52,211,153,.2),transparent 70%)}
+  .hero-card.red .hero-glow{background:radial-gradient(circle,rgba(248,113,113,.2),transparent 70%)}
+  .hero-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;margin-bottom:8px;opacity:.7}
+  .hero-main{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+  .hero-value{font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1}
+  .hero-card.green .hero-value{color:var(--gr)}
+  .hero-card.red .hero-value{color:var(--re)}
+  .hero-card.neutral .hero-value{color:var(--or)}
+  .hero-target-block{text-align:right}
+  .hero-target-label{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.5px;font-family:monospace;margin-bottom:3px}
+  .hero-target-value{font-size:18px;font-weight:700;color:var(--ow);opacity:.85}
+  .hero-pct-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .hero-pct{font-size:24px;font-weight:800;letter-spacing:-1px}
+  .hero-card.green .hero-pct{color:var(--gr)}
+  .hero-card.red .hero-pct{color:var(--re)}
+  .hero-badge{padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .hero-card.green .hero-badge{background:rgba(52,211,153,.15);color:var(--gr);border:1px solid rgba(52,211,153,.3)}
+  .hero-card.red .hero-badge{background:rgba(248,113,113,.15);color:var(--re);border:1px solid rgba(248,113,113,.3)}
+  .hero-bar-track{height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+  .hero-bar-fill{height:100%;border-radius:99px;width:0%;transition:width 1.3s cubic-bezier(.4,0,.2,1)}
+  .hero-card.green .hero-bar-fill{background:linear-gradient(90deg,#1a8a5a,var(--gr))}
+  .hero-card.red .hero-bar-fill{background:linear-gradient(90deg,#8a1a1a,var(--re))}
+  .hero-var{font-size:11px;margin-top:6px;opacity:.75}
+  .hero-card.green .hero-var{color:var(--gr)}
+  .hero-card.red .hero-var{color:var(--re)}
+
+  /* Stat cards */
+  .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+  .stat-card{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
+  .stat-card.vis{opacity:1;transform:translateY(0)}
+  .stat-card.orders{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .stat-card.shipped{background:linear-gradient(135deg,#0d2234,#0f3045);border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.12)}
+  .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:3px}
+  .stat-sub{font-size:11px;color:var(--mu);margin-bottom:10px}
+  .stat-value{font-size:56px;font-weight:800;letter-spacing:-3px;line-height:1}
+  .stat-period{font-size:10px;color:var(--mu);margin-top:4px;font-style:italic}
+  .stat-card.orders .stat-value{color:var(--or)}
+  .stat-card.shipped .stat-value{color:var(--cy)}
+
+  /* Leaderboard */
+  .lb-card{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:14px 18px;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+  .lb-card.vis{opacity:1;transform:translateY(0)}
+  .lb-total{font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--or);margin-bottom:2px}
+  .lb-total-label{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;margin-bottom:10px}
+  .lb-list{display:flex;flex-direction:column;gap:6px}
+  .lb-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border-radius:8px;padding:7px 10px}
+  .lb-rank{font-size:14px;width:20px;flex-shrink:0;text-align:center}
+  .lb-rank.gold{color:#fbbf24}
+  .lb-rank.silver{color:#94a3b8}
+  .lb-rank.bronze{color:#cd7c3e}
+  .lb-name{flex:1;font-size:13px;font-weight:600;color:var(--ow)}
+  .lb-count{font-size:16px;font-weight:800;color:var(--gr);letter-spacing:-.5px}
+  .lb-unit{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.5px;font-family:"Courier New",monospace;margin-left:3px}
+  .lb-empty{font-size:12px;color:var(--mu);font-style:italic}
+
+  /* Loading / error */
+  .lwrap{display:flex;flex-direction:column;align-items:center;padding:90px 0;gap:20px}
+  .spin{width:44px;height:44px;border:3px solid var(--nc);border-top-color:var(--or);border-radius:50%;animation:spin .85s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ltxt{color:var(--mu);font-size:14px}
+  .errb{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px 20px;color:#fca5a5;margin-bottom:16px;font-size:13px;line-height:1.8}
+  .fnote{display:flex;align-items:center;gap:12px;background:var(--nc);border:1px solid var(--nb);border-radius:12px;padding:10px 16px;font-size:11px;color:var(--mu);line-height:1.6;opacity:0;transition:opacity .5s ease .9s}
+  .fnote.vis{opacity:1}
+  .fico{width:24px;height:24px;border-radius:8px;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+
+  @media(max-width:700px){.hinn{padding:0 18px}main{padding:14px 18px 20px}.arpl{display:none}.stat-row{grid-template-columns:1fr}}
+  select option{background:#162040}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="lcard">
+    <img class="llogo" src="../Plus_Logo.jpg" alt="Plus Packaging">
+    <div class="ltitle">Warehouse Dashboard</div>
+    <div class="lsub">Sign in with your Plus Packaging Microsoft 365 account to view live data.</div>
+    <button class="btnms" id="signInBtn" onclick="signIn()">
+      <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+        <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <div class="lnote">Handled securely by Microsoft. No data is stored by this dashboard.</div>
+  </div>
+</div>
+
+<div id="dashScreen" style="display:none">
+  <header>
+    <div class="hstr"></div>
+    <div class="hinn">
+      <div class="hlft">
+        <img class="hlog" src="../Plus_Logo.jpg" alt="Plus Packaging">
+        <div class="hdiv"></div>
+        <div>
+          <div class="htop">Plus Packaging</div>
+          <div class="hbot">Warehouse Dashboard</div>
+        </div>
+      </div>
+      <div class="hrgt">
+        <a class="btnhome" href="../">&#8962; Dashboards</a>
+        <div class="lupd" id="lupd" style="display:none"><span>Updated</span><strong id="lupdT"></strong></div>
+        <div class="arpl">
+          <span class="arl" id="arl" style="color:var(--or)">Auto</span>
+          <div class="tog" id="atog" onclick="toggleAuto()"><div class="togk"></div></div>
+          <select class="arsl" id="asel" onchange="changeInt()">
+            <option value="1">1m</option><option value="2">2m</option>
+            <option value="5" selected>5m</option><option value="10">10m</option>
+            <option value="15">15m</option><option value="30">30m</option>
+          </select>
+          <span class="arcd" id="acd">5:00</span>
+        </div>
+        <button class="btnr" id="btnr" onclick="fetchData()">⟳ Refresh</button>
+        <button class="btnso" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="sbar">
+      <div class="sdt" id="sdt"></div>
+      <div class="slv"><div class="sdot ld" id="sdot"></div><span id="stxt">Connecting&hellip;</span></div>
+    </div>
+    <div id="errb" class="errb" style="display:none"></div>
+    <div id="lwrap" class="lwrap"><div class="spin"></div><div class="ltxt">Fetching live data&hellip;</div></div>
+
+    <div id="content" style="display:none">
+
+      <!-- MTD Performance -->
+      <div class="slbl"><span>MTD Performance</span><div class="slbll"></div></div>
+      <div class="hero-grid">
+        <div class="hero-card neutral" id="heroSales">
+          <div class="hero-glow"></div>
+          <div class="hero-label">Sales MTD</div>
+          <div class="hero-main">
+            <div class="hero-value" id="hSalesVal">&#8212;</div>
+            <div class="hero-target-block">
+              <div class="hero-target-label">MTD Target</div>
+              <div class="hero-target-value" id="hSalesTgt">&#8212;</div>
+            </div>
+          </div>
+          <div class="hero-pct-row">
+            <div class="hero-pct" id="hSalesPct">&#8212;</div>
+            <div class="hero-badge" id="hSalesBadge">&#8212;</div>
+          </div>
+          <div class="hero-bar-track"><div class="hero-bar-fill" id="hSalesBar"></div></div>
+          <div class="hero-var" id="hSalesVar"></div>
+        </div>
+        <div class="hero-card neutral" id="heroPM">
+          <div class="hero-glow"></div>
+          <div class="hero-label">Product Margin MTD</div>
+          <div class="hero-main">
+            <div class="hero-value" id="hPMVal">&#8212;</div>
+            <div class="hero-target-block">
+              <div class="hero-target-label">MTD Target</div>
+              <div class="hero-target-value" id="hPMTgt">&#8212;</div>
+            </div>
+          </div>
+          <div class="hero-pct-row">
+            <div class="hero-pct" id="hPMPct">&#8212;</div>
+            <div class="hero-badge" id="hPMBadge">&#8212;</div>
+          </div>
+          <div class="hero-bar-track"><div class="hero-bar-fill" id="hPMBar"></div></div>
+          <div class="hero-var" id="hPMVar"></div>
+        </div>
+      </div>
+
+      <!-- Today's Activity -->
+      <div class="slbl"><span>Today's Activity</span><div class="slbll"></div></div>
+      <div class="stat-row">
+        <div class="stat-card orders" id="sc0">
+          <div class="stat-label">Orders Processed Today</div>
+          <div class="stat-sub">Total orders handled</div>
+          <div class="stat-value" id="sOrders">&#8212;</div>
+          <div class="stat-period">Data Dump &bull; Customer Service sheet</div>
+        </div>
+        <div class="stat-card shipped" id="sc1">
+          <div class="stat-label">Total Shipments Today</div>
+          <div class="stat-sub">Dispatched today</div>
+          <div class="stat-value" id="sShipped">&#8212;</div>
+          <div class="stat-period">Data Dump &bull; OPS sheet C7</div>
+        </div>
+      </div>
+
+      <!-- Top Pickers -->
+      <div class="slbl"><span>Top Pickers Today</span><div class="slbll"></div></div>
+      <div style="max-width:600px;margin-bottom:16px;">
+        <div class="lb-card" id="sc2">
+          <div class="lb-list" id="pickerList"><div class="lb-empty">Loading&hellip;</div></div>
+        </div>
+      </div>
+
+      <div class="fnote" id="fnote">
+        <div class="fico">i</div>
+        <span>Sales &amp; targets from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (SALES sheet). Orders processed &amp; shipments from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (OPS sheet). Top pickers from <strong style="color:var(--wh)">Data Dump.xlsx</strong> (OPS sheet C20:D30). <span id="farN">Auto-refreshes every 5 minutes.</span></span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const CFG = {
+  clientId:       "984139d6-9a6c-4da1-894d-34148ff1d570",
+  tenantId:       "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
+  scopes:         ["Files.Read.All","Sites.Read.All","User.Read"],
+  driveId:        "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
+  outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
+};
+const REDIRECT_URI = location.origin + location.pathname;
+let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
+
+async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
+function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
+function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return b64url(a);}
+async function signIn(){
+  const btn=document.getElementById("signInBtn");
+  btn.disabled=true;btn.textContent="Redirecting to Microsoft...";
+  const ver=rnd(43),ch=b64url(await sha256(ver)),st=rnd(16);
+  sessionStorage.setItem("pkce_ver",ver);sessionStorage.setItem("pkce_st",st);
+  const p=new URLSearchParams({client_id:CFG.clientId,response_type:"code",redirect_uri:REDIRECT_URI,
+    scope:CFG.scopes.join(" ")+" offline_access",code_challenge:ch,code_challenge_method:"S256",
+    state:st,response_mode:"query",prompt:"select_account"});
+  location.href="https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/authorize?"+p;
+}
+async function getToken(params){
+  const r=await fetch("https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/token",
+    {method:"POST",body:new URLSearchParams(params)});
+  const j=await r.json();
+  if(j.error)throw new Error(j.error_description||j.error);
+  token=j.access_token;
+  sessionStorage.setItem("tok",token);sessionStorage.setItem("exp",Date.now()+j.expires_in*1000);
+  if(j.refresh_token)sessionStorage.setItem("rt",j.refresh_token);
+}
+async function handleCallback(code,state){
+  if(state!==sessionStorage.getItem("pkce_st")){alert("Auth error.");return;}
+  await getToken({client_id:CFG.clientId,grant_type:"authorization_code",code,
+    redirect_uri:REDIRECT_URI,code_verifier:sessionStorage.getItem("pkce_ver"),scope:CFG.scopes.join(" ")});
+  history.replaceState({},document.title,REDIRECT_URI);showDash();
+}
+async function ensureToken(){
+  const exp=+sessionStorage.getItem("exp")||0;
+  if(Date.now()<exp-60000)return true;
+  const rt=sessionStorage.getItem("rt");if(!rt)return false;
+  try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});return true;}
+  catch{return false;}
+}
+function signOut(){sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
+async function graphJSON(url){
+  if(!await ensureToken()){signOut();throw new Error("Session expired.");}
+  const r=await fetch("https://graph.microsoft.com/v1.0"+url,{headers:{Authorization:"Bearer "+(token||sessionStorage.getItem("tok"))}});
+  if(r.status===401){signOut();throw new Error("Session expired.");}
+  if(!r.ok)throw new Error("Graph "+r.status+": "+r.statusText);
+  return r.json();
+}
+async function downloadAndParse(driveId,itemId){
+  const meta=await graphJSON("/drives/"+driveId+"/items/"+itemId);
+  const url=meta["@microsoft.graph.downloadUrl"];
+  if(!url)throw new Error("No download URL");
+  const r=await fetch(url);
+  if(!r.ok)throw new Error("Download failed: "+r.status);
+  return XLSX.read(await r.arrayBuffer(),{type:"array"});
+}
+
+async function readDataDump(){
+  const folder=await graphJSON("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
+  const file=folder.value.find(f=>f.name==="Data Dump.xlsx");
+  if(!file)throw new Error("Data Dump.xlsx not found");
+  const wb=await downloadAndParse(CFG.driveId,file.id);
+
+  // SALES sheet — MTD figures and targets
+  const wsSales=wb.Sheets[wb.SheetNames[0]];
+  const rowsSales=XLSX.utils.sheet_to_json(wsSales,{header:1,defval:""});
+  const salesTarget =rowsSales[21]?.[2]!=null&&rowsSales[21][2]!==""?Math.abs(Number(rowsSales[21][2])):null;
+  const pmTarget    =rowsSales[22]?.[2]!=null&&rowsSales[22][2]!==""?Math.abs(Number(rowsSales[22][2])):null;
+  const flatSales=rowsSales.flat();
+  const find=(...labels)=>{
+    for(const lbl of labels){
+      const lo=lbl.toLowerCase();
+      for(let i=0;i<flatSales.length;i++){
+        const cell=flatSales[i];
+        if(typeof cell==="string"&&cell.toLowerCase().includes(lo)){
+          for(let j=i+1;j<Math.min(i+10,flatSales.length);j++){
+            const v=flatSales[j];
+            if(typeof v==="number"&&v!==0)return Math.abs(v);
+            if(typeof v==="string"&&v.trim()!==""){const n=parseFloat(v.replace(/[^0-9.-]/g,""));if(!isNaN(n)&&n!==0)return Math.abs(n);}
+          }
+        }
+      }
+    }
+    return null;
+  };
+  const sales=find("Total Sales");
+  const pm   =find("Total Margin","Product Margin","Total PM");
+
+  // OPS sheet
+  const opsName=wb.SheetNames.find(n=>n.toLowerCase().includes("ops"));
+  let shipmentsToday=null,csOrdersTotal=null,top3Pickers=[];
+  if(opsName){
+    const wsOps=wb.Sheets[opsName];
+    const rowsOps=XLSX.utils.sheet_to_json(wsOps,{header:1,defval:""});
+
+    // C7 = row index 6, col index 2 — total shipments today
+    const rawShip=rowsOps[6]?.[2];
+    if(rawShip!=null&&rawShip!=="")shipmentsToday=Number(rawShip)||0;
+
+    // C3 = row index 2, col index 2 — orders processed today (from CS sheet)
+    // Actually from Customer Service sheet:
+    const csName=wb.SheetNames.find(n=>n.toLowerCase().includes("customer service")||n.toLowerCase().includes("customer serv"));
+    if(csName){
+      const wsCS=wb.Sheets[csName];
+      const rowsCS=XLSX.utils.sheet_to_json(wsCS,{header:1,defval:""});
+      const rawTotal=rowsCS[2]?.[2];
+      if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
+    }
+
+    // C20:D30 = rows 19-29, col 2 (names) col 3 (picks) — top pickers
+    const pickers=[];
+    for(let r=19;r<=29;r++){
+      const name=rowsOps[r]?.[2];
+      const count=rowsOps[r]?.[3];
+      if(name&&String(name).trim()!==""){
+        pickers.push({name:String(name).trim(),count:Number(count)||0});
+      }
+    }
+    top3Pickers=pickers.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
+  }
+
+  return{sales,pm,salesTarget,pmTarget,shipmentsToday,csOrdersTotal,top3Pickers};
+}
+
+const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function renderHero(cardId,valId,tgtId,pctId,badgeId,barId,varId,value,target){
+  const card=document.getElementById(cardId);
+  const pct=value&&target?Math.min(100,(value/target)*100):null;
+  const onTarget=pct!=null&&pct>=100;
+  card.className="hero-card "+(pct==null?"neutral":onTarget?"green":"red")+" vis";
+  document.getElementById(valId).textContent=GBP(value);
+  document.getElementById(tgtId).textContent=GBP(target);
+  document.getElementById(pctId).textContent=pct!=null?pct.toFixed(1)+"%":"—";
+  document.getElementById(badgeId).textContent=pct==null?"—":onTarget?"On Target ✓":"Below Target";
+  if(value!=null&&target!=null){const diff=value-target,sign=diff>=0?"+":"";document.getElementById(varId).textContent=sign+GBP(diff)+" vs MTD Target";}
+  setTimeout(()=>{document.getElementById(barId).style.width=(pct??0)+"%";},400);
+}
+
+function render(d){
+  renderHero("heroSales","hSalesVal","hSalesTgt","hSalesPct","hSalesBadge","hSalesBar","hSalesVar",d.sales,d.salesTarget);
+  renderHero("heroPM","hPMVal","hPMTgt","hPMPct","hPMBadge","hPMBar","hPMVar",d.pm,d.pmTarget);
+
+  // Orders processed today
+  document.getElementById("sOrders").textContent=d.csOrdersTotal!=null?d.csOrdersTotal:"—";
+
+  // Shipments today
+  document.getElementById("sShipped").textContent=d.shipmentsToday!=null?d.shipmentsToday:"—";
+
+  // Top pickers leaderboard
+  const ranks=["gold","silver","bronze"];
+  const medals=["🥇","🥈","🥉"];
+  const pickerList=document.getElementById("pickerList");
+  if(d.top3Pickers&&d.top3Pickers.length>0){
+    pickerList.innerHTML=d.top3Pickers.map((p,i)=>`
+      <div class="lb-row">
+        <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-count">${p.count}</div><div class="lb-unit">picks</div>
+      </div>`).join("");
+  }else{
+    pickerList.innerHTML='<div class="lb-empty">No picks recorded yet today</div>';
+  }
+
+  // Show content
+  document.getElementById("lwrap").style.display="none";
+  document.getElementById("content").style.display="block";
+  document.getElementById("errb").style.display="none";
+  ["sc0","sc1","sc2"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
+  document.getElementById("fnote").classList.add("vis");
+  document.getElementById("lupd").style.display="block";
+  document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
+}
+
+function setStatus(s){const d=document.getElementById("sdot"),t=document.getElementById("stxt");d.className="sdot"+(s==="ld"?" ld":s==="er"?" er":"");t.textContent=s==="ld"?"Fetching data…":s==="er"?"Connection error":"Live data";}
+
+async function fetchData(){
+  if(busy)return;busy=true;setStatus("ld");
+  document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";
+  document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
+  document.querySelectorAll(".hero-card,.stat-card,.lb-card").forEach(c=>c.classList.remove("vis"));
+  document.getElementById("fnote").classList.remove("vis");
+  try{
+    const d=await readDataDump();
+    render(d);setStatus("ok");document.getElementById("errb").style.display="none";
+  }catch(e){
+    setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
+    const eb=document.getElementById("errb");eb.style.display="block";
+    eb.innerHTML="<strong>&#9888; Could not load data:</strong> "+e.message+"<br><small>Check your connection or sign out and back in.</small>";
+  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";restartCd();}
+}
+
+function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
+function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,"0");document.getElementById("acd").textContent=m+":"+s;document.getElementById("farN").textContent=autoOn?"Auto-refreshes every "+intMins+"m. Next in "+m+":"+s+".":"Auto-refresh paused.";}
+function toggleAuto(){autoOn=!autoOn;document.getElementById("atog").classList.toggle("off",!autoOn);const l=document.getElementById("arl");l.style.color=autoOn?"var(--or)":"var(--mu)";l.textContent=autoOn?"Auto":"Paused";document.getElementById("acd").style.display=autoOn?"":"none";document.getElementById("asel").style.display=autoOn?"":"none";autoOn?restartCd():clearInterval(ticker);updCd();}
+function changeInt(){intMins=parseInt(document.getElementById("asel").value);restartCd();}
+function showDash(){document.getElementById("loginScreen").style.display="none";document.getElementById("dashScreen").style.display="block";document.getElementById("sdt").textContent=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});fetchData();}
+
+async function boot(){
+  const p=new URLSearchParams(location.search);
+  if(p.has("code")){await handleCallback(p.get("code"),p.get("state"));return;}
+  const t=sessionStorage.getItem("tok"),exp=+sessionStorage.getItem("exp")||0;
+  if(t&&Date.now()<exp-30000){token=t;showDash();return;}
+  const rt=sessionStorage.getItem("rt");
+  if(rt){try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});showDash();return;}catch{}}
+  document.getElementById("loginScreen").style.display="flex";
+}
+boot();
+</script>
+</body>
+</html>
