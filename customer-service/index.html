@@ -402,6 +402,7 @@ async function readDataDump(){
   const salesTarget  =rowsSales[21]?.[2]!=null&&rowsSales[21][2]!==""?Math.abs(Number(rowsSales[21][2])):null;
   const pmTarget     =rowsSales[22]?.[2]!=null&&rowsSales[22][2]!==""?Math.abs(Number(rowsSales[22][2])):null;
   const ordersTarget =rowsSales[23]?.[2]!=null&&rowsSales[23][2]!==""?Math.abs(Number(rowsSales[23][2])):null;
+  const ordersToday  =rowsSales[26]?.[2]!=null&&rowsSales[26][2]!==""?Math.abs(Number(rowsSales[26][2])):null;
   const find=(...labels)=>{
     for(const lbl of labels){
       const lo=lbl.toLowerCase();
@@ -420,7 +421,6 @@ async function readDataDump(){
   };
   const sales=find("Total Sales");
   const pm   =find("Total Margin","Product Margin","Total PM");
-  const ordersToday=find("Orders in Today","Orders Today","Orders In Today");
 
   // OPS sheet — catalogue in stock at C11 (row index 10, col index 2)
   let cataloguePct=null;
