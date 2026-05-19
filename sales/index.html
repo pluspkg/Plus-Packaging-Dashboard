@@ -272,13 +272,15 @@ const CFG = {
   clientId:       "984139d6-9a6c-4da1-894d-34148ff1d570",
   tenantId:       "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
   scopes:         ["Files.Read.All","Sites.Read.All","User.Read"],
+  dynamicsScopes: ["https://pluspackaging.crm11.dynamics.com/user_impersonation"],
+  dynamicsUrl:    "https://pluspackaging.crm11.dynamics.com/api/data/v9.2",
   driveId:        "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
   outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
   crmDriveId:     "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
   crmItemId:      "017WW6KAARD5NC52XSNVH3MPPI4DC5FT3H",
 };
 const REDIRECT_URI = location.origin + location.pathname;
-let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
+let token=null,dynToken=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
 
 async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
 function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
@@ -288,8 +290,9 @@ async function signIn(){
   btn.disabled=true;btn.textContent="Redirecting to Microsoft...";
   const ver=rnd(43),ch=b64url(await sha256(ver)),st=rnd(16);
   sessionStorage.setItem("pkce_ver",ver);sessionStorage.setItem("pkce_st",st);
+  const allScopes=[...CFG.scopes,...CFG.dynamicsScopes].join(" ")+" offline_access";
   const p=new URLSearchParams({client_id:CFG.clientId,response_type:"code",redirect_uri:REDIRECT_URI,
-    scope:CFG.scopes.join(" ")+" offline_access",code_challenge:ch,code_challenge_method:"S256",
+    scope:allScopes,code_challenge:ch,code_challenge_method:"S256",
     state:st,response_mode:"query",prompt:"select_account"});
   location.href="https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/authorize?"+p;
 }
@@ -304,15 +307,17 @@ async function getToken(params){
 }
 async function handleCallback(code,state){
   if(state!==sessionStorage.getItem("pkce_st")){alert("Auth error.");return;}
+  const allScopes=[...CFG.scopes,...CFG.dynamicsScopes].join(" ");
   await getToken({client_id:CFG.clientId,grant_type:"authorization_code",code,
-    redirect_uri:REDIRECT_URI,code_verifier:sessionStorage.getItem("pkce_ver"),scope:CFG.scopes.join(" ")});
+    redirect_uri:REDIRECT_URI,code_verifier:sessionStorage.getItem("pkce_ver"),scope:allScopes});
   history.replaceState({},document.title,REDIRECT_URI);showDash();
 }
 async function ensureToken(){
   const exp=+sessionStorage.getItem("exp")||0;
   if(Date.now()<exp-60000)return true;
   const rt=sessionStorage.getItem("rt");if(!rt)return false;
-  try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});return true;}
+  const allScopes=[...CFG.scopes,...CFG.dynamicsScopes].join(" ");
+  try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:allScopes});return true;}
   catch{return false;}
 }
 function signOut(){sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
@@ -344,6 +349,7 @@ async function readDataDump(){
   const ordersTarget=rows[23]&&rows[23][2]!=null&&rows[23][2]!==""?Math.abs(Number(rows[23][2])):null;
   const newCustomers=rows[63]&&rows[63][2]!=null&&rows[63][2]!==""?Math.abs(Number(rows[63][2])):null;
   const shippedToday=rows[16]&&rows[16][2]!=null&&rows[16][2]!==""?Math.abs(Number(rows[16][2])):null;
+  const ordersToday =rows[26]&&rows[26][2]!=null&&rows[26][2]!==""?Math.abs(Number(rows[26][2])):null;
   const find=(...labels)=>{
     for(const lbl of labels){
       const lo=lbl.toLowerCase();
@@ -360,29 +366,89 @@ async function readDataDump(){
     }
     return null;
   };
-  return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,ordersTarget,newCustomers,shippedToday,ordersToday:find("Orders in Today","Orders Today","Orders In Today")};
+  return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,ordersTarget,newCustomers,shippedToday,ordersToday};
 }
+async function getDynToken(){
+  // Reuse cached token if still valid
+  const exp=+sessionStorage.getItem("dynExp")||0;
+  if(dynToken&&Date.now()<exp-60000)return dynToken;
+  // Get a fresh token for Dynamics scope using refresh token
+  const rt=sessionStorage.getItem("rt");
+  if(!rt)throw new Error("No refresh token — please sign in again.");
+  const r=await fetch("https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/token",
+    {method:"POST",body:new URLSearchParams({
+      client_id:CFG.clientId,grant_type:"refresh_token",
+      refresh_token:rt,scope:CFG.dynamicsScopes.join(" ")+" offline_access"
+    })});
+  const j=await r.json();
+  if(j.error)throw new Error("Dynamics auth: "+j.error_description);
+  dynToken=j.access_token;
+  sessionStorage.setItem("dynExp",Date.now()+j.expires_in*1000);
+  if(j.refresh_token)sessionStorage.setItem("rt",j.refresh_token);
+  return dynToken;
+}
+
+async function dynFetch(path){
+  const tok=await getDynToken();
+  const r=await fetch(CFG.dynamicsUrl+path,{headers:{
+    "Authorization":"Bearer "+tok,
+    "Accept":"application/json",
+    "OData-MaxVersion":"4.0",
+    "OData-Version":"4.0",
+    "Prefer":"odata.include-annotations=OData.Community.Display.V1.FormattedValue"
+  }});
+  if(!r.ok)throw new Error("Dynamics "+r.status+": "+await r.text());
+  return r.json();
+}
+
 async function readCRM(){
   try{
-    const wb=await downloadAndParse(CFG.crmDriveId,CFG.crmItemId);
-    const sheetName=wb.SheetNames.find(n=>n.toLowerCase().includes("total"))??wb.SheetNames[0];
-    const ws=wb.Sheets[sheetName];
-    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
-    let callsCol=-1,dealsCol=-1,apptCol=-1,lastHdrRow=-1;
-    for(let i=0;i<rows.length;i++){
-      let cc=-1,dc=-1,ac=-1;
-      rows[i].forEach((c,ci)=>{
-        if(typeof c==="string"){
-          if(c.toLowerCase()==="calls")        cc=ci;
-          if(c.toLowerCase()==="deals")        dc=ci;
-          if(c.toLowerCase()==="appointments") ac=ci;
-        }
-      });
-      if(cc>=0&&dc>=0&&ac>=0){callsCol=cc;dealsCol=dc;apptCol=ac;lastHdrRow=i;}
-    }
-    const totalsRow=lastHdrRow>=0?(rows[lastHdrRow+1]||[]):[];
-    return{callsToday:callsCol>=0?Number(totalsRow[callsCol])||0:null,dealsToday:dealsCol>=0?Number(totalsRow[dealsCol])||0:null,apptToday:apptCol>=0?Number(totalsRow[apptCol])||0:null};
-  }catch(e){console.warn("CRM:",e.message);return{callsToday:null,apptToday:null,dealsToday:null};}
+    // Today's date range in UTC
+    const now=new Date();
+    const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
+    const todayEnd=new Date(now);todayEnd.setHours(23,59,59,999);
+    const from=todayStart.toISOString();
+    const to=todayEnd.toISOString();
+
+    // ── PHONE CALLS ──
+    // Filter: today, completed (statecode=1), Meaningful Sales Interaction = Yes
+    // PLACEHOLDER field name: replace 'cr9b2_meaningfulsalesinteraction' with actual field name from IT
+    const MEANINGFUL_FIELD = "cr9b2_meaningfulsalesinteraction"; // ← REPLACE WITH ACTUAL FIELD NAME
+    const callsRes = await dynFetch(
+      `/phonecalls?$select=activityid,subject,${MEANINGFUL_FIELD}`+
+      `&$filter=statecode eq 1`+
+      ` and actualend ge ${from} and actualend le ${to}`+
+      ` and ${MEANINGFUL_FIELD} eq true`+
+      `&$count=true&$top=1`
+    );
+    const callsToday = callsRes["@odata.count"]??callsRes.value?.length??0;
+
+    // ── DEALS (Opportunities) ──
+    // Filter: created today
+    const dealsRes = await dynFetch(
+      `/opportunities?$select=opportunityid`+
+      `&$filter=createdon ge ${from} and createdon le ${to}`+
+      `&$count=true&$top=1`
+    );
+    const dealsToday = dealsRes["@odata.count"]??dealsRes.value?.length??0;
+
+    // ── APPOINTMENTS ──
+    // Filter: today, Customer Expecting = Yes
+    // PLACEHOLDER field name: replace 'cr9b2_customerexpecting' with actual field name from IT
+    const CUSTOMER_EXPECTING_FIELD = "cr9b2_customerexpecting"; // ← REPLACE WITH ACTUAL FIELD NAME
+    const apptRes = await dynFetch(
+      `/appointments?$select=activityid,subject,${CUSTOMER_EXPECTING_FIELD}`+
+      `&$filter=scheduledstart ge ${from} and scheduledstart le ${to}`+
+      ` and ${CUSTOMER_EXPECTING_FIELD} eq true`+
+      `&$count=true&$top=1`
+    );
+    const apptToday = apptRes["@odata.count"]??apptRes.value?.length??0;
+
+    return{callsToday,dealsToday,apptToday};
+  }catch(e){
+    console.warn("Dynamics CRM:",e.message);
+    return{callsToday:null,dealsToday:null,apptToday:null};
+  }
 }
 async function readNPS(){
   try{
