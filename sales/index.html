@@ -111,7 +111,7 @@
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
   .calls-lb{grid-column:1 / -1;flex-direction:row;align-items:center;gap:0;}
-  .clb-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%;}
+  .clb-grid{display:flex;gap:12px;width:100%;}
   .clb-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.04);}
   .clb-rank{font-size:13px;width:20px;flex-shrink:0;text-align:center;}
   .clb-name{flex:1;font-size:13px;font-weight:600;color:var(--ow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -541,16 +541,26 @@ function render(d){
   document.getElementById("k5").textContent=d.callsToday??0;
   const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣"];
   const lbList=document.getElementById("callsLbList");
-  if(d.top6Callers&&d.top6Callers.length>0){
-    lbList.innerHTML='<div class="clb-grid">'+d.top6Callers.map((p,i)=>`
-      <div class="clb-row">
-        <div class="clb-rank">${medals[i]||i+1}</div>
-        <div class="clb-name">${p.name}</div>
-        <div class="clb-count">${p.count}</div><div class="clb-lbl">calls</div>
-      </div>`).join("")+'</div>';
-  }else{
-    lbList.innerHTML='<div style="font-size:11px;color:var(--mu);font-style:italic;">No calls recorded yet today</div>';
-  }
+  const callers=d.top6Callers||[];
+  const left=callers.slice(0,3);
+  const right=callers.slice(3,6);
+  const makeRow=(p,i,offset)=>p?`
+    <div class="clb-row">
+      <div class="clb-rank">${medals[offset+i]}</div>
+      <div class="clb-name">${p.name}</div>
+      <div class="clb-count">${p.count}</div><div class="clb-lbl">calls</div>
+    </div>`:`<div class="clb-row" style="opacity:0.2;">
+      <div class="clb-rank">${medals[offset+i]}</div>
+      <div class="clb-name" style="color:var(--mu);">—</div>
+    </div>`;
+  lbList.innerHTML=`<div class="clb-grid">
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${[0,1,2].map(i=>makeRow(left[i],i,0)).join("")}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${[0,1,2].map(i=>makeRow(right[i],i,3)).join("")}
+    </div>
+  </div>`;
   document.getElementById("k6").textContent=INT(d.apptToday);
   document.getElementById("k7").textContent=INT(d.dealsToday);
   document.getElementById("k8").textContent=GBP(d.ordersToday);
