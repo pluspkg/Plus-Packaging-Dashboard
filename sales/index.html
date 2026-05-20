@@ -155,11 +155,14 @@
     .hero-var{font-size:10px}
     .bottom-grid{gap:8px;margin-bottom:10px}
     .kgrid{grid-template-columns:1fr 1fr;gap:8px}
-    .calls-lb{grid-column:1 / -1}
+    .calls-lb{grid-column:1 / -1;flex-direction:column;align-items:flex-start;gap:10px;}
+    .calls-divider{display:none;}
+    #callsLbList{margin-left:0!important;width:100%;}
     .kcard{padding:12px 14px;gap:10px;border-radius:10px}
     .kico{font-size:22px}
     .kval{font-size:22px}
-    .clb-grid{grid-template-columns:1fr}
+    .clb-grid{flex-direction:column;gap:4px;}
+    .clb-row{padding:5px 8px;}
     .nps-card{padding:10px 14px;gap:12px;border-radius:10px}
     .nps-score{font-size:32px}
   }
@@ -279,7 +282,8 @@
                 <div class="klbl">Total Outbound Calls Today</div>
               </div>
             </div>
-            <div id="callsLbList" style="flex:1;margin-left:24px;"></div>
+            <div style="width:1px;height:100%;background:rgba(255,255,255,.1);flex-shrink:0;" class="calls-divider"></div>
+            <div id="callsLbList" style="flex:1;"></div>
           </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
@@ -503,10 +507,13 @@ async function readCRM(){
   }catch(e){
     console.warn("Dynamics CRM:",e.message);
     const lbList=document.getElementById("callsLbList");
-    if(lbList)lbList.innerHTML=`<div style="font-size:11px;color:var(--re);font-style:italic;">CRM Error: ${e.message}</div>`;
+    if(lbList){
+      const noAccess=e.message.includes("401")||e.message.includes("403")||e.message.includes("auth")||e.message.includes("consent");
+      lbList.innerHTML=`<div style="font-size:11px;color:var(--mu);font-style:italic;">${noAccess?"CRM access not available for this account":"No calls recorded yet today"}</div>`;
+    }
     document.getElementById("k6").textContent="—";
     document.getElementById("k7").textContent="—";
-    return{callsToday:0,top6Callers:[],dealsToday:0,apptToday:0};
+    return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};
   }
 }
 async function readNPS(){
@@ -583,7 +590,7 @@ async function fetchData(){
   document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
   document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
   try{
-    const[dd,crm]=await Promise.all([readDataDump(),readCRM()]);
+    const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};})]);
     render({...dd,...crm});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
