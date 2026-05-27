@@ -101,7 +101,7 @@
   .hero-card.red .hero-var{color:var(--re)}
 
   /* Stat cards row */
-  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   @media(max-width:900px){.stat-row{grid-template-columns:1fr 1fr}}
   @media(max-width:600px){.stat-row{grid-template-columns:1fr}}
   .stat-card{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
@@ -306,6 +306,14 @@
           <div class="stat-period">Data Dump &bull; OPS sheet</div>
         </div>
 
+        <!-- Order Accuracy -->
+        <div class="stat-card" id="sc5" style="background:linear-gradient(135deg,#1a0d38,#240f52);border-color:rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.1);">
+          <div class="stat-label">Order Accuracy</div>
+          <div class="stat-sub">Last 30 days</div>
+          <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
+          <div class="stat-period">Data Dump &bull; Customer Service sheet</div>
+        </div>
+
       </div>
 
       <!-- NPS + Leaderboards -->
@@ -469,6 +477,10 @@ async function readDataDump(){
     // C3 = row index 2, col index 2
     const rawTotal=rowsCS[2]?.[2];
     if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
+    // C19 = row index 18, col index 2 — Order Accuracy %
+    const rawAcc=rowsCS[18]?.[2];
+    let orderAccuracy=null;
+    if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     // C5:C14 = rows 4-13, col 2 (names); D5:D14 = rows 4-13, col 3 (counts)
     const processors=[];
     for(let r=4;r<=13;r++){
@@ -481,7 +493,7 @@ async function readDataDump(){
     csTop3=processors.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
   }
 
-  return{sales,pm,salesTarget,pmTarget,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3};
+  return{sales,pm,salesTarget,pmTarget,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3,orderAccuracy};
 }
 
 // Read OTIF from OTIF Report xlsx — C11 (row 10, col 2)
@@ -549,6 +561,7 @@ function render(d){
 
   // Catalogue in stock
   document.getElementById("sCat").textContent=PCT(d.cataloguePct);
+  document.getElementById("sAccuracy").textContent=d.orderAccuracy!=null?d.orderAccuracy.toFixed(1)+"%":"—";
 
   // NPS
   const score=d.score!=null?Math.round(d.score):null;
