@@ -101,7 +101,7 @@
   .hero-card.red .hero-var{color:var(--re)}
 
   /* Stat cards */
-  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   .stat-card{border-radius:14px;padding:14px 18px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
   .stat-card.vis{opacity:1;transform:translateY(0)}
   .stat-card.orders{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
@@ -298,6 +298,12 @@
             </div>
           </div>
         </div>
+        <div class="stat-card" id="sc4" style="background:linear-gradient(135deg,#1a0d38,#240f52);border-color:rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.1);">
+          <div class="stat-label">Order Accuracy</div>
+          <div class="stat-sub">Last 30 days</div>
+          <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
+          <div class="stat-period">Data Dump &bull; Customer Service sheet</div>
+        </div>
       </div>
 
       <!-- Top Pickers -->
@@ -410,7 +416,7 @@ async function readDataDump(){
 
   // OPS sheet
   const opsName=wb.SheetNames.find(n=>n.toLowerCase().includes("ops"));
-  let shipmentsToday=null,csOrdersTotal=null,top3Pickers=[];
+  let shipmentsToday=null,csOrdersTotal=null,orderAccuracy=null,top3Pickers=[];
   if(opsName){
     const wsOps=wb.Sheets[opsName];
     const rowsOps=XLSX.utils.sheet_to_json(wsOps,{header:1,defval:""});
@@ -427,6 +433,9 @@ async function readDataDump(){
       const rowsCS=XLSX.utils.sheet_to_json(wsCS,{header:1,defval:""});
       const rawTotal=rowsCS[2]?.[2];
       if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
+      // C19 = row index 18 — Order Accuracy %
+      const rawAcc=rowsCS[18]?.[2];
+      if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     }
 
     // C20:D30 = rows 19-29, col 2 (names) col 3 (picks) — top pickers
@@ -441,7 +450,7 @@ async function readDataDump(){
     top3Pickers=pickers.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
   }
 
-  return{sales,pm,salesTarget,pmTarget,shipmentsToday,shippedToday,shippedTarget,csOrdersTotal,top3Pickers};
+  return{sales,pm,salesTarget,pmTarget,shipmentsToday,shippedToday,shippedTarget,csOrdersTotal,orderAccuracy,top3Pickers};
 }
 
 const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -478,6 +487,7 @@ function render(d){
   document.getElementById("sShippedPct").textContent=shippedPct!=null?shippedPct.toFixed(1)+"%":"—";
   document.getElementById("sShippedPct").style.color=onTarget?"var(--gr)":"var(--re)";
   document.getElementById("sShippedTgt").textContent=d.shippedTarget!=null?GBP(d.shippedTarget):"";
+  document.getElementById("sAccuracy").textContent=d.orderAccuracy!=null?d.orderAccuracy.toFixed(1)+"%":"—";
 
   // Top pickers leaderboard
   const ranks=["gold","silver","bronze"];
@@ -498,7 +508,7 @@ function render(d){
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["sc0","sc1","sc2","sc3"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
+  ["sc0","sc1","sc2","sc3","sc4"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
 }
