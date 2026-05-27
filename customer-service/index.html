@@ -295,7 +295,6 @@
           <div class="stat-label">OTIF</div>
           <div class="stat-sub">On Time In Full &bull; Today</div>
           <div class="stat-value" id="sOtif">&#8212;</div>
-          <div class="stat-period">OTIF Report &bull; Promised delivery date</div>
         </div>
 
         <!-- Catalogue In Stock -->
@@ -303,7 +302,6 @@
           <div class="stat-label">Catalogue In Stock</div>
           <div class="stat-sub">Items available</div>
           <div class="stat-value" id="sCat">&#8212;</div>
-          <div class="stat-period">Data Dump &bull; OPS sheet</div>
         </div>
 
         <!-- Order Accuracy -->
@@ -311,7 +309,6 @@
           <div class="stat-label">Order Accuracy</div>
           <div class="stat-sub">Last 30 days</div>
           <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
-          <div class="stat-period">Data Dump &bull; Customer Service sheet</div>
         </div>
 
       </div>
@@ -469,7 +466,7 @@ async function readDataDump(){
   }
 
   // Customer Service sheet — C3=total orders processed, C5:C14=names, D5:D14=counts
-  let csOrdersTotal=null,csTop3=[];
+  let csOrdersTotal=null,csTop3=[],orderAccuracy=null;
   const csSheet=wb.SheetNames.find(n=>n.toLowerCase().includes("customer service")||n.toLowerCase().includes("customer serv"));
   if(csSheet){
     const wsCS=wb.Sheets[csSheet];
@@ -479,7 +476,6 @@ async function readDataDump(){
     if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
     // C19 = row index 18, col index 2 — Order Accuracy %
     const rawAcc=rowsCS[18]?.[2];
-    let orderAccuracy=null;
     if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     // C5:C14 = rows 4-13, col 2 (names); D5:D14 = rows 4-13, col 3 (counts)
     const processors=[];
