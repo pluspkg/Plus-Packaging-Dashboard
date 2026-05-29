@@ -110,7 +110,7 @@
   .kcard.ac .kval{color:var(--or)}
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
-  .calls-lb{grid-column:1 / -1;flex-direction:row;align-items:center;gap:0;}
+  .calls-lb{grid-column:span 1;flex-direction:row;align-items:center;gap:0;min-width:0;}
   .clb-grid{display:flex;gap:12px;width:100%;}
   .clb-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.04);}
   .clb-rank{font-size:13px;width:20px;flex-shrink:0;text-align:center;}
@@ -279,8 +279,8 @@
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
               <div class="kico">&#128222;</div>
               <div>
-                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
-                <div class="klbl">Total Outbound Calls Today</div>
+                <div style="font-size:40px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
               </div>
             </div>
             <div style="width:1px;height:100%;background:rgba(255,255,255,.1);flex-shrink:0;" class="calls-divider"></div>
@@ -290,8 +290,8 @@
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
               <div class="kico">&#128197;</div>
               <div>
-                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
-                <div class="klbl">Total Outbound Calls This Week</div>
+                <div style="font-size:40px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
               </div>
             </div>
             <div style="width:1px;height:100%;background:rgba(255,255,255,.1);flex-shrink:0;" class="calls-divider"></div>
