@@ -286,6 +286,17 @@
             <div style="width:1px;height:100%;background:rgba(255,255,255,.1);flex-shrink:0;" class="calls-divider"></div>
             <div id="callsLbList" style="flex:1;"></div>
           </div>
+          <div class="kcard calls-lb" id="kc0w">
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div class="kico">&#128197;</div>
+              <div>
+                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
+                <div class="klbl">Total Outbound Calls This Week</div>
+              </div>
+            </div>
+            <div style="width:1px;height:100%;background:rgba(255,255,255,.1);flex-shrink:0;" class="calls-divider"></div>
+            <div id="callsWeekLbList" style="flex:1;"></div>
+          </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
           <div class="kcard"    id="kc3"><div class="kico">&#128200;</div><div class="kinfo"><div class="kval" id="k8">&#8212;</div><div class="klbl">Orders In Today</div><div class="ktgt" id="k8tgt"></div></div></div>
@@ -482,34 +493,61 @@ async function dynFetch(path){
 
 async function readCRM(){
   try{
-    // Today's date range in UTC
     const now=new Date();
     const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
     const todayEnd=new Date(now);todayEnd.setHours(23,59,59,999);
     const from=todayStart.toISOString();
     const to=todayEnd.toISOString();
 
-    // ── PHONE CALLS — outbound, today, Meaningful Sales Interaction = Yes ──
-    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction";
-    const callsRes = await dynFetch(
-      `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
-      `&$filter=directioncode eq true`+
-      ` and actualend ge ${from} and actualend le ${to}`+
-      ` and statecode eq 1`+
-      ` and ${MEANINGFUL_FIELD} eq true`
-    );
-    const callRecords = callsRes.value || [];
-    const callsToday = callRecords.length;
+    // Week start = Monday
+    const weekStart=new Date(todayStart);
+    const day=weekStart.getDay();
+    const diff=day===0?6:day-1;
+    weekStart.setDate(weekStart.getDate()-diff);
+    const weekFrom=weekStart.toISOString();
 
-    // Count by caller name, get top 6
+    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction";
+
+    // Fetch today's AND this week's calls in parallel
+    const [todayRes, weekRes] = await Promise.all([
+      dynFetch(
+        `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
+        `&$filter=directioncode eq true`+
+        ` and actualend ge ${from} and actualend le ${to}`+
+        ` and statecode eq 1`+
+        ` and ${MEANINGFUL_FIELD} eq true`
+      ),
+      dynFetch(
+        `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
+        `&$filter=directioncode eq true`+
+        ` and actualend ge ${weekFrom} and actualend le ${to}`+
+        ` and statecode eq 1`+
+        ` and ${MEANINGFUL_FIELD} eq true`
+      ),
+    ]);
+
+    // Today
+    const callRecords = todayRes.value || [];
+    const callsToday = callRecords.length;
     const callerCounts = {};
     for(const c of callRecords){
-      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"]
-                || c._ownerid_value
-                || "Unknown";
+      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"] || c._ownerid_value || "Unknown";
       callerCounts[name] = (callerCounts[name]||0) + 1;
     }
     const top6Callers = Object.entries(callerCounts)
+      .map(([name,count])=>({name,count}))
+      .sort((a,b)=>b.count-a.count)
+      .slice(0,6);
+
+    // This week
+    const weekRecords = weekRes.value || [];
+    const callsWeek = weekRecords.length;
+    const weekCounts = {};
+    for(const c of weekRecords){
+      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"] || c._ownerid_value || "Unknown";
+      weekCounts[name] = (weekCounts[name]||0) + 1;
+    }
+    const top6CallersWeek = Object.entries(weekCounts)
       .map(([name,count])=>({name,count}))
       .sort((a,b)=>b.count-a.count)
       .slice(0,6);
@@ -533,7 +571,7 @@ async function readCRM(){
     );
     const apptToday = apptRes["@odata.count"]??apptRes.value?.length??0;
 
-    return{callsToday,top6Callers,dealsToday,apptToday};
+    return{callsToday,top6Callers,callsWeek,top6CallersWeek,dealsToday,apptToday};
   }catch(e){
     console.warn("Dynamics CRM:",e.message);
     const lbList=document.getElementById("callsLbList");
@@ -543,7 +581,7 @@ async function readCRM(){
     }
     document.getElementById("k6").textContent="—";
     document.getElementById("k7").textContent="—";
-    return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};
+    return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};
   }
 }
 async function readNPS(){
@@ -599,6 +637,20 @@ function render(d){
     </div>
   </div>`;
   document.getElementById("k6").textContent=INT(d.apptToday);
+  // Weekly calls leaderboard
+  document.getElementById("k5w").textContent=d.callsWeek??0;
+  const weekLbList=document.getElementById("callsWeekLbList");
+  const weekCallers=d.top6CallersWeek||[];
+  const weekLeft=weekCallers.slice(0,3);
+  const weekRight=weekCallers.slice(3,6);
+  weekLbList.innerHTML=`<div class="clb-grid">
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${[0,1,2].map(i=>makeRow(weekLeft[i],i,0)).join("")}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${[0,1,2].map(i=>makeRow(weekRight[i],i,3)).join("")}
+    </div>
+  </div>`;
   document.getElementById("k7").textContent=INT(d.dealsToday);
   document.getElementById("k8").textContent=GBP(d.ordersToday);
   // Orders target
@@ -609,7 +661,7 @@ function render(d){
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["kc0","kc1","kc2","kc3","kc4","kc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
+  ["kc0","kc0w","kc1","kc2","kc3","kc4","kc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
 }
