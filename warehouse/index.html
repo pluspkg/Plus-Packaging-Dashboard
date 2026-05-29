@@ -380,6 +380,30 @@ async function downloadAndParse(driveId,itemId){
   return XLSX.read(await r.arrayBuffer(),{type:"array"});
 }
 
+// ── NAV CONFIGURATION ─────────────────────────────────────────────────────────
+const NAV_ENABLED    = true;
+const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
+
+async function readNAV(dd){
+  try{
+    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(30000)});
+    if(!r.ok)throw new Error("NAV Worker "+r.status);
+    const j=await r.json();
+    return{
+      sales:           (dd.salesYesterday??0) + (j.salesToday??0),
+      pm:              (dd.pmYesterday??0)    + (j.marginToday??0),
+      ordersToday:     j.ordersToday          ?? null,
+      shippedToday:    j.shippedToday         ?? null,
+      shipmentsToday:  j.shipmentsToday       ?? null,
+      csOrdersTotal:   j.orderProcessorTotal  ?? null,
+      navLoaded: true,
+    };
+  }catch(e){
+    console.warn("NAV Worker:",e.message);
+    return{navLoaded:false};
+  }
+}
+
 async function readDataDump(){
   const folder=await graphJSON("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
   const file=folder.value.find(f=>f.name==="Data Dump.xlsx");
@@ -391,6 +415,8 @@ async function readDataDump(){
   const rowsSales=XLSX.utils.sheet_to_json(wsSales,{header:1,defval:""});
   const salesTarget =rowsSales[21]?.[2]!=null&&rowsSales[21][2]!==""?Math.abs(Number(rowsSales[21][2])):null;
   const pmTarget    =rowsSales[22]?.[2]!=null&&rowsSales[22][2]!==""?Math.abs(Number(rowsSales[22][2])):null;
+  const salesYesterday=rowsSales[73]?.[2]!=null&&rowsSales[73][2]!==""?Math.abs(Number(rowsSales[73][2])):null;
+  const pmYesterday   =rowsSales[77]?.[2]!=null&&rowsSales[77][2]!==""?Math.abs(Number(rowsSales[77][2])):null;
   const shippedToday=rowsSales[16]?.[2]!=null&&rowsSales[16][2]!==""?Math.abs(Number(rowsSales[16][2])):null;
   const shippedTarget=rowsSales[20]?.[2]!=null&&rowsSales[20][2]!==""?Math.abs(Number(rowsSales[20][2])):null;
   const flatSales=rowsSales.flat();
@@ -449,7 +475,7 @@ async function readDataDump(){
     top3Pickers=pickers.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
   }
 
-  return{sales,pm,salesTarget,pmTarget,shipmentsToday,shippedToday,shippedTarget,csOrdersTotal,orderAccuracy,top3Pickers};
+  return{sales,pm,salesTarget,pmTarget,salesYesterday,pmYesterday,shipmentsToday,shippedToday,shippedTarget,csOrdersTotal,orderAccuracy,top3Pickers};
 }
 
 const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -521,7 +547,8 @@ async function fetchData(){
   document.querySelectorAll(".hero-card,.stat-card,.lb-card").forEach(c=>c.classList.remove("vis"));
   try{
     const d=await readDataDump();
-    render(d);setStatus("ok");document.getElementById("errb").style.display="none";
+    const navData = NAV_ENABLED ? await readNAV(d) : {};
+    render({...d,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
