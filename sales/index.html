@@ -646,6 +646,7 @@ function render(d){
       ${[0,1,2].map(i=>makeRow(weekRight[i],i,3)).join("")}
     </div>
   </div>`;
+  document.getElementById("k6").textContent=INT(d.apptToday);
   document.getElementById("k7").textContent=INT(d.dealsToday);
   document.getElementById("k8").textContent=GBP(d.ordersToday);
   // Orders target
