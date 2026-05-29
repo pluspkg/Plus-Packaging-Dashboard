@@ -425,15 +425,15 @@ const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
 
 async function readNAV(){
   try{
-    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(10000)});
+    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(30000)});
     if(!r.ok)throw new Error("NAV Worker "+r.status);
     const j=await r.json();
     return{
-      sales:          j.salesMTD                    ?? null,
-      pm:             j.productMarginMTD             ?? null,
-      ordersToday:    j.ordersToday                  ?? null,
-      csOrdersTotal:  j.processors?.total            ?? null,
-      csTop3:         j.processors?.top3             ?? [],
+      sales:          j.salesMTD             ?? null,
+      pm:             j.productMarginMTD     ?? null,
+      ordersToday:    j.ordersToday          ?? null,
+      csOrdersTotal:  j.orderProcessorTotal  ?? null,
+      navOrderCounts: j.orderProcessorCounts ?? {},
       navLoaded: true,
     };
   }catch(e){
@@ -591,12 +591,33 @@ function render(d){
   document.getElementById("sNpsSub").textContent=score!=null?"AskNicely NPS":"Data unavailable";
 
   // Order processor leaderboard
+  // If NAV data available, merge NAV counts with Data Dump names
   document.getElementById("lbTotal").textContent=d.csOrdersTotal!=null?d.csOrdersTotal:"—";
   const lbList=document.getElementById("lbList");
   const ranks=["gold","silver","bronze"];
   const medals=["🥇","🥈","🥉"];
-  if(d.csTop3&&d.csTop3.length>0){
-    lbList.innerHTML=d.csTop3.map((p,i)=>`
+
+  let top3ToShow = d.csTop3 || [];
+  if(d.navOrderCounts && Object.keys(d.navOrderCounts).length > 0 && d.csTop3 && d.csTop3.length > 0){
+    // Match NAV Assigned_User_ID to Data Dump names
+    // Data Dump has names like "Kayleigh Hewitt", NAV has "PLUSPACKAGING\KAYLEIGH.H"
+    // Build a lookup: last part of NAV ID (e.g. KAYLEIGH.H) matched to Data Dump name
+    const navMerged = d.csTop3.map(p => {
+      // Find matching NAV key for this person
+      const navKey = Object.keys(d.navOrderCounts).find(k => {
+        const parts = k.split("\\");
+        const uid = parts[parts.length - 1].toLowerCase();
+        const nameParts = p.name.toLowerCase().split(" ");
+        // Match on first name initial + last name (e.g. KAYLEIGH.H → kayleigh)
+        return nameParts.some(part => uid.startsWith(part.slice(0,3)));
+      });
+      return { name: p.name, count: navKey ? d.navOrderCounts[navKey] : p.count };
+    }).sort((a,b) => b.count - a.count);
+    top3ToShow = navMerged.filter(p => p.count > 0).slice(0, 3);
+  }
+
+  if(top3ToShow.length > 0){
+    lbList.innerHTML=top3ToShow.map((p,i)=>`
       <div class="lb-row">
         <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
         <div class="lb-name">${p.name}</div>
