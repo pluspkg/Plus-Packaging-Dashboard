@@ -387,17 +387,17 @@ const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
 
 async function readNAV(){
   try{
-    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(10000)});
+    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(30000)});
     if(!r.ok)throw new Error("NAV Worker "+r.status);
     const j=await r.json();
     return{
-      sales:           j.salesMTD                  ?? null,
-      pm:              j.productMarginMTD           ?? null,
-      ordersToday:     j.ordersToday               ?? null,
-      shippedToday:    j.shippedToday              ?? null,
-      shipmentsToday:  j.shipmentsToday            ?? null,
-      csOrdersTotal:   j.processors?.total         ?? null,
-      top3Pickers:     j.pickers?.top3             ?? [],
+      sales:           j.salesMTD             ?? null,
+      pm:              j.productMarginMTD     ?? null,
+      ordersToday:     j.ordersToday          ?? null,
+      shippedToday:    j.shippedToday         ?? null,
+      shipmentsToday:  j.shipmentsToday       ?? null,
+      csOrdersTotal:   j.orderProcessorTotal  ?? null,
+      navOrderCounts:  j.orderProcessorCounts ?? {},
       navLoaded: true,
     };
   }catch(e){
