@@ -99,7 +99,7 @@
   .nps-period{font-size:10px;color:var(--mu);margin-top:2px;font-style:italic}
   .nps-text{display:flex;flex-direction:column;}
   .bottom-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
-  .kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .kgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
   .kcard{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:18px 20px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:16px}
   .kcard.vis{opacity:1;transform:translateY(0)}
   .kcard.ac{background:linear-gradient(135deg,var(--nc) 40%,rgba(244,124,32,.1));border-color:rgba(244,124,32,.35)}
@@ -110,7 +110,8 @@
   .kcard.ac .kval{color:var(--or)}
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
-  .calls-lb{grid-column:1 / -1;flex-direction:row;align-items:center;gap:0;}
+  .calls-lb{grid-column:span 3;flex-direction:row;align-items:center;gap:0;min-width:0;}
+  .kgrid .kcard:not(.calls-lb){grid-column:span 2;}
   .clb-grid{display:flex;gap:12px;width:100%;}
   .clb-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.04);}
   .clb-rank{font-size:13px;width:20px;flex-shrink:0;text-align:center;}
@@ -155,7 +156,10 @@
     .hero-var{font-size:10px}
     .bottom-grid{gap:8px;margin-bottom:10px}
     .kgrid{grid-template-columns:1fr 1fr;gap:8px}
+    .kgrid .kcard:not(.calls-lb){grid-column:span 1;}
+    .calls-lb{grid-column:1 / -1;}
     .calls-lb{grid-column:1 / -1;flex-direction:column;align-items:flex-start;gap:10px;}
+    .kgrid .kcard:not(.calls-lb){grid-column:span 1;}
     .calls-divider{display:none;}
     #callsLbList{margin-left:0!important;width:100%;}
     .kcard{padding:12px 14px;gap:10px;border-radius:10px}
@@ -279,18 +283,29 @@
               <div class="kico">&#128222;</div>
               <div>
                 <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
-                <div class="klbl">Total Outbound Calls Today</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
               </div>
             </div>
-            <div style="width:1px;height:100%;background:rgba(255,255,255,.1);flex-shrink:0;" class="calls-divider"></div>
-            <div id="callsLbList" style="flex:1;"></div>
+            
+            <div id="callsLbList" style="flex:1;padding-left:12px;"></div>
+          </div>
+          <div class="kcard calls-lb" id="kc0w">
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div class="kico" style="color:var(--cy)">&#128222;</div>
+              <div>
+                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
+              </div>
+            </div>
+            
+            <div id="callsWeekLbList" style="flex:1;padding-left:12px;"></div>
           </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
           <div class="kcard"    id="kc3"><div class="kico">&#128200;</div><div class="kinfo"><div class="kval" id="k8">&#8212;</div><div class="klbl">Orders In Today</div><div class="ktgt" id="k8tgt"></div></div></div>
           <div class="kcard ac" id="kc4"><div class="kico">&#128666;</div><div class="kinfo"><div class="kval" id="k9">&#8212;</div><div class="klbl">Shipped Today</div></div></div>
           <div class="kcard"    id="kc5"><div class="kico">&#127381;</div><div class="kinfo"><div class="kval" id="k10">&#8212;</div><div class="klbl">New Customers This Month</div></div></div>
-          <div class="nps-card" id="marginPctCard" style="background:linear-gradient(135deg,#0d2438,#102e4a);border-color:rgba(251,191,36,.35);box-shadow:0 8px 40px rgba(251,191,36,.1);border-radius:14px;padding:14px 18px;">
+          <div class="nps-card" id="marginPctCard" style="background:linear-gradient(135deg,#0d2438,#102e4a);border-color:rgba(251,191,36,.35);box-shadow:0 8px 40px rgba(251,191,36,.1);border-radius:14px;padding:14px 18px;grid-column:span 2;">
             <div class="nps-score" id="marginPctScore" style="color:var(--am);font-size:32px;">&#8212;</div>
             <div class="nps-text">
               <div class="nps-label">Margin %</div>
@@ -476,34 +491,61 @@ async function dynFetch(path){
 
 async function readCRM(){
   try{
-    // Today's date range in UTC
     const now=new Date();
     const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
     const todayEnd=new Date(now);todayEnd.setHours(23,59,59,999);
     const from=todayStart.toISOString();
     const to=todayEnd.toISOString();
 
-    // ── PHONE CALLS — outbound, today, Meaningful Sales Interaction = Yes ──
-    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction";
-    const callsRes = await dynFetch(
-      `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
-      `&$filter=directioncode eq true`+
-      ` and actualend ge ${from} and actualend le ${to}`+
-      ` and statecode eq 1`+
-      ` and ${MEANINGFUL_FIELD} eq true`
-    );
-    const callRecords = callsRes.value || [];
-    const callsToday = callRecords.length;
+    // Week start = Monday
+    const weekStart=new Date(todayStart);
+    const day=weekStart.getDay();
+    const diff=day===0?6:day-1; // days since Monday
+    weekStart.setDate(weekStart.getDate()-diff);
+    const weekFrom=weekStart.toISOString();
 
-    // Count by caller name, get top 6
+    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction";
+
+    // Fetch today's AND this week's calls in parallel
+    const [todayRes, weekRes] = await Promise.all([
+      dynFetch(
+        `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
+        `&$filter=directioncode eq true`+
+        ` and actualend ge ${from} and actualend le ${to}`+
+        ` and statecode eq 1`+
+        ` and ${MEANINGFUL_FIELD} eq true`
+      ),
+      dynFetch(
+        `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
+        `&$filter=directioncode eq true`+
+        ` and actualend ge ${weekFrom} and actualend le ${to}`+
+        ` and statecode eq 1`+
+        ` and ${MEANINGFUL_FIELD} eq true`
+      ),
+    ]);
+
+    // Today
+    const callRecords = todayRes.value || [];
+    const callsToday = callRecords.length;
     const callerCounts = {};
     for(const c of callRecords){
-      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"]
-                || c._ownerid_value
-                || "Unknown";
+      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"] || c._ownerid_value || "Unknown";
       callerCounts[name] = (callerCounts[name]||0) + 1;
     }
     const top6Callers = Object.entries(callerCounts)
+      .map(([name,count])=>({name,count}))
+      .sort((a,b)=>b.count-a.count)
+      .slice(0,6);
+
+    // This week
+    const weekRecords = weekRes.value || [];
+    const callsWeek = weekRecords.length;
+    const weekCounts = {};
+    for(const c of weekRecords){
+      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"] || c._ownerid_value || "Unknown";
+      weekCounts[name] = (weekCounts[name]||0) + 1;
+    }
+    const top6CallersWeek = Object.entries(weekCounts)
       .map(([name,count])=>({name,count}))
       .sort((a,b)=>b.count-a.count)
       .slice(0,6);
@@ -527,7 +569,7 @@ async function readCRM(){
     );
     const apptToday = apptRes["@odata.count"]??apptRes.value?.length??0;
 
-    return{callsToday,top6Callers,dealsToday,apptToday};
+    return{callsToday,top6Callers,callsWeek,top6CallersWeek,dealsToday,apptToday};
   }catch(e){
     console.warn("Dynamics CRM:",e.message);
     const lbList=document.getElementById("callsLbList");
@@ -537,7 +579,7 @@ async function readCRM(){
     }
     document.getElementById("k6").textContent="—";
     document.getElementById("k7").textContent="—";
-    return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};
+    return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};
   }
 }
 async function readNPS(){
@@ -592,7 +634,20 @@ function render(d){
       ${[0,1,2].map(i=>makeRow(right[i],i,3)).join("")}
     </div>
   </div>`;
-  document.getElementById("k6").textContent=INT(d.apptToday);
+  // Weekly calls leaderboard
+  document.getElementById("k5w").textContent=d.callsWeek??0;
+  const weekLbList=document.getElementById("callsWeekLbList");
+  const weekCallers=d.top6CallersWeek||[];
+  const weekLeft=weekCallers.slice(0,3);
+  const weekRight=weekCallers.slice(3,6);
+  weekLbList.innerHTML=`<div class="clb-grid">
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${[0,1,2].map(i=>makeRow(weekLeft[i],i,0)).join("")}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${[0,1,2].map(i=>makeRow(weekRight[i],i,3)).join("")}
+    </div>
+  </div>`;
   document.getElementById("k7").textContent=INT(d.dealsToday);
   document.getElementById("k8").textContent=GBP(d.ordersToday);
   // Orders target
@@ -603,7 +658,7 @@ function render(d){
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["kc0","kc1","kc2","kc3","kc4","kc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
+  ["kc0","kc0w","kc1","kc2","kc3","kc4","kc5"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*60));
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
 }
