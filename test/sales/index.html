@@ -384,7 +384,7 @@ const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
 async function readNAV(){
   // Called when NAV_ENABLED = true — fetches all metrics from NAV Worker
   try{
-    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(10000)});
+    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(30000)});
     if(!r.ok)throw new Error("NAV Worker "+r.status);
     const j=await r.json();
     return{
