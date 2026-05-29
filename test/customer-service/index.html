@@ -423,14 +423,14 @@ async function downloadAndParse(driveId,itemId){
 const NAV_ENABLED    = true;
 const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
 
-async function readNAV(){
+async function readNAV(dd){
   try{
     const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(30000)});
     if(!r.ok)throw new Error("NAV Worker "+r.status);
     const j=await r.json();
     return{
-      sales:          j.salesMTD             ?? null,
-      pm:             j.productMarginMTD     ?? null,
+      sales:          (dd.salesYesterday??0) + (j.salesToday??0),
+      pm:             (dd.pmYesterday??0)    + (j.marginToday??0),
       ordersToday:    j.ordersToday          ?? null,
       csOrdersTotal:  j.orderProcessorTotal  ?? null,
       navOrderCounts: j.orderProcessorCounts ?? {},
@@ -454,6 +454,8 @@ async function readDataDump(){
   const flatSales=rowsSales.flat();
   const salesTarget  =rowsSales[21]?.[2]!=null&&rowsSales[21][2]!==""?Math.abs(Number(rowsSales[21][2])):null;
   const pmTarget     =rowsSales[22]?.[2]!=null&&rowsSales[22][2]!==""?Math.abs(Number(rowsSales[22][2])):null;
+  const salesYesterday=rowsSales[73]?.[2]!=null&&rowsSales[73][2]!==""?Math.abs(Number(rowsSales[73][2])):null;
+  const pmYesterday   =rowsSales[77]?.[2]!=null&&rowsSales[77][2]!==""?Math.abs(Number(rowsSales[77][2])):null;
   const ordersTarget =rowsSales[23]?.[2]!=null&&rowsSales[23][2]!==""?Math.abs(Number(rowsSales[23][2])):null;
   const ordersToday  =rowsSales[26]?.[2]!=null&&rowsSales[26][2]!==""?Math.abs(Number(rowsSales[26][2])):null;
   const find=(...labels)=>{
@@ -513,7 +515,7 @@ async function readDataDump(){
     csTop3=processors.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
   }
 
-  return{sales,pm,salesTarget,pmTarget,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3,orderAccuracy};
+  return{sales,pm,salesTarget,pmTarget,salesYesterday,pmYesterday,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3,orderAccuracy};
 }
 
 // Read OTIF from OTIF Report xlsx — C11 (row 10, col 2)
@@ -659,7 +661,7 @@ async function fetchData(){
   document.querySelectorAll(".hero-card,.stat-card").forEach(c=>c.classList.remove("vis"));
   try{
     const[dd,otif,nps,rc]=await Promise.all([readDataDump(),readOTIF(),readNPS(),readCallsByPerson()]);
-    const navData = NAV_ENABLED ? await readNAV() : {};
+    const navData = NAV_ENABLED ? await readNAV(dd) : {};
     render({...dd,...otif,...nps,...rc,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
