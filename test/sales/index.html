@@ -381,18 +381,19 @@ async function downloadAndParse(driveId,itemId){
 const NAV_ENABLED    = true;
 const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
 
-async function readNAV(){
-  // Called when NAV_ENABLED = true — fetches all metrics from NAV Worker
+async function readNAV(dd){
   try{
     const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(30000)});
     if(!r.ok)throw new Error("NAV Worker "+r.status);
     const j=await r.json();
+    // Sales MTD = yesterday's total from Data Dump + today's from NAV
+    const salesMTD = (dd.salesYesterday??0) + (j.salesToday??0);
+    const pmMTD    = (dd.pmYesterday??0)    + (dd.pmYesterday!=null&&j.marginToday!=null ? j.marginToday : 0);
     return{
-      sales:          j.salesMTD          ?? null,
-      pm:             j.productMarginMTD  ?? null,
-      ordersToday:    j.ordersToday       ?? null,
-      shippedToday:   j.shippedToday      ?? null,
-      // targets still come from Data Dump — not overridden here
+      sales:        salesMTD,
+      pm:           (dd.pmYesterday??0) + (j.marginToday??0),
+      ordersToday:  j.ordersToday    ?? null,
+      shippedToday: j.shippedToday   ?? null,
       navLoaded: true,
     };
   }catch(e){
@@ -409,8 +410,10 @@ async function readDataDump(){
   const ws=wb.Sheets[wb.SheetNames[0]];
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
   const flat=rows.flat();
-  const salesTarget=rows[21]&&rows[21][2]!=null&&rows[21][2]!==""?Math.abs(Number(rows[21][2])):null;
-  const pmTarget   =rows[22]&&rows[22][2]!=null&&rows[22][2]!==""?Math.abs(Number(rows[22][2])):null;
+  const salesTarget   =rows[21]&&rows[21][2]!=null&&rows[21][2]!==""?Math.abs(Number(rows[21][2])):null;
+  const pmTarget      =rows[22]&&rows[22][2]!=null&&rows[22][2]!==""?Math.abs(Number(rows[22][2])):null;
+  const salesYesterday=rows[73]&&rows[73][2]!=null&&rows[73][2]!==""?Math.abs(Number(rows[73][2])):null;
+  const pmYesterday   =rows[77]&&rows[77][2]!=null&&rows[77][2]!==""?Math.abs(Number(rows[77][2])):null;
   const ordersTarget=rows[23]&&rows[23][2]!=null&&rows[23][2]!==""?Math.abs(Number(rows[23][2])):null;
   const newCustomers=rows[63]&&rows[63][2]!=null&&rows[63][2]!==""?Math.abs(Number(rows[63][2])):null;
   const shippedToday=rows[16]&&rows[16][2]!=null&&rows[16][2]!==""?Math.abs(Number(rows[16][2])):null;
@@ -431,7 +434,7 @@ async function readDataDump(){
     }
     return null;
   };
-  return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,ordersTarget,newCustomers,shippedToday,ordersToday};
+  return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,salesYesterday,pmYesterday,ordersTarget,newCustomers,shippedToday,ordersToday};
 }
 async function getDynToken(){
   const exp=+sessionStorage.getItem("dynExp")||0;
@@ -619,7 +622,7 @@ async function fetchData(){
   try{
     const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};})]);
     // Merge NAV data over Data Dump values when NAV is enabled
-    const navData = NAV_ENABLED ? await readNAV() : {};
+    const navData = NAV_ENABLED ? await readNAV(dd) : {};
     render({...dd,...crm,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
