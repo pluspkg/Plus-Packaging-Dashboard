@@ -562,7 +562,7 @@ async function readCRM(){
     // ── APPOINTMENTS — created today, Customer Expecting = Yes ──
     const CUSTOMER_EXPECTING_FIELD = "new_fixed"; // Customer Expecting
     const apptRes = await dynFetch(
-      `/appointments?$select=activityid,${CUSTOMER_EXPECTING_FIELD}`+
+      `/appointments?$select=activityid,${CUSTOMER_EXPECTING_FIELD},scheduledstart`+
       `&$filter=createdon ge ${from} and createdon le ${to}`+
       ` and ${CUSTOMER_EXPECTING_FIELD} eq true`+
       `&$count=true&$top=1`
@@ -669,7 +669,7 @@ async function fetchData(){
   document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
   document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
   try{
-    const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};})]);
+    const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};})]);
     // Merge NAV data over Data Dump values when NAV is enabled
     const navData = NAV_ENABLED ? await readNAV(dd) : {};
     render({...dd,...crm,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
