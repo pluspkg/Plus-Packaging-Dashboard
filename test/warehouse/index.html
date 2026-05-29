@@ -549,7 +549,7 @@ async function fetchData(){
   document.querySelectorAll(".hero-card,.stat-card,.lb-card").forEach(c=>c.classList.remove("vis"));
   try{
     const d=await readDataDump();
-    const navData = NAV_ENABLED ? await readNAV(dd) : {};
+    const navData = NAV_ENABLED ? await readNAV(d) : {};
     render({...d,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
