@@ -560,20 +560,18 @@ async function readCRM(){
     // Filter: created today
     const dealsRes = await dynFetch(
       `/opportunities?$select=opportunityid`+
-      `&$filter=createdon ge ${from} and createdon le ${to}`+
-      `&$count=true&$top=1`
+      `&$filter=createdon ge ${from} and createdon le ${to}`
     );
-    const dealsToday = dealsRes["@odata.count"]??dealsRes.value?.length??0;
+    const dealsToday = dealsRes.value?.length??0;
 
     // ── APPOINTMENTS — created today, Customer Expecting = Yes ──
     const CUSTOMER_EXPECTING_FIELD = "new_fixed"; // Customer Expecting
     const apptRes = await dynFetch(
       `/appointments?$select=activityid,${CUSTOMER_EXPECTING_FIELD}`+
       `&$filter=createdon ge ${from} and createdon le ${to}`+
-      ` and ${CUSTOMER_EXPECTING_FIELD} eq true`+
-      `&$count=true&$top=1`
+      ` and ${CUSTOMER_EXPECTING_FIELD} eq true`
     );
-    const apptToday = apptRes["@odata.count"]??apptRes.value?.length??0;
+    const apptToday = apptRes.value?.length??0;
 
     return{callsToday,top6Callers,callsWeek,top6CallersWeek,dealsToday,apptToday};
   }catch(e){
@@ -676,7 +674,7 @@ async function fetchData(){
   document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
   document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
   try{
-    const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],dealsToday:null,apptToday:null};})]);
+    const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};})]);
     // Merge NAV data over Data Dump values when NAV is enabled
     const navData = NAV_ENABLED ? await readNAV(dd) : {};
     render({...dd,...crm,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
