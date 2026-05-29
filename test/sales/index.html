@@ -99,7 +99,7 @@
   .nps-period{font-size:10px;color:var(--mu);margin-top:2px;font-style:italic}
   .nps-text{display:flex;flex-direction:column;}
   .bottom-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
-  .kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .kgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
   .kcard{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:18px 20px;box-shadow:0 4px 20px rgba(0,0,0,.25);position:relative;overflow:hidden;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease;display:flex;align-items:center;gap:16px}
   .kcard.vis{opacity:1;transform:translateY(0)}
   .kcard.ac{background:linear-gradient(135deg,var(--nc) 40%,rgba(244,124,32,.1));border-color:rgba(244,124,32,.35)}
@@ -110,7 +110,8 @@
   .kcard.ac .kval{color:var(--or)}
   .klbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace}
   .ktgt{font-size:10px;color:var(--mu);margin-top:3px;font-family:"Courier New",monospace}
-  .calls-lb{grid-column:span 1;flex-direction:row;align-items:center;gap:0;min-width:0;}
+  .calls-lb{grid-column:span 3;flex-direction:row;align-items:center;gap:0;min-width:0;}
+  .kgrid .kcard:not(.calls-lb){grid-column:span 2;}
   .clb-grid{display:flex;gap:12px;width:100%;}
   .clb-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.04);}
   .clb-rank{font-size:13px;width:20px;flex-shrink:0;text-align:center;}
@@ -155,7 +156,10 @@
     .hero-var{font-size:10px}
     .bottom-grid{gap:8px;margin-bottom:10px}
     .kgrid{grid-template-columns:1fr 1fr;gap:8px}
+    .kgrid .kcard:not(.calls-lb){grid-column:span 1;}
+    .calls-lb{grid-column:1 / -1;}
     .calls-lb{grid-column:1 / -1;flex-direction:column;align-items:flex-start;gap:10px;}
+    .kgrid .kcard:not(.calls-lb){grid-column:span 1;}
     .calls-divider{display:none;}
     #callsLbList{margin-left:0!important;width:100%;}
     .kcard{padding:12px 14px;gap:10px;border-radius:10px}
@@ -279,7 +283,7 @@
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
               <div class="kico">&#128222;</div>
               <div>
-                <div style="font-size:40px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
+                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
                 <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
               </div>
             </div>
@@ -290,7 +294,7 @@
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
               <div class="kico">&#128197;</div>
               <div>
-                <div style="font-size:40px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
+                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
                 <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
               </div>
             </div>
