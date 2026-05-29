@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[TEST] Plus Packaging – Customer Service Dashboard</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--nd:#0d1b38;--nm:#162040;--nc:#1c2b52;--nb:#243365;--or:#f47c20;--wh:#ffffff;--ow:#e8eef8;--mu:#7a95be;--gr:#34d399;--am:#fbbf24;--re:#f87171;--pu:#a78bfa;--cy:#38bdf8}
+  body{background:var(--nd);font-family:"Segoe UI",system-ui,sans-serif;color:var(--wh);min-height:100vh;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(var(--nb) 1px,transparent 1px);background-size:36px 36px;opacity:.28;pointer-events:none;z-index:0}
+  body::after{content:"";position:fixed;top:-300px;right:-200px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.1),transparent 65%);pointer-events:none;z-index:0}
+
+  /* Login */
+  #loginScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;background:var(--nd)}
+  .lcard{background:var(--nc);border:1px solid var(--nb);border-radius:20px;padding:44px 52px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5);max-width:480px;width:90%}
+  .llogo{height:52px;margin-bottom:28px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .ltitle{font-size:22px;font-weight:700;margin-bottom:8px}
+  .lsub{font-size:13px;color:var(--mu);margin-bottom:32px;line-height:1.6}
+  .btnms{display:inline-flex;align-items:center;gap:10px;background:#0078d4;border:none;color:var(--wh);padding:13px 28px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:opacity .15s}
+  .btnms:hover{opacity:.88}
+  .lnote{font-size:11px;color:var(--mu);margin-top:18px;line-height:1.6}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:200;background:rgba(22,32,64,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--nb);box-shadow:0 4px 32px rgba(0,0,0,.4)}
+  .hstr{height:3px;background:linear-gradient(90deg,var(--cy),rgba(56,189,248,.3),transparent)}
+  .hinn{display:flex;align-items:center;justify-content:space-between;padding:0 36px;height:60px}
+  .hlft{display:flex;align-items:center;gap:20px}
+  .hlog{height:38px;width:auto;display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .hdiv{width:1px;height:30px;background:var(--nb)}
+  .htop{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;margin-bottom:2px}
+  .hbot{font-size:15px;font-weight:700}
+  .hrgt{display:flex;align-items:center;gap:14px}
+  .lupd{text-align:right;font-size:11px}
+  .lupd span{color:var(--mu);display:block}
+  .lupd strong{color:var(--wh)}
+  .arpl{display:flex;align-items:center;gap:9px;background:var(--nc);border:1px solid var(--nb);border-radius:10px;padding:6px 12px;font-size:12px}
+  .arl{font-weight:600}
+  .tog{width:38px;height:21px;border-radius:99px;background:var(--or);cursor:pointer;position:relative;transition:background .2s;border:1px solid transparent;flex-shrink:0}
+  .tog.off{background:var(--nm);border-color:var(--nb)}
+  .togk{position:absolute;top:2px;left:19px;width:15px;height:15px;border-radius:50%;background:var(--wh);transition:left .2s;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .tog.off .togk{left:2px}
+  .arsl{background:transparent;border:none;color:var(--wh);font-size:12px;cursor:pointer;outline:none}
+  .arcd{font-family:"Courier New",monospace;font-size:13px;color:var(--or);min-width:36px;text-align:right}
+  .btnr{background:var(--or);border:none;color:var(--wh);padding:7px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 18px rgba(244,124,32,.35);transition:opacity .15s}
+  .btnr:hover{opacity:.85}
+  .btnr:disabled{opacity:.45;cursor:default;box-shadow:none}
+  .btnso{background:transparent;border:1px solid var(--nb);color:var(--mu);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+  .btnso:hover{border-color:var(--mu);color:var(--wh)}
+  .btnhome{background:transparent;border:1px solid var(--nb);color:var(--mu);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  .btnhome:hover{border-color:var(--mu);color:var(--wh)}
+
+  /* Main */
+  main{position:relative;z-index:5;padding:18px 36px 24px;max-width:1400px;margin:0 auto}
+  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .sdt{font-size:12px;color:var(--mu)}
+  .slv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
+  .sdot{width:7px;height:7px;border-radius:50%;background:var(--gr);box-shadow:0 0 8px var(--gr);animation:pulse 2s ease-in-out infinite}
+  .sdot.ld{background:var(--am);box-shadow:0 0 8px var(--am)}
+  .sdot.er{background:var(--re);box-shadow:0 0 8px var(--re);animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .slbl{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .slbl span{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;white-space:nowrap}
+  .slbll{flex:1;height:1px;background:linear-gradient(90deg,var(--nb),transparent)}
+
+  /* Hero cards */
+  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr}}
+  .hero-card{border-radius:16px;padding:22px 24px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+  .hero-card.vis{opacity:1;transform:translateY(0)}
+  .hero-card.green{background:linear-gradient(135deg,#0d2e1a,#0f3d20);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.15)}
+  .hero-card.red{background:linear-gradient(135deg,#2e0d0d,#3d1010);border-color:rgba(248,113,113,.35);box-shadow:0 8px 40px rgba(248,113,113,.15)}
+  .hero-card.neutral{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .hero-glow{position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;pointer-events:none}
+  .hero-card.green .hero-glow{background:radial-gradient(circle,rgba(52,211,153,.2),transparent 70%)}
+  .hero-card.red .hero-glow{background:radial-gradient(circle,rgba(248,113,113,.2),transparent 70%)}
+  .hero-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;margin-bottom:8px;opacity:.7}
+  .hero-main{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+  .hero-value{font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1}
+  .hero-card.green .hero-value{color:var(--gr)}
+  .hero-card.red .hero-value{color:var(--re)}
+  .hero-card.neutral .hero-value{color:var(--or)}
+  .hero-target-block{text-align:right}
+  .hero-target-label{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.5px;font-family:monospace;margin-bottom:3px}
+  .hero-target-value{font-size:18px;font-weight:700;color:var(--ow);opacity:.85}
+  .hero-pct-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .hero-pct{font-size:24px;font-weight:800;letter-spacing:-1px}
+  .hero-card.green .hero-pct{color:var(--gr)}
+  .hero-card.red .hero-pct{color:var(--re)}
+  .hero-badge{padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .hero-card.green .hero-badge{background:rgba(52,211,153,.15);color:var(--gr);border:1px solid rgba(52,211,153,.3)}
+  .hero-card.red .hero-badge{background:rgba(248,113,113,.15);color:var(--re);border:1px solid rgba(248,113,113,.3)}
+  .hero-bar-track{height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+  .hero-bar-fill{height:100%;border-radius:99px;width:0%;transition:width 1.3s cubic-bezier(.4,0,.2,1)}
+  .hero-card.green .hero-bar-fill{background:linear-gradient(90deg,#1a8a5a,var(--gr))}
+  .hero-card.red .hero-bar-fill{background:linear-gradient(90deg,#8a1a1a,var(--re))}
+  .hero-var{font-size:11px;margin-top:6px;opacity:.75}
+  .hero-card.green .hero-var{color:var(--gr)}
+  .hero-card.red .hero-var{color:var(--re)}
+
+  /* Stat cards row */
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:900px){.stat-row{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.stat-row{grid-template-columns:1fr}}
+  .stat-card{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
+  .stat-card.vis{opacity:1;transform:translateY(0)}
+  .stat-card.nps{background:linear-gradient(135deg,#1a1040,#241558);border-color:rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.15)}
+  .stat-card.otif{background:linear-gradient(135deg,#0d2234,#0f3045);border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.12)}
+  .stat-card.cat{background:linear-gradient(135deg,#1c1506,#2b1f08);border-color:rgba(251,191,36,.35);box-shadow:0 8px 40px rgba(251,191,36,.1)}
+  .stat-card.orders{background:var(--nc);border-color:var(--nb);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:3px}
+  .stat-sub{font-size:11px;color:var(--mu);margin-bottom:10px}
+  .stat-value{font-size:38px;font-weight:800;letter-spacing:-2px;line-height:1}
+  .stat-period{font-size:10px;color:var(--mu);margin-top:4px;font-style:italic}
+  .stat-card.nps  .stat-value{color:var(--pu)}
+  .stat-card.otif .stat-value{color:var(--cy)}
+  .stat-card.cat  .stat-value{color:var(--am)}
+  .stat-card.orders .stat-value{color:var(--or)}
+  .ktgt{font-size:10px;color:var(--mu);margin-top:4px;font-family:"Courier New",monospace}
+
+  /* Leaderboard */
+  .lb-card{background:var(--nc);border:1px solid var(--nb);border-radius:14px;padding:14px 18px;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+  .lb-card.vis{opacity:1;transform:translateY(0)}
+  .lb-total{font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--or);margin-bottom:2px}
+  .lb-total-label{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;margin-bottom:10px}
+  .lb-list{display:flex;flex-direction:column;gap:6px}
+  .lb-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border-radius:8px;padding:7px 10px}
+  .lb-rank{font-size:14px;width:20px;flex-shrink:0;text-align:center}
+  .lb-rank.gold{color:#fbbf24}
+  .lb-rank.silver{color:#94a3b8}
+  .lb-rank.bronze{color:#cd7c3e}
+  .lb-name{flex:1;font-size:13px;font-weight:600;color:var(--ow)}
+  .lb-count{font-size:16px;font-weight:800;color:var(--or);letter-spacing:-.5px}
+  .lb-orders-lbl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.5px;font-family:"Courier New",monospace;margin-left:3px}
+  .lb-empty{font-size:12px;color:var(--mu);font-style:italic}
+
+  /* Loading / error */
+  .lwrap{display:flex;flex-direction:column;align-items:center;padding:90px 0;gap:20px}
+  .spin{width:44px;height:44px;border:3px solid var(--nc);border-top-color:var(--or);border-radius:50%;animation:spin .85s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ltxt{color:var(--mu);font-size:14px}
+  .errb{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px 20px;color:#fca5a5;margin-bottom:16px;font-size:13px;line-height:1.8}
+  .fnote{display:flex;align-items:center;gap:12px;background:var(--nc);border:1px solid var(--nb);border-radius:12px;padding:10px 16px;font-size:11px;color:var(--mu);line-height:1.6;opacity:0;transition:opacity .5s ease .9s}
+  .fnote.vis{opacity:1}
+  .fico{width:24px;height:24px;border-radius:8px;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+
+  @media(max-width:700px){
+    .hinn{padding:0 14px;height:54px}
+    .hlog{height:32px}
+    .htop{display:none}
+    .hbot{font-size:13px}
+    .arpl{display:none}
+    .lupd{display:none!important}
+    .btnhome{padding:5px 10px;font-size:11px}
+    .btnr{padding:6px 14px;font-size:12px}
+    .btnso{padding:5px 10px;font-size:11px}
+    main{padding:10px 12px 16px}
+    .sbar{margin-bottom:8px}
+    .slbl{margin-bottom:8px}
+    .hero-grid{grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+    .hero-card{padding:14px 16px}
+    .hero-value{font-size:32px}
+    .hero-target-value{font-size:15px}
+    .hero-pct{font-size:18px}
+    .stat-row{grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+    .stat-card{padding:14px 16px}
+    .stat-value{font-size:36px}
+    .lb-card{padding:12px 14px}
+    .lb-total{font-size:26px}
+    .lb-name{font-size:12px}
+    .lb-count{font-size:14px}
+  }
+  @media(max-width:380px){
+    .hero-value{font-size:26px}
+    .stat-value{font-size:28px}
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="lcard">
+    <img class="llogo" src="../../Plus_Logo.jpg" alt="Plus Packaging">
+    <div class="ltitle">Customer Service Dashboard [TEST]</div>
+    <div class="lsub">Sign in with your Plus Packaging Microsoft 365 account to view live data.</div>
+    <button class="btnms" id="signInBtn" onclick="signIn()">
+      <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+        <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <div class="lnote">Handled securely by Microsoft. No data is stored by this dashboard.</div>
+  </div>
+</div>
+
+<div id="dashScreen" style="display:none">
+<div style="background:#f59e0b;color:#1a1f3a;text-align:center;padding:6px;font-size:12px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;position:sticky;top:0;z-index:999;">⚠ TEST ENVIRONMENT — NAV Data Active — Not For Live Use</div>
+  <header>
+    <div class="hstr"></div>
+    <div class="hinn">
+      <div class="hlft">
+        <img class="hlog" src="../../Plus_Logo.jpg" alt="Plus Packaging">
+        <div class="hdiv"></div>
+        <div>
+          <div class="htop">Plus Packaging</div>
+          <div class="hbot">Customer Service Dashboard [TEST]</div>
+        </div>
+      </div>
+      <div class="hrgt">
+        <a class="btnhome" href="../../">&#8962; Dashboards</a>
+        <div class="lupd" id="lupd" style="display:none"><span>Updated</span><strong id="lupdT"></strong></div>
+        <div class="arpl">
+          <span class="arl" id="arl" style="color:var(--or)">Auto</span>
+          <div class="tog" id="atog" onclick="toggleAuto()"><div class="togk"></div></div>
+          <select class="arsl" id="asel" onchange="changeInt()">
+            <option value="1">1m</option><option value="2">2m</option>
+            <option value="5" selected>5m</option><option value="10">10m</option>
+            <option value="15">15m</option><option value="30">30m</option>
+          </select>
+          <span class="arcd" id="acd">5:00</span>
+        </div>
+        <button class="btnr" id="btnr" onclick="fetchData()">⟳ Refresh</button>
+        <button class="btnso" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="sbar">
+      <div class="sdt" id="sdt"></div>
+      <div class="slv"><div class="sdot ld" id="sdot"></div><span id="stxt">Connecting&hellip;</span></div>
+    </div>
+    <div id="errb" class="errb" style="display:none"></div>
+    <div id="lwrap" class="lwrap"><div class="spin"></div><div class="ltxt">Fetching live data&hellip;</div></div>
+
+    <div id="content" style="display:none">
+
+      <!-- MTD Performance -->
+      <div class="slbl"><span>MTD Performance</span><div class="slbll"></div></div>
+      <div class="hero-grid">
+        <div class="hero-card neutral" id="heroSales">
+          <div class="hero-glow"></div>
+          <div class="hero-label">Sales MTD</div>
+          <div class="hero-main">
+            <div class="hero-value" id="hSalesVal">&#8212;</div>
+            <div class="hero-target-block">
+              <div class="hero-target-label">MTD Target</div>
+              <div class="hero-target-value" id="hSalesTgt">&#8212;</div>
+            </div>
+          </div>
+          <div class="hero-pct-row">
+            <div class="hero-pct" id="hSalesPct">&#8212;</div>
+            <div class="hero-badge" id="hSalesBadge">&#8212;</div>
+          </div>
+          <div class="hero-bar-track"><div class="hero-bar-fill" id="hSalesBar"></div></div>
+          <div class="hero-var" id="hSalesVar"></div>
+        </div>
+        <div class="hero-card neutral" id="heroPM">
+          <div class="hero-glow"></div>
+          <div class="hero-label">Product Margin MTD</div>
+          <div class="hero-main">
+            <div class="hero-value" id="hPMVal">&#8212;</div>
+            <div class="hero-target-block">
+              <div class="hero-target-label">MTD Target</div>
+              <div class="hero-target-value" id="hPMTgt">&#8212;</div>
+            </div>
+          </div>
+          <div class="hero-pct-row">
+            <div class="hero-pct" id="hPMPct">&#8212;</div>
+            <div class="hero-badge" id="hPMBadge">&#8212;</div>
+          </div>
+          <div class="hero-bar-track"><div class="hero-bar-fill" id="hPMBar"></div></div>
+          <div class="hero-var" id="hPMVar"></div>
+        </div>
+      </div>
+
+      <!-- Today's Metrics -->
+      <div class="slbl"><span>Today's Metrics</span><div class="slbll"></div></div>
+      <div class="stat-row">
+
+        <!-- Orders In Today -->
+        <div class="stat-card orders" id="sc0">
+          <div class="stat-label">Orders In Today</div>
+          <div class="stat-sub">vs daily target</div>
+          <div class="stat-value" id="sOrders">&#8212;</div>
+          <div class="ktgt" id="sOrdersTgt"></div>
+        </div>
+
+        <!-- OTIF -->
+        <div class="stat-card otif" id="sc1">
+          <div class="stat-label">OTIF</div>
+          <div class="stat-sub">On Time In Full &bull; Today</div>
+          <div class="stat-value" id="sOtif">&#8212;</div>
+        </div>
+
+        <!-- Catalogue In Stock -->
+        <div class="stat-card cat" id="sc2">
+          <div class="stat-label">Catalogue In Stock</div>
+          <div class="stat-sub">Items available</div>
+          <div class="stat-value" id="sCat">&#8212;</div>
+        </div>
+
+        <!-- Order Accuracy -->
+        <div class="stat-card" id="sc6" style="background:linear-gradient(135deg,#1a0d38,#240f52);border-color:rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.1);">
+          <div class="stat-label">Order Accuracy</div>
+          <div class="stat-sub">Last 30 days</div>
+          <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
+        </div>
+
+      </div>
+
+      <!-- NPS + Leaderboards -->
+      <div class="slbl"><span>Customer Experience</span><div class="slbll"></div></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;align-items:flex-start;" id="lbRow">
+
+        <!-- NPS -->
+        <div style="min-width:240px;">
+          <div class="stat-card nps" id="sc3">
+            <div class="stat-label">NPS Score</div>
+            <div class="stat-sub" id="sNpsSub">Loading&hellip;</div>
+            <div class="stat-value" id="sNps">&#8212;</div>
+            <div class="stat-period">Last 30 days &bull; AskNicely</div>
+          </div>
+        </div>
+
+        <!-- Order Processors -->
+        <div style="flex:1;min-width:260px;">
+          <div class="stat-label" style="margin-bottom:10px;">Order Processors Today</div>
+          <div class="lb-card" id="sc4">
+            <div class="lb-total" id="lbTotal">&#8212;</div>
+            <div class="lb-total-label">Total Orders Processed Today</div>
+            <div class="lb-list" id="lbList"><div class="lb-empty">Loading&hellip;</div></div>
+          </div>
+        </div>
+
+        <!-- Calls by Person -->
+        <div style="flex:1;min-width:260px;">
+          <div class="stat-label" style="margin-bottom:10px;">Top Callers Today</div>
+          <div class="lb-card" id="sc5" style="border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.1);">
+            <div class="lb-total" id="rcTotal" style="color:var(--cy);">&#8212;</div>
+            <div class="lb-total-label">Total Inbound Calls Today</div>
+            <div class="lb-list" id="rcList"><div class="lb-empty">Loading&hellip;</div></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+const CFG = {
+  clientId:       "984139d6-9a6c-4da1-894d-34148ff1d570",
+  tenantId:       "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
+  scopes:         ["Files.Read.All","Sites.Read.All","User.Read"],
+  driveId:        "b!MfZQMhbAJkWmoO_5biyf8WZTRBg9IitDqU0d5RC3C8h6y-Xm-ktGRbX7WUTNNtgX",
+  outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
+};
+const REDIRECT_URI = location.origin + location.pathname;
+let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
+
+async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
+function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
+function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return b64url(a);}
+async function signIn(){
+  const btn=document.getElementById("signInBtn");
+  btn.disabled=true;btn.textContent="Redirecting to Microsoft...";
+  const ver=rnd(43),ch=b64url(await sha256(ver)),st=rnd(16);
+  sessionStorage.setItem("pkce_ver",ver);sessionStorage.setItem("pkce_st",st);
+  const p=new URLSearchParams({client_id:CFG.clientId,response_type:"code",redirect_uri:REDIRECT_URI,
+    scope:CFG.scopes.join(" ")+" offline_access",code_challenge:ch,code_challenge_method:"S256",
+    state:st,response_mode:"query",prompt:"select_account"});
+  location.href="https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/authorize?"+p;
+}
+async function getToken(params){
+  const r=await fetch("https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/token",
+    {method:"POST",body:new URLSearchParams(params)});
+  const j=await r.json();
+  if(j.error)throw new Error(j.error_description||j.error);
+  token=j.access_token;
+  sessionStorage.setItem("tok",token);sessionStorage.setItem("exp",Date.now()+j.expires_in*1000);
+  if(j.refresh_token)sessionStorage.setItem("rt",j.refresh_token);
+}
+async function handleCallback(code,state){
+  if(state!==sessionStorage.getItem("pkce_st")){alert("Auth error.");return;}
+  await getToken({client_id:CFG.clientId,grant_type:"authorization_code",code,
+    redirect_uri:REDIRECT_URI,code_verifier:sessionStorage.getItem("pkce_ver"),scope:CFG.scopes.join(" ")});
+  history.replaceState({},document.title,REDIRECT_URI);showDash();
+}
+async function ensureToken(){
+  const exp=+sessionStorage.getItem("exp")||0;
+  if(Date.now()<exp-60000)return true;
+  const rt=sessionStorage.getItem("rt");if(!rt)return false;
+  try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});return true;}
+  catch{return false;}
+}
+function signOut(){sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
+async function graphJSON(url){
+  if(!await ensureToken()){signOut();throw new Error("Session expired.");}
+  const r=await fetch("https://graph.microsoft.com/v1.0"+url,{headers:{Authorization:"Bearer "+(token||sessionStorage.getItem("tok"))}});
+  if(r.status===401){signOut();throw new Error("Session expired.");}
+  if(!r.ok)throw new Error("Graph "+r.status+": "+r.statusText);
+  return r.json();
+}
+async function downloadAndParse(driveId,itemId){
+  const meta=await graphJSON("/drives/"+driveId+"/items/"+itemId);
+  const url=meta["@microsoft.graph.downloadUrl"];
+  if(!url)throw new Error("No download URL");
+  const r=await fetch(url);
+  if(!r.ok)throw new Error("Download failed: "+r.status);
+  return XLSX.read(await r.arrayBuffer(),{type:"array"});
+}
+
+// Read Data Dump — SALES sheet (C22=salesTarget, C23=pmTarget, C24=ordersTarget)
+// and OPS sheet (C11 = catalogue in stock %)
+// ── NAV CONFIGURATION ─────────────────────────────────────────────────────────
+const NAV_ENABLED    = true;
+const NAV_WORKER_URL = "https://nav-data.darren-clayson.workers.dev";
+
+async function readNAV(){
+  try{
+    const r=await fetch(NAV_WORKER_URL+"/nav/all",{signal:AbortSignal.timeout(10000)});
+    if(!r.ok)throw new Error("NAV Worker "+r.status);
+    const j=await r.json();
+    return{
+      sales:          j.salesMTD                    ?? null,
+      pm:             j.productMarginMTD             ?? null,
+      ordersToday:    j.ordersToday                  ?? null,
+      csOrdersTotal:  j.processors?.total            ?? null,
+      csTop3:         j.processors?.top3             ?? [],
+      navLoaded: true,
+    };
+  }catch(e){
+    console.warn("NAV Worker:",e.message);
+    return{navLoaded:false};
+  }
+}
+
+async function readDataDump(){
+  const folder=await graphJSON("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
+  const file=folder.value.find(f=>f.name==="Data Dump.xlsx");
+  if(!file)throw new Error("Data Dump.xlsx not found");
+  const wb=await downloadAndParse(CFG.driveId,file.id);
+
+  // SALES sheet (first sheet)
+  const wsSales=wb.Sheets[wb.SheetNames[0]];
+  const rowsSales=XLSX.utils.sheet_to_json(wsSales,{header:1,defval:""});
+  const flatSales=rowsSales.flat();
+  const salesTarget  =rowsSales[21]?.[2]!=null&&rowsSales[21][2]!==""?Math.abs(Number(rowsSales[21][2])):null;
+  const pmTarget     =rowsSales[22]?.[2]!=null&&rowsSales[22][2]!==""?Math.abs(Number(rowsSales[22][2])):null;
+  const ordersTarget =rowsSales[23]?.[2]!=null&&rowsSales[23][2]!==""?Math.abs(Number(rowsSales[23][2])):null;
+  const ordersToday  =rowsSales[26]?.[2]!=null&&rowsSales[26][2]!==""?Math.abs(Number(rowsSales[26][2])):null;
+  const find=(...labels)=>{
+    for(const lbl of labels){
+      const lo=lbl.toLowerCase();
+      for(let i=0;i<flatSales.length;i++){
+        const cell=flatSales[i];
+        if(typeof cell==="string"&&cell.toLowerCase().includes(lo)){
+          for(let j=i+1;j<Math.min(i+10,flatSales.length);j++){
+            const v=flatSales[j];
+            if(typeof v==="number"&&v!==0)return Math.abs(v);
+            if(typeof v==="string"&&v.trim()!==""){const n=parseFloat(v.replace(/[^0-9.-]/g,""));if(!isNaN(n)&&n!==0)return Math.abs(n);}
+          }
+        }
+      }
+    }
+    return null;
+  };
+  const sales=find("Total Sales");
+  const pm   =find("Total Margin","Product Margin","Total PM");
+
+  // OPS sheet — catalogue in stock at C11 (row index 10, col index 2)
+  let cataloguePct=null;
+  const opsSheet=wb.SheetNames.find(n=>n.toLowerCase().includes("ops"));
+  if(opsSheet){
+    const wsOps=wb.Sheets[opsSheet];
+    const rowsOps=XLSX.utils.sheet_to_json(wsOps,{header:1,defval:""});
+    const raw=rowsOps[10]?.[2];
+    if(raw!=null&&raw!==""){
+      const n=Number(raw);
+      // Value is already a percentage (e.g. 0.95 → 95%, or 95 → 95%)
+      cataloguePct=isNaN(n)?null:(n<=1?n*100:n);
+    }
+  }
+
+  // Customer Service sheet — C3=total orders processed, C5:C14=names, D5:D14=counts
+  let csOrdersTotal=null,csTop3=[],orderAccuracy=null;
+  const csSheet=wb.SheetNames.find(n=>n.toLowerCase().includes("customer service")||n.toLowerCase().includes("customer serv"));
+  if(csSheet){
+    const wsCS=wb.Sheets[csSheet];
+    const rowsCS=XLSX.utils.sheet_to_json(wsCS,{header:1,defval:""});
+    // C3 = row index 2, col index 2
+    const rawTotal=rowsCS[2]?.[2];
+    if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
+    // C19 = row index 18, col index 2 — Order Accuracy %
+    const rawAcc=rowsCS[18]?.[2];
+    if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
+    // C5:C14 = rows 4-13, col 2 (names); D5:D14 = rows 4-13, col 3 (counts)
+    const processors=[];
+    for(let r=4;r<=13;r++){
+      const name=rowsCS[r]?.[2];
+      const count=rowsCS[r]?.[3];
+      if(name&&String(name).trim()!==""){
+        processors.push({name:String(name).trim(),count:Number(count)||0});
+      }
+    }
+    csTop3=processors.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
+  }
+
+  return{sales,pm,salesTarget,pmTarget,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3,orderAccuracy};
+}
+
+// Read OTIF from OTIF Report xlsx — C11 (row 10, col 2)
+async function readOTIF(){
+  try{
+    const folder=await graphJSON("/drives/"+CFG.driveId+"/items/"+CFG.outputFolderId+"/children");
+    const file=folder.value.find(f=>f.name==="OTIF Report - promised delivery date.xlsx");
+    if(!file)throw new Error("OTIF Report - promised delivery date.xlsx not found");
+    const wb=await downloadAndParse(CFG.driveId,file.id);
+    const ws=wb.Sheets[wb.SheetNames.find(n=>n.toLowerCase().includes("data"))||wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+    const raw=rows[10]?.[2];
+    if(raw==null||raw==="")return{otif:null};
+    const n=Number(raw);
+    // already a percentage value
+    return{otif:isNaN(n)?null:(n<=1?n*100:n)};
+  }catch(e){console.warn("OTIF:",e.message);return{otif:null};}
+}
+
+async function readCallsByPerson(){
+  try{
+    const r=await fetch("https://rc-answer-time.darren-clayson.workers.dev/calls-by-person",{signal:AbortSignal.timeout(8000)});
+    if(!r.ok)throw new Error("RC worker "+r.status);
+    const j=await r.json();
+    return{rcTotal:j.total??null,rcTop3:j.top3??[]};
+  }catch(e){console.warn("RingCentral calls-by-person:",e.message);return{rcTotal:null,rcTop3:[]};}
+}
+
+async function readNPS(){
+  try{
+    const r=await fetch("../../nps.json?t="+Date.now(),{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)throw new Error("nps.json "+r.status);
+    const j=await r.json();
+    return{score:j.NPS??j.score??j.nps??null};
+  }catch(e){console.warn("NPS:",e.message);return{score:null};}
+}
+
+const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
+const PCT=v=>(v==null||isNaN(+v))?"—":Number(v).toFixed(1)+"%";
+
+function renderHero(cardId,valId,tgtId,pctId,badgeId,barId,varId,value,target){
+  const card=document.getElementById(cardId);
+  const pct=value&&target?Math.min(100,(value/target)*100):null;
+  const onTarget=pct!=null&&pct>=100;
+  card.className="hero-card "+(pct==null?"neutral":onTarget?"green":"red")+" vis";
+  document.getElementById(valId).textContent=GBP(value);
+  document.getElementById(tgtId).textContent=GBP(target);
+  document.getElementById(pctId).textContent=pct!=null?pct.toFixed(1)+"%":"—";
+  document.getElementById(badgeId).textContent=pct==null?"—":onTarget?"On Target ✓":"Below Target";
+  if(value!=null&&target!=null){const diff=value-target,sign=diff>=0?"+":"";document.getElementById(varId).textContent=sign+GBP(diff)+" vs MTD Target";}
+  setTimeout(()=>{document.getElementById(barId).style.width=(pct??0)+"%";},400);
+}
+
+function render(d){
+  renderHero("heroSales","hSalesVal","hSalesTgt","hSalesPct","hSalesBadge","hSalesBar","hSalesVar",d.sales,d.salesTarget);
+  renderHero("heroPM","hPMVal","hPMTgt","hPMPct","hPMBadge","hPMBar","hPMVar",d.pm,d.pmTarget);
+
+  // Orders In Today
+  document.getElementById("sOrders").textContent=GBP(d.ordersToday);
+  const tgtEl=document.getElementById("sOrdersTgt");
+  tgtEl.textContent=d.ordersTarget!=null?"Target: "+GBP(d.ordersTarget):"";
+
+  // OTIF
+  document.getElementById("sOtif").textContent=PCT(d.otif);
+
+  // Catalogue in stock
+  document.getElementById("sCat").textContent=PCT(d.cataloguePct);
+  document.getElementById("sAccuracy").textContent=d.orderAccuracy!=null?d.orderAccuracy.toFixed(1)+"%":"—";
+
+  // NPS
+  const score=d.score!=null?Math.round(d.score):null;
+  const npsEl=document.getElementById("sNps");
+  npsEl.textContent=score!=null?score:"—";
+  npsEl.style.color=score==null?"var(--pu)":score>=50?"var(--gr)":score>=0?"var(--am)":"var(--re)";
+  document.getElementById("sNpsSub").textContent=score!=null?"AskNicely NPS":"Data unavailable";
+
+  // Order processor leaderboard
+  document.getElementById("lbTotal").textContent=d.csOrdersTotal!=null?d.csOrdersTotal:"—";
+  const lbList=document.getElementById("lbList");
+  const ranks=["gold","silver","bronze"];
+  const medals=["🥇","🥈","🥉"];
+  if(d.csTop3&&d.csTop3.length>0){
+    lbList.innerHTML=d.csTop3.map((p,i)=>`
+      <div class="lb-row">
+        <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-count">${p.count}</div><div class="lb-orders-lbl">orders</div>
+      </div>`).join("");
+  }else{
+    lbList.innerHTML='<div class="lb-empty">No orders processed yet today</div>';
+  }
+
+  // RingCentral calls by person leaderboard
+  document.getElementById("rcTotal").textContent=d.rcTotal!=null?d.rcTotal:"—";
+  const rcList=document.getElementById("rcList");
+  if(d.rcTop3&&d.rcTop3.length>0){
+    rcList.innerHTML=d.rcTop3.map((p,i)=>`
+      <div class="lb-row">
+        <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-count" style="color:var(--cy)">${p.count}</div><div class="lb-orders-lbl">calls</div>
+      </div>`).join("");
+  }else{
+    rcList.innerHTML='<div class="lb-empty">No inbound calls yet today</div>';
+  }
+
+  // Show content
+  document.getElementById("lwrap").style.display="none";
+  document.getElementById("content").style.display="block";
+  document.getElementById("errb").style.display="none";
+  ["sc0","sc1","sc2","sc3","sc4","sc5","sc6"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
+  document.getElementById("lupd").style.display="block";
+  document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
+}
+
+function setStatus(s){const d=document.getElementById("sdot"),t=document.getElementById("stxt");d.className="sdot"+(s==="ld"?" ld":s==="er"?" er":"");t.textContent=s==="ld"?"Fetching data…":s==="er"?"Connection error":"Live data";}
+
+async function fetchData(){
+  if(busy)return;busy=true;setStatus("ld");
+  document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";
+  document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
+  document.querySelectorAll(".hero-card,.stat-card").forEach(c=>c.classList.remove("vis"));
+  try{
+    const[dd,otif,nps,rc]=await Promise.all([readDataDump(),readOTIF(),readNPS(),readCallsByPerson()]);
+    const navData = NAV_ENABLED ? await readNAV() : {};
+    render({...dd,...otif,...nps,...rc,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
+  }catch(e){
+    setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
+    const eb=document.getElementById("errb");eb.style.display="block";
+    eb.innerHTML="<strong>&#9888; Could not load data:</strong> "+e.message+"<br><small>Check your connection or sign out and back in.</small>";
+  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";restartCd();}
+}
+
+function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
+function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,"0");document.getElementById("acd").textContent=m+":"+s;}
+function toggleAuto(){autoOn=!autoOn;document.getElementById("atog").classList.toggle("off",!autoOn);const l=document.getElementById("arl");l.style.color=autoOn?"var(--or)":"var(--mu)";l.textContent=autoOn?"Auto":"Paused";document.getElementById("acd").style.display=autoOn?"":"none";document.getElementById("asel").style.display=autoOn?"":"none";autoOn?restartCd():clearInterval(ticker);updCd();}
+function changeInt(){intMins=parseInt(document.getElementById("asel").value);restartCd();}
+function showDash(){document.getElementById("loginScreen").style.display="none";document.getElementById("dashScreen").style.display="block";document.getElementById("sdt").textContent=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});fetchData();}
+
+async function boot(){
+  const p=new URLSearchParams(location.search);
+  if(p.has("code")){await handleCallback(p.get("code"),p.get("state"));return;}
+  const t=sessionStorage.getItem("tok"),exp=+sessionStorage.getItem("exp")||0;
+  if(t&&Date.now()<exp-30000){token=t;showDash();return;}
+  const rt=sessionStorage.getItem("rt");
+  if(rt){try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});showDash();return;}catch{}}
+  document.getElementById("loginScreen").style.display="flex";
+}
+boot();
+</script>
+</body>
+</html>
