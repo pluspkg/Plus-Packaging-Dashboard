@@ -362,7 +362,7 @@ const CFG = {
   outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
 };
 const REDIRECT_URI = location.origin + location.pathname;
-let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
+let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false,firstLoad=true;
 
 async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
 function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
@@ -500,18 +500,18 @@ async function readDataDump(){
     const rawTotal=rowsCS[2]?.[2];
     if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
     // C19 = row index 18, col index 2 — Order Accuracy %
-    const rawAcc=rowsCS[18]?.[2];
+    const rawAcc=rowsCS[19]?.[2];
     if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
-    // C5:C14 = rows 4-13, col 2 (names); D5:D14 = rows 4-13, col 3 (counts)
+    // B5:B14 = col 1 (NAV ID); C5:C14 = col 2 (names) — counts come from NAV only
     const processors=[];
-    for(let r=4;r<=13;r++){
+    for(let r=4;r<=14;r++){
+      const navId=rowsCS[r]?.[1];
       const name=rowsCS[r]?.[2];
-      const count=rowsCS[r]?.[3];
       if(name&&String(name).trim()!==""){
-        processors.push({name:String(name).trim(),count:Number(count)||0});
+        processors.push({navId:String(navId||"").trim(),name:String(name).trim()});
       }
     }
-    csTop3=processors.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
+    csTop3=processors; // all processors — counts matched from NAV in render
   }
 
   return{sales,pm,salesTarget,pmTarget,salesYesterday,pmYesterday,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3,orderAccuracy};
@@ -596,8 +596,18 @@ function render(d){
   const lbList=document.getElementById("lbList");
   const ranks=["gold","silver","bronze"];
   const medals=["🥇","🥈","🥉"];
-  if(d.csTop3&&d.csTop3.length>0){
-    lbList.innerHTML=d.csTop3.map((p,i)=>`
+
+  // Build leaderboard from NAV counts, using Data Dump as ID→name lookup
+  const idToName = {};
+  (d.csTop3||[]).forEach(p => { if(p.navId) idToName[p.navId] = p.name; });
+  const top3ToShow = Object.entries(d.navOrderCounts||{})
+    .map(([navId, count]) => ({ name: idToName[navId] || navId, count }))
+    .filter(p => p.count > 0 && p.name !== "Website Order")
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 3);
+
+  if(top3ToShow.length > 0){
+    lbList.innerHTML=top3ToShow.map((p,i)=>`
       <div class="lb-row">
         <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
         <div class="lb-name">${p.name}</div>
@@ -633,10 +643,9 @@ function render(d){
 function setStatus(s){const d=document.getElementById("sdot"),t=document.getElementById("stxt");d.className="sdot"+(s==="ld"?" ld":s==="er"?" er":"");t.textContent=s==="ld"?"Fetching data…":s==="er"?"Connection error":"Live data";}
 
 async function fetchData(){
-  if(busy)return;busy=true;setStatus("ld");
-  document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";
-  document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
-  document.querySelectorAll(".hero-card,.stat-card").forEach(c=>c.classList.remove("vis"));
+  if(busy)return;busy=true;
+  if(firstLoad){setStatus("ld");document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";}
+  if(firstLoad){document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";document.querySelectorAll(".hero-card,.stat-card").forEach(c=>c.classList.remove("vis"));}
   try{
     const[dd,otif,nps,rc]=await Promise.all([readDataDump(),readOTIF(),readNPS(),readCallsByPerson()]);
     const navData = NAV_ENABLED ? await readNAV(dd) : {};
@@ -645,7 +654,7 @@ async function fetchData(){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
     eb.innerHTML="<strong>&#9888; Could not load data:</strong> "+e.message+"<br><small>Check your connection or sign out and back in.</small>";
-  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";restartCd();}
+  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";firstLoad=false;restartCd();}
 }
 
 function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
