@@ -326,7 +326,7 @@ const CFG = {
   outputFolderId: "017WW6KAG3P4TJAUFSJJE3Z7YYHROSB4LE",
 };
 const REDIRECT_URI = location.origin + location.pathname;
-let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
+let token=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false,firstLoad=true;
 
 async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
 function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
@@ -459,7 +459,7 @@ async function readDataDump(){
       const rawTotal=rowsCS[2]?.[2];
       if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
       // C19 = row index 18 — Order Accuracy %
-      const rawAcc=rowsCS[18]?.[2];
+      const rawAcc=rowsCS[19]?.[2];
       if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     }
 
@@ -541,10 +541,9 @@ function render(d){
 function setStatus(s){const d=document.getElementById("sdot"),t=document.getElementById("stxt");d.className="sdot"+(s==="ld"?" ld":s==="er"?" er":"");t.textContent=s==="ld"?"Fetching data…":s==="er"?"Connection error":"Live data";}
 
 async function fetchData(){
-  if(busy)return;busy=true;setStatus("ld");
-  document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";
-  document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
-  document.querySelectorAll(".hero-card,.stat-card,.lb-card").forEach(c=>c.classList.remove("vis"));
+  if(busy)return;busy=true;
+  if(firstLoad){setStatus("ld");document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";}
+  if(firstLoad){document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";document.querySelectorAll(".hero-card,.stat-card,.lb-card").forEach(c=>c.classList.remove("vis"));}
   try{
     const d=await readDataDump();
     const navData = NAV_ENABLED ? await readNAV(d) : {};
@@ -553,7 +552,7 @@ async function fetchData(){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
     eb.innerHTML="<strong>&#9888; Could not load data:</strong> "+e.message+"<br><small>Check your connection or sign out and back in.</small>";
-  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";restartCd();}
+  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";firstLoad=false;restartCd();}
 }
 
 function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
