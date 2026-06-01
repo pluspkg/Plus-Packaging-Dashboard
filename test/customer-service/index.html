@@ -503,17 +503,16 @@ async function readDataDump(){
     // C19 = row index 18, col index 2 — Order Accuracy %
     const rawAcc=rowsCS[18]?.[2];
     if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
-    // B5:B14 = col 1 (NAV ID); C5:C14 = col 2 (names); D5:D14 = col 3 (counts)
+    // B5:B14 = col 1 (NAV ID); C5:C14 = col 2 (names) — counts come from NAV only
     const processors=[];
     for(let r=4;r<=13;r++){
       const navId=rowsCS[r]?.[1];
       const name=rowsCS[r]?.[2];
-      const count=rowsCS[r]?.[3];
       if(name&&String(name).trim()!==""){
-        processors.push({navId:String(navId||"").trim(),name:String(name).trim(),count:Number(count)||0});
+        processors.push({navId:String(navId||"").trim(),name:String(name).trim()});
       }
     }
-    csTop3=processors.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
+    csTop3=processors; // all processors — counts matched from NAV in render
   }
 
   return{sales,pm,salesTarget,pmTarget,salesYesterday,pmYesterday,ordersTarget,ordersToday,cataloguePct,csOrdersTotal,csTop3,orderAccuracy};
@@ -600,15 +599,14 @@ function render(d){
   const ranks=["gold","silver","bronze"];
   const medals=["🥇","🥈","🥉"];
 
-  let top3ToShow = d.csTop3 || [];
-  if(d.navOrderCounts && Object.keys(d.navOrderCounts).length > 0 && d.csTop3 && d.csTop3.length > 0){
-    const navMerged = d.csTop3.map(p => {
-      // Use exact NAV ID from Data Dump column B
-      const count = p.navId && d.navOrderCounts[p.navId] != null ? d.navOrderCounts[p.navId] : 0;
-      return { name: p.name, count };
-    }).sort((a,b) => b.count - a.count);
-    top3ToShow = navMerged.filter(p => p.count > 0).slice(0, 3);
-  }
+  // Build leaderboard from NAV counts, using Data Dump as ID→name lookup
+  const idToName = {};
+  (d.csTop3||[]).forEach(p => { if(p.navId) idToName[p.navId] = p.name; });
+  const top3ToShow = Object.entries(d.navOrderCounts||{})
+    .map(([navId, count]) => ({ name: idToName[navId] || navId, count }))
+    .filter(p => p.count > 0)
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 3);
 
   if(top3ToShow.length > 0){
     lbList.innerHTML=top3ToShow.map((p,i)=>`
