@@ -682,7 +682,7 @@ async function fetchData(){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
     eb.innerHTML="<strong>&#9888; Could not load data:</strong> "+e.message+"<br><small>Check your connection or sign out and back in.</small>";
-  }finally{busy=false;if(firstLoad){document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";}restartCd();}
+  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";firstLoad=false;restartCd();}
 }
 function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
 function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,"0");document.getElementById("acd").textContent=m+":"+s;}
