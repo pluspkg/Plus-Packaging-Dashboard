@@ -461,7 +461,7 @@ async function readDataDump(){
       const rawTotal=rowsCS[2]?.[2];
       if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
       // C19 = row index 18 — Order Accuracy %
-      const rawAcc=rowsCS[18]?.[2];
+      const rawAcc=rowsCS[19]?.[2];
       if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     }
 
