@@ -671,7 +671,7 @@ function setStatus(s){const d=document.getElementById("sdot"),t=document.getElem
 async function fetchData(){
   if(busy)return;busy=true;
   if(firstLoad){setStatus("ld");document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";}
-  document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
+  if(firstLoad){document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";}
   document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
   try{
     const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};})]);
