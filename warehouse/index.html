@@ -130,6 +130,8 @@
   .lb-name{flex:1;font-size:13px;font-weight:600;color:var(--ow)}
   .lb-count{font-size:16px;font-weight:800;color:var(--gr);letter-spacing:-.5px}
   .lb-unit{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1.5px;font-family:"Courier New",monospace;margin-left:3px}
+  .lb-open{margin-left:auto;font-size:11px;font-weight:600;color:var(--cy);background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);border-radius:10px;padding:2px 8px;white-space:nowrap;}
+  .lb-open-none{color:var(--mu);background:none;border-color:transparent;}
   .lb-empty{font-size:12px;color:var(--mu);font-style:italic}
 
   /* Loading / error */
@@ -396,6 +398,7 @@ async function readNAV(dd){
       shippedToday:    j.shippedToday         ?? null,
       shipmentsToday:  j.shipmentsToday       ?? null,
       csOrdersTotal:   j.orderProcessorTotal  ?? null,
+      openPickCounts:  j.openPickCounts       ?? {},
       navLoaded: true,
     };
   }catch(e){
@@ -463,13 +466,14 @@ async function readDataDump(){
       if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     }
 
-    // C20:D30 = rows 19-29, col 2 (names) col 3 (picks) — top pickers
+    // B20:C30 = rows 19-29, col 1 (NAV ID), col 2 (names), col 3 (picks from Data Dump — ignored)
     const pickers=[];
     for(let r=19;r<=29;r++){
+      const navId=rowsOps[r]?.[1];
       const name=rowsOps[r]?.[2];
       const count=rowsOps[r]?.[3];
       if(name&&String(name).trim()!==""){
-        pickers.push({name:String(name).trim(),count:Number(count)||0});
+        pickers.push({navId:String(navId||"").trim(),name:String(name).trim(),count:Number(count)||0});
       }
     }
     top3Pickers=pickers.sort((a,b)=>b.count-a.count).slice(0,3).filter(p=>p.count>0);
@@ -519,12 +523,15 @@ function render(d){
   const medals=["🥇","🥈","🥉"];
   const pickerList=document.getElementById("pickerList");
   if(d.top3Pickers&&d.top3Pickers.length>0){
-    pickerList.innerHTML=d.top3Pickers.map((p,i)=>`
-      <div class="lb-row">
+    pickerList.innerHTML=d.top3Pickers.map((p,i)=>{
+      const open=d.openPickCounts&&p.navId?d.openPickCounts[p.navId]??0:0;
+      return`<div class="lb-row">
         <div class="lb-rank ${ranks[i]}">${medals[i]}</div>
         <div class="lb-name">${p.name}</div>
         <div class="lb-count">${p.count}</div><div class="lb-unit">picks</div>
-      </div>`).join("");
+        ${open>0?`<div class="lb-open" title="Open picks">${open} open</div>`:`<div class="lb-open lb-open-none">—</div>`}
+      </div>`;
+    }).join("");
   }else{
     pickerList.innerHTML='<div class="lb-empty">No picks recorded yet today</div>';
   }
