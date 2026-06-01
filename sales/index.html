@@ -333,7 +333,7 @@ const CFG = {
   crmItemId:      "017WW6KAARD5NC52XSNVH3MPPI4DC5FT3H",
 };
 const REDIRECT_URI = location.origin + location.pathname;
-let token=null,dynToken=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false;
+let token=null,dynToken=null,autoOn=true,intMins=5,cdSecs=300,ticker=null,busy=false,firstLoad=true;
 
 async function sha256(s){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));}
 function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
@@ -663,20 +663,19 @@ function render(d){
 }
 function setStatus(s){const d=document.getElementById("sdot"),t=document.getElementById("stxt");d.className="sdot"+(s==="ld"?" ld":s==="er"?" er":"");t.textContent=s==="ld"?"Fetching data…":s==="er"?"Connection error":"Live data";}
 async function fetchData(){
-  if(busy)return;busy=true;setStatus("ld");
-  document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";
-  document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";
-  document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));
+  if(busy)return;busy=true;
+  if(firstLoad){setStatus("ld");document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";}
+  if(firstLoad){document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));}
   try{
     const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};})]);
     // Merge NAV data over Data Dump values when NAV is enabled
     const navData = NAV_ENABLED ? await readNAV(dd) : {};
-    render({...dd,...crm,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
+    render({...dd,...crm,...navData});setStatus("ok");document.getElementById("errb").style.display="none";firstLoad=false;
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
     eb.innerHTML="<strong>&#9888; Could not load data:</strong> "+e.message+"<br><small>Check your connection or sign out and back in.</small>";
-  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";restartCd();}
+  }finally{busy=false;document.getElementById("btnr").disabled=false;document.getElementById("btnr").textContent="⟳ Refresh";firstLoad=false;restartCd();}
 }
 function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
 function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,"0");document.getElementById("acd").textContent=m+":"+s;}
