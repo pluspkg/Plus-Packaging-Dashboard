@@ -501,11 +501,11 @@ async function readDataDump(){
     const rawTotal=rowsCS[2]?.[2];
     if(rawTotal!=null&&rawTotal!=="")csOrdersTotal=Number(rawTotal)||0;
     // C19 = row index 18, col index 2 — Order Accuracy %
-    const rawAcc=rowsCS[18]?.[2];
+    const rawAcc=rowsCS[19]?.[2];
     if(rawAcc!=null&&rawAcc!==""){const n=Number(rawAcc);orderAccuracy=isNaN(n)?null:(n<=1?n*100:n);}
     // B5:B14 = col 1 (NAV ID); C5:C14 = col 2 (names) — counts come from NAV only
     const processors=[];
-    for(let r=4;r<=13;r++){
+    for(let r=4;r<=14;r++){
       const navId=rowsCS[r]?.[1];
       const name=rowsCS[r]?.[2];
       if(name&&String(name).trim()!==""){
@@ -604,7 +604,7 @@ function render(d){
   (d.csTop3||[]).forEach(p => { if(p.navId) idToName[p.navId] = p.name; });
   const top3ToShow = Object.entries(d.navOrderCounts||{})
     .map(([navId, count]) => ({ name: idToName[navId] || navId, count }))
-    .filter(p => p.count > 0)
+    .filter(p => p.count > 0 && p.name !== "Website Order")
     .sort((a,b) => b.count - a.count)
     .slice(0, 3);
 
