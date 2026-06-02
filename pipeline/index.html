@@ -1,426 +1,765 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plus Packaging — Dashboards</title>
-  <link rel="icon" type="image/png" href="/Plus-Packaging-Dashboard/favicon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plus Packaging – Pipeline Dashboard</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --nd:#0d1b38;--nm:#162040;--nc:#1c2b52;--nb:#243365;
+    --or:#f47c20;--wh:#ffffff;--ow:#e8eef8;--mu:#7a95be;
+    --gr:#34d399;--am:#fbbf24;--re:#f87171;--pu:#a78bfa;
+    --stage1:#38bdf8;--stage2:#a78bfa;--stage3:#f47c20;
+  }
+  body{background:var(--nd);font-family:"Segoe UI",system-ui,sans-serif;color:var(--wh);min-height:100vh;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(var(--nb) 1px,transparent 1px);background-size:36px 36px;opacity:.28;pointer-events:none;z-index:0}
+  body::after{content:"";position:fixed;top:-300px;right:-200px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(244,124,32,.14),transparent 65%);pointer-events:none;z-index:0}
 
-    :root {
-      --navy:      #2d3a7a;
-      --navy-dark: #1e2857;
-      --amber:     #f5a623;
-      --amber-dark:#d4891a;
-      --grey:      #a09e9e;
-      --light:     #f4f5f8;
-      --white:     #ffffff;
-      --text:      #1a1f3a;
-    }
+  /* ── LOGIN ── */
+  #loginScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;background:var(--nd)}
+  .lcard{background:var(--nc);border:1px solid var(--nb);border-radius:20px;padding:44px 52px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5);max-width:480px;width:90%}
+  .llogo{height:52px;margin-bottom:28px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .ltitle{font-size:22px;font-weight:700;margin-bottom:8px}
+  .lsub{font-size:13px;color:var(--mu);margin-bottom:32px;line-height:1.6}
+  .btnms{display:inline-flex;align-items:center;gap:10px;background:#0078d4;border:none;color:var(--wh);padding:13px 28px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:opacity .15s}
+  .btnms:hover{opacity:.88}
+  .lnote{font-size:11px;color:var(--mu);margin-top:18px;line-height:1.6}
 
-    html, body {
-      min-height: 100%;
-      background: var(--light);
-      color: var(--text);
-      font-family: 'Lato', sans-serif;
-    }
+  /* ── HEADER ── */
+  header{position:sticky;top:0;z-index:200;background:rgba(22,32,64,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--nb);box-shadow:0 4px 32px rgba(0,0,0,.4)}
+  .hstr{height:3px;background:linear-gradient(90deg,var(--or),rgba(244,124,32,.3),transparent)}
+  .hinn{display:flex;align-items:center;justify-content:space-between;padding:0 36px;height:60px}
+  .hlft{display:flex;align-items:center;gap:20px}
+  .hlog{height:38px;width:auto;display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .hdiv{width:1px;height:30px;background:var(--nb)}
+  .htop{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;margin-bottom:2px}
+  .hbot{font-size:15px;font-weight:700}
+  .hnav{display:flex;align-items:center;gap:6px;margin-left:12px}
+  .hnav a{color:var(--mu);text-decoration:none;font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid transparent;transition:all .15s;letter-spacing:.02em}
+  .hnav a:hover{color:var(--wh);border-color:var(--nb);background:rgba(255,255,255,.04)}
+  .hnav a.active{color:var(--or);border-color:rgba(244,124,32,.3);background:rgba(244,124,32,.07)}
+  .hrgt{display:flex;align-items:center;gap:14px}
+  .lupd{text-align:right;font-size:11px}
+  .lupd span{color:var(--mu);display:block}
+  .lupd strong{color:var(--wh)}
+  .arpl{display:flex;align-items:center;gap:9px;background:var(--nc);border:1px solid var(--nb);border-radius:10px;padding:6px 12px;font-size:12px}
+  .arl{font-weight:600;color:var(--or)}
+  .tog{width:38px;height:21px;border-radius:99px;background:var(--or);cursor:pointer;position:relative;transition:background .2s;border:1px solid transparent;flex-shrink:0}
+  .tog.off{background:var(--nm);border-color:var(--nb)}
+  .togk{position:absolute;top:2px;left:19px;width:15px;height:15px;border-radius:50%;background:var(--wh);transition:left .2s;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .tog.off .togk{left:2px}
+  .arsl{background:transparent;border:none;color:var(--wh);font-size:12px;cursor:pointer;outline:none}
+  .arcd{font-family:"Courier New",monospace;font-size:13px;color:var(--or);min-width:36px;text-align:right}
+  .btnr{background:var(--or);border:none;color:var(--wh);padding:7px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 18px rgba(244,124,32,.35);transition:opacity .15s}
+  .btnr:hover{opacity:.85}
+  .btnr:disabled{opacity:.45;cursor:default;box-shadow:none}
+  .uinfo{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
+  .uavt{width:30px;height:30px;border-radius:50%;background:var(--nb);border:1px solid var(--or);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--or)}
 
-    /* Top amber bar */
-    .topbar {
-      background: var(--amber);
-      height: 5px;
-    }
+  /* ── MAIN ── */
+  main{position:relative;z-index:5;padding:16px 36px 24px;max-width:1500px;margin:0 auto}
 
-    /* Header */
-    .header {
-      background: var(--white);
-      border-bottom: 1px solid #e0e3ef;
-      padding: 18px 40px;
-      display: flex;
-      align-items: center;
-    }
+  /* ── PAGE HEADER ── */
+  .pghdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px}
+  .pgtitle{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;margin-bottom:4px}
+  .pgname{font-size:26px;font-weight:800;letter-spacing:-0.5px}
+  .pgname span{color:var(--or)}
+  .pgperiod{font-family:"Courier New",monospace;font-size:11px;color:var(--mu);background:var(--nc);border:1px solid var(--nb);padding:5px 12px;border-radius:20px}
 
-    .logo {
-      height: 52px;
-      width: auto;
-      display: block;
-    }
+  /* ── SECTION LABEL ── */
+  .slbl{display:flex;align-items:center;gap:14px;margin-bottom:10px;margin-top:16px}
+  .slbl span{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:2.5px;font-family:"Courier New",monospace;white-space:nowrap}
+  .slbll{flex:1;height:1px;background:linear-gradient(90deg,var(--nb),transparent)}
 
-    .header-label {
-      margin-left: auto;
-      font-size: 12px;
-      font-weight: 400;
-      color: var(--grey);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
+  /* ── ERROR BANNER ── */
+  #errb{display:none;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);color:#fca5a5;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:14px;line-height:1.6}
 
-    /* Hero */
-    .hero {
-      background: var(--navy);
-      padding: 56px 40px 80px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
+  /* ── LOADING ── */
+  #lwrap{display:none;align-items:center;justify-content:center;min-height:300px;flex-direction:column;gap:16px}
+  .spin{width:36px;height:36px;border:3px solid var(--nb);border-top-color:var(--or);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ldtxt{font-size:12px;color:var(--mu);font-family:"Courier New",monospace}
+  #content{display:none}
 
-    .hero::after {
-      content: '';
-      position: absolute;
-      bottom: -1px; left: -5%;
-      width: 110%;
-      height: 44px;
-      background: var(--amber);
-      transform: skewY(-1.5deg);
-      transform-origin: bottom left;
-    }
+  /* ── STATUS BAR ── */
+  .sbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .sdt{font-size:12px;color:var(--mu)}
+  .slv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
+  .sdot{width:7px;height:7px;border-radius:50%;background:var(--gr);box-shadow:0 0 8px var(--gr);animation:pulse 2s ease-in-out infinite}
+  .sdot.ld{background:var(--am);box-shadow:0 0 8px var(--am)}
+  .sdot.er{background:var(--re);box-shadow:0 0 8px var(--re);animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 
-    .hero h1 {
-      font-family: 'Lato', sans-serif;
-      font-weight: 900;
-      font-size: clamp(26px, 5vw, 42px);
-      color: var(--white);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-    }
+  /* ── METRIC CARDS ── */
+  .mcard{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid var(--nb);background:var(--nc);cursor:pointer;opacity:0;transform:translateY(18px);transition:opacity .45s ease,transform .45s ease,border-color .15s,box-shadow .15s}
+  .mcard.vis{opacity:1;transform:translateY(0)}
+  .mcard:hover{border-color:var(--nb);box-shadow:0 6px 28px rgba(0,0,0,.3);transform:translateY(-2px)!important}
+  .mcard .mglow{position:absolute;top:-50px;right:-50px;width:150px;height:150px;border-radius:50%;pointer-events:none}
+  .mcard-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:8px}
+  .mcard-value{font-size:36px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+  .mcard-sub{font-size:11px;color:var(--mu);margin-top:5px}
+  .mcard-hint{position:absolute;bottom:10px;right:12px;font-size:10px;color:var(--nb);font-family:"Courier New",monospace;letter-spacing:.05em;opacity:0;transition:opacity .15s}
+  .mcard:hover .mcard-hint{opacity:1;color:var(--mu)}
 
-    .hero p {
-      font-size: 15px;
-      font-weight: 300;
-      color: rgba(255,255,255,0.6);
-    }
+  .mcard.orange{border-color:rgba(244,124,32,.35);background:linear-gradient(135deg,#1f1408,#2a1b09)}
+  .mcard.orange .mglow{background:radial-gradient(circle,rgba(244,124,32,.2),transparent 70%)}
+  .mcard.orange .mcard-value{color:var(--or)}
+  .mcard.blue{border-color:rgba(56,189,248,.25);background:linear-gradient(135deg,#0a1e30,#0d2840)}
+  .mcard.blue .mglow{background:radial-gradient(circle,rgba(56,189,248,.18),transparent 70%)}
+  .mcard.blue .mcard-value{color:var(--stage1)}
+  .mcard.green{border-color:rgba(52,211,153,.25);background:linear-gradient(135deg,#0a2018,#0d2e1e)}
+  .mcard.green .mglow{background:radial-gradient(circle,rgba(52,211,153,.18),transparent 70%)}
+  .mcard.green .mcard-value{color:var(--gr)}
+  .mcard.red{border-color:rgba(248,113,113,.25);background:linear-gradient(135deg,#2a0d0d,#360f0f)}
+  .mcard.red .mglow{background:radial-gradient(circle,rgba(248,113,113,.18),transparent 70%)}
+  .mcard.red .mcard-value{color:var(--re)}
 
-    /* Amber spacer below hero slash */
-    .amber-bar {
-      background: var(--amber);
-      height: 44px;
-    }
+  .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:4px}
+  @media(max-width:1100px){.metrics-grid{grid-template-columns:repeat(2,1fr)}}
 
-    /* Cards */
-    .cards-section {
-      padding: 52px 40px 64px;
-      display: flex;
-      justify-content: center;
-    }
+  /* ── STAGE CARDS ── */
+  .stages-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
+  @media(max-width:900px){.stages-grid{grid-template-columns:1fr}}
+  .scard{border-radius:14px;padding:16px 20px;border:1px solid var(--nb);background:var(--nc);cursor:pointer;opacity:0;transform:translateY(18px);transition:opacity .45s ease,transform .45s ease,border-color .15s,box-shadow .15s;position:relative;overflow:hidden}
+  .scard.vis{opacity:1;transform:translateY(0)}
+  .scard:hover{box-shadow:0 6px 28px rgba(0,0,0,.3);transform:translateY(-2px)!important}
+  .scard-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .scard-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .scard-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace;color:var(--mu)}
+  .scard-count{font-size:38px;font-weight:800;letter-spacing:-1.5px;line-height:1;margin-bottom:4px}
+  .scard-val{font-family:"Courier New",monospace;font-size:13px;color:var(--mu)}
+  .scard-bar-bg{height:3px;background:rgba(255,255,255,.06);border-radius:99px;margin-top:14px;overflow:hidden}
+  .scard-bar{height:100%;border-radius:99px;width:0;transition:width 1s cubic-bezier(.4,0,.2,1)}
+  .scard-arrow{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--nb);font-size:18px;transition:all .15s}
+  .scard:hover .scard-arrow{color:var(--mu);right:11px}
 
-    .cards {
-      display: flex;
-      gap: 28px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
+  .scard.s1{border-color:rgba(56,189,248,.25);background:linear-gradient(135deg,#091c2a,#0b2336)}
+  .scard.s1 .scard-count{color:var(--stage1)}
+  .scard.s2{border-color:rgba(167,139,250,.25);background:linear-gradient(135deg,#150f2a,#1c1436)}
+  .scard.s2 .scard-count{color:var(--stage2)}
+  .scard.s3{border-color:rgba(244,124,32,.25);background:linear-gradient(135deg,#1f1206,#28180a)}
+  .scard.s3 .scard-count{color:var(--stage3)}
 
-    .card {
-      width: 300px;
-      background: var(--white);
-      border: 2px solid #e0e3ef;
-      text-decoration: none;
-      color: inherit;
-      display: flex;
-      flex-direction: column;
-      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-      animation: fadeUp 0.45s ease both;
-    }
+  /* ── BOTTOM GRID ── */
+  .bot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+  @media(max-width:900px){.bot-grid{grid-template-columns:1fr}}
 
-    .card:nth-child(2) { animation-delay: 0.1s; }
-    .card:nth-child(3) { animation-delay: 0.2s; }
-    .card:nth-child(4) { animation-delay: 0.3s; }
+  /* ── PANEL ── */
+  .panel{border-radius:14px;padding:16px 20px;border:1px solid var(--nb);background:var(--nc);opacity:0;transform:translateY(18px);transition:opacity .45s ease,transform .45s ease}
+  .panel.vis{opacity:1;transform:translateY(0)}
+  .panel-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .panel-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-family:"Courier New",monospace}
+  .panel-badge{font-family:"Courier New",monospace;font-size:11px;color:var(--mu);background:var(--nm);border:1px solid var(--nb);padding:2px 9px;border-radius:99px}
 
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 14px 36px rgba(45,58,122,0.13);
-    }
+  /* ── SP ROWS ── */
+  .sp-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:8px 6px;border-bottom:1px solid rgba(36,51,101,.6);cursor:pointer;border-radius:6px;transition:background .12s}
+  .sp-row:last-child{border-bottom:none}
+  .sp-row:hover{background:rgba(36,51,101,.4)}
+  .sp-name{font-size:13px;font-weight:600}
+  .sp-deals{font-size:11px;color:var(--mu);font-family:"Courier New",monospace;margin-top:1px}
+  .sp-od{font-family:"Courier New",monospace;font-size:12px;color:var(--re);background:rgba(248,113,113,.08);padding:2px 8px;border-radius:4px;min-width:32px;text-align:center;border:1px solid rgba(248,113,113,.15)}
+  .sp-od.zero{color:var(--mu);background:transparent;border-color:transparent}
 
-    .card--sales:hover      { border-color: var(--amber); }
-    .card--cs:hover         { border-color: var(--navy); }
-    .card--warehouse:hover  { border-color: #34d399; }
-    .card--pipeline:hover   { border-color: #38bdf8; }
+  /* ── ACTIVITY ── */
+  .act-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(36,51,101,.5)}
+  .act-row:last-child{border-bottom:none}
+  .act-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+  .act-icon.call{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.15)}
+  .act-icon.appt{background:rgba(244,124,32,.08);border:1px solid rgba(244,124,32,.15)}
+  .act-info{flex:1;min-width:0}
+  .act-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .act-meta{font-size:11px;color:var(--mu);margin-top:1px}
+  .act-date{font-family:"Courier New",monospace;font-size:10px;color:var(--mu);flex-shrink:0}
 
-    .card-top {
-      background: var(--navy);
-      padding: 22px 26px 18px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
+  /* ── WIN/LOST ── */
+  .wl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+  .wl-card{border-radius:14px;padding:16px 20px;border:1px solid var(--nb);opacity:0;transform:translateY(18px);transition:opacity .45s ease,transform .45s ease}
+  .wl-card.vis{opacity:1;transform:translateY(0)}
+  .wl-card.won{background:linear-gradient(135deg,#0a2018,#0d2e1e);border-color:rgba(52,211,153,.25)}
+  .wl-card.lost{background:linear-gradient(135deg,#2a0d0d,#360f0f);border-color:rgba(248,113,113,.25)}
+  .wl-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .wl-dot{width:8px;height:8px;border-radius:50%}
+  .wl-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu)}
+  .wl-count{font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1}
+  .wl-val{font-family:"Courier New",monospace;font-size:12px;color:var(--mu);margin-top:3px}
 
-    .card--cs .card-top        { background: var(--navy-dark); }
-    .card--warehouse .card-top { background: #0f3d20; }
-    .card--pipeline .card-top  { background: #0a1e30; }
-
-    .card-icon {
-      width: 42px;
-      height: 42px;
-      background: var(--amber);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .card-icon svg {
-      width: 21px;
-      height: 21px;
-      stroke: var(--navy);
-      fill: none;
-      stroke-width: 2;
-    }
-
-    .card-num {
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.45);
-      margin-bottom: 3px;
-    }
-
-    .card-title {
-      font-family: 'Lato', sans-serif;
-      font-weight: 800;
-      font-size: 21px;
-      color: var(--white);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .card-body {
-      padding: 22px 26px 20px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .card-desc {
-      font-size: 14px;
-      color: #555;
-      line-height: 1.65;
-    }
-
-    .card-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .tag {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 4px 10px;
-      border: 1px solid #dde0ec;
-      color: var(--grey);
-    }
-
-    .card-cta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--amber);
-      padding: 13px 20px;
-      font-family: 'Lato', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
-      color: var(--navy);
-      transition: background 0.2s;
-    }
-
-    .card:hover .card-cta { background: var(--amber-dark); }
-
-    .card-cta svg {
-      width: 16px;
-      height: 16px;
-      stroke: var(--navy);
-      fill: none;
-      stroke-width: 2.5;
-      transition: transform 0.2s;
-    }
-
-    .card:hover .card-cta svg { transform: translateX(4px); }
-
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding: 18px;
-      font-size: 11px;
-      color: var(--grey);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      border-top: 1px solid #e0e3ef;
-      background: var(--white);
-    }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(18px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @media (max-width: 680px) {
-      .header { padding: 12px 16px; }
-      .logo { height: 38px; }
-      .header-label { font-size: 10px; }
-      .hero { padding: 32px 16px 72px; }
-      .hero h1 { font-size: 22px; }
-      .hero p { font-size: 13px; }
-      .amber-bar { height: 36px; }
-      .cards-section { padding: 24px 16px 40px; }
-      .cards { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin: 0 auto; }
-      .card { width: 100%; }
-      .card-top { padding: 16px 18px 14px; }
-      .card-body { padding: 16px 18px; gap: 12px; }
-      .card-desc { font-size: 13px; }
-      .card-cta { padding: 11px 18px; font-size: 13px; }
-      .footer { font-size: 10px; padding: 14px; }
-    }
-
-    @media (max-width: 380px) {
-      .hero h1 { font-size: 18px; }
-      .card-title { font-size: 18px; }
-    }
-  </style>
+  /* ── DRILL PANEL ── */
+  .d-overlay{position:fixed;inset:0;background:rgba(13,27,56,.65);z-index:500;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(3px)}
+  .d-overlay.open{opacity:1;pointer-events:all}
+  .d-panel{position:fixed;top:0;right:0;bottom:0;width:600px;max-width:96vw;background:var(--nm);border-left:1px solid var(--nb);z-index:501;transform:translateX(100%);transition:transform .3s cubic-bezier(.25,.46,.45,.94);display:flex;flex-direction:column;overflow:hidden}
+  .d-panel.open{transform:translateX(0)}
+  .d-hstr{height:3px;background:linear-gradient(90deg,var(--or),rgba(244,124,32,.2),transparent);flex-shrink:0}
+  .d-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--nb);flex-shrink:0;background:rgba(22,32,64,.6)}
+  .d-title{font-size:16px;font-weight:700}
+  .d-sub{font-size:12px;color:var(--mu);margin-top:2px;font-family:"Courier New",monospace}
+  .d-close{background:none;border:1px solid var(--nb);color:var(--mu);width:32px;height:32px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;flex-shrink:0}
+  .d-close:hover{border-color:var(--re);color:var(--re)}
+  .d-summary{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--nb);flex-shrink:0}
+  .d-sum-item{padding:12px 20px;border-right:1px solid var(--nb)}
+  .d-sum-item:last-child{border-right:none}
+  .d-sum-lbl{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--mu);font-family:"Courier New",monospace;margin-bottom:4px}
+  .d-sum-val{font-size:20px;font-weight:800;letter-spacing:-0.5px}
+  .d-body{flex:1;overflow-y:auto;padding:12px 20px}
+  .d-body::-webkit-scrollbar{width:4px}
+  .d-body::-webkit-scrollbar-track{background:transparent}
+  .d-body::-webkit-scrollbar-thumb{background:var(--nb);border-radius:2px}
+  .deal-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;padding:10px 6px;border-bottom:1px solid rgba(36,51,101,.5);border-radius:6px;transition:background .1s}
+  .deal-row:last-child{border-bottom:none}
+  .deal-row:hover{background:rgba(36,51,101,.35);padding-left:10px;padding-right:10px;margin:0 -4px}
+  .deal-name{font-size:13px;font-weight:600;line-height:1.4}
+  .deal-tags{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+  .dtag{font-family:"Courier New",monospace;font-size:10px;color:var(--mu);background:var(--nd);padding:2px 6px;border-radius:3px;border:1px solid var(--nb)}
+  .dtag.overdue{color:var(--re);background:rgba(248,113,113,.06);border-color:rgba(248,113,113,.2)}
+  .dtag.soon{color:var(--am);background:rgba(251,191,36,.06);border-color:rgba(251,191,36,.2)}
+  .deal-val{font-family:"Courier New",monospace;font-size:13px;font-weight:700;color:var(--or);white-space:nowrap;text-align:right}
+  .deal-owner{font-size:11px;color:var(--mu);margin-top:3px;text-align:right}
+  .empty-state{text-align:center;padding:40px 16px;color:var(--mu);font-size:13px}
+</style>
 </head>
 <body>
 
-  <div class="topbar"></div>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="display:none">
+  <div class="lcard">
+    <img src="/favicon.png" class="llogo" alt="Plus Packaging" onerror="this.style.display='none'">
+    <div class="ltitle">Pipeline Dashboard</div>
+    <div class="lsub">Sign in with your Plus Packaging Microsoft account to view the sales pipeline.</div>
+    <button class="btnms" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div class="lnote">Access restricted to Plus Packaging staff. Use your company Microsoft account.</div>
+  </div>
+</div>
 
-  <header class="header">
-    <a href="#">
-      <img class="logo" src="./Plus_Logo.jpg" alt="Plus Packaging" />
-    </a>
-    <span class="header-label">Internal Dashboards</span>
+<!-- DRILL OVERLAY -->
+<div class="d-overlay" id="dOverlay" onclick="closeDrill()"></div>
+
+<!-- DRILL PANEL -->
+<div class="d-panel" id="dPanel">
+  <div class="d-hstr"></div>
+  <div class="d-hdr">
+    <div>
+      <div class="d-title" id="dTitle">Deals</div>
+      <div class="d-sub" id="dSub"></div>
+    </div>
+    <button class="d-close" onclick="closeDrill()">✕</button>
+  </div>
+  <div class="d-summary" id="dSummary"></div>
+  <div class="d-body" id="dBody"></div>
+</div>
+
+<!-- DASHBOARD SCREEN -->
+<div id="dashScreen" style="display:none">
+  <header>
+    <div class="hstr"></div>
+    <div class="hinn">
+      <div class="hlft">
+        <img src="/favicon.png" class="hlog" alt="Plus Packaging" onerror="this.style.display='none'">
+        <div class="hdiv"></div>
+        <div>
+          <div class="htop">Plus Packaging</div>
+          <div class="hbot">Pipeline Dashboard</div>
+        </div>
+        <nav class="hnav">
+          <a href="/sales/">Sales</a>
+          <a href="/customer-service/">Customer Service</a>
+          <a href="/warehouse/">Warehouse</a>
+          <a href="/pipeline/" class="active">Pipeline</a>
+        </nav>
+      </div>
+      <div class="hrgt">
+        <div class="lupd" id="lupd" style="display:none">
+          <span>Last updated</span>
+          <strong id="lupdT">—</strong>
+        </div>
+        <div class="arpl">
+          <span class="arl" id="arl">Auto</span>
+          <div class="tog" id="atog" onclick="toggleAuto()"><div class="togk"></div></div>
+          <select class="arsl" id="asel" onchange="changeInt()">
+            <option value="5">5 min</option>
+            <option value="10" selected>10 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+          </select>
+          <span class="arcd" id="acd"></span>
+        </div>
+        <button class="btnr" id="btnr" onclick="fetchData()">⟳ Refresh</button>
+        <div class="uinfo">
+          <div class="uavt" id="uavt">—</div>
+          <span id="uname"></span>
+        </div>
+      </div>
+    </div>
   </header>
 
-  <div class="hero">
-    <h1>Business Intelligence</h1>
-    <p>Select a dashboard below to view live data</p>
-  </div>
-  <div class="amber-bar"></div>
-
-  <section class="cards-section">
-    <div class="cards">
-
-      <a class="card card--sales" href="./sales/">
-        <div class="card-top">
-          <div class="card-icon">
-            <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          </div>
-          <div>
-            <div class="card-num">Dashboard 01</div>
-            <div class="card-title">Sales</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <p class="card-desc">Month-to-date sales &amp; margin vs target, NPS score, margin %, CRM calls/deals/appointments, orders in and shipped today.</p>
-          <div class="card-tags">
-            <span class="tag">MTD Sales</span>
-            <span class="tag">Margin</span>
-            <span class="tag">Margin %</span>
-            <span class="tag">NPS</span>
-            <span class="tag">CRM</span>
-            <span class="tag">Orders In</span>
-            <span class="tag">Shipped Today</span>
-            <span class="tag">New Customers</span>
-          </div>
-        </div>
-        <div class="card-cta">
-          Open Dashboard
-          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-      </a>
-
-      <a class="card card--cs" href="./customer-service/">
-        <div class="card-top">
-          <div class="card-icon">
-            <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z"/></svg>
-          </div>
-          <div>
-            <div class="card-num">Dashboard 02</div>
-            <div class="card-title">Customer Service</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <p class="card-desc">MTD sales &amp; margin, NPS, OTIF, catalogue in stock, orders in, top inbound callers and order processors today.</p>
-          <div class="card-tags">
-            <span class="tag">MTD Sales</span>
-            <span class="tag">NPS</span>
-            <span class="tag">OTIF</span>
-            <span class="tag">Catalogue Stock</span>
-            <span class="tag">Top Callers</span>
-            <span class="tag">Order Processors</span>
-          </div>
-        </div>
-        <div class="card-cta">
-          Open Dashboard
-          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-      </a>
-
-      <a class="card card--warehouse" href="./warehouse/">
-        <div class="card-top">
-          <div class="card-icon">
-            <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-          </div>
-          <div>
-            <div class="card-num">Dashboard 03</div>
-            <div class="card-title">Warehouse</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <p class="card-desc">MTD sales &amp; margin, orders processed today, total shipments, and top pickers leaderboard.</p>
-          <div class="card-tags">
-            <span class="tag">MTD Sales</span>
-            <span class="tag">Margin</span>
-            <span class="tag">Orders Processed</span>
-            <span class="tag">Shipments</span>
-            <span class="tag">Top Pickers</span>
-          </div>
-        </div>
-        <div class="card-cta">
-          Open Dashboard
-          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-      </a>
-
-      <a class="card card--pipeline" href="./pipeline/">
-        <div class="card-top">
-          <div class="card-icon">
-            <svg viewBox="0 0 24 24"><path d="M3 3h6l4 9 4-6h4"/><circle cx="19" cy="19" r="2"/><circle cx="5" cy="19" r="2"/><line x1="5" y1="17" x2="5" y2="12"/><line x1="19" y1="17" x2="19" y2="6"/></svg>
-          </div>
-          <div>
-            <div class="card-num">Dashboard 04</div>
-            <div class="card-title">Pipeline</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <p class="card-desc">Live CRM sales pipeline — open deals by stage, total pipeline value, win rate, overdue deals by salesperson, and recent activity.</p>
-          <div class="card-tags">
-            <span class="tag">Open Deals</span>
-            <span class="tag">Pipeline Value</span>
-            <span class="tag">Win Rate</span>
-            <span class="tag">By Stage</span>
-            <span class="tag">Overdue</span>
-            <span class="tag">Activity</span>
-          </div>
-        </div>
-        <div class="card-cta">
-          Open Dashboard
-          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-      </a>
-
+  <main>
+    <div class="sbar">
+      <div class="sdt" id="sdt"></div>
+      <div class="slv"><div class="sdot" id="sdot"></div><span id="stxt">Live data</span></div>
     </div>
-  </section>
 
-  <footer class="footer">Plus Packaging Ltd &mdash; Internal Use Only</footer>
+    <div id="errb"></div>
 
+    <!-- LOADING -->
+    <div id="lwrap">
+      <div class="spin"></div>
+      <div class="ldtxt" id="ldtxt">Fetching pipeline data…</div>
+    </div>
+
+    <div id="content">
+
+      <!-- PAGE TITLE -->
+      <div class="pghdr">
+        <div>
+          <div class="pgtitle">Plus Packaging · CRM</div>
+          <div class="pgname">Sales <span>Pipeline</span></div>
+        </div>
+        <div class="pgperiod" id="pgperiod">ALL OPEN + 30-DAY CLOSED</div>
+      </div>
+
+      <!-- KEY METRICS -->
+      <div class="slbl"><span>Key Metrics</span><div class="slbll"></div></div>
+      <div class="metrics-grid">
+        <div class="mcard orange" id="mc0" onclick="drillAll()">
+          <div class="mglow"></div>
+          <div class="mcard-label">Total Pipeline Value</div>
+          <div class="mcard-value" id="mVal">—</div>
+          <div class="mcard-sub" id="mValSub">all open deals</div>
+          <div class="mcard-hint">CLICK TO EXPLORE →</div>
+        </div>
+        <div class="mcard blue" id="mc1" onclick="drillAll()">
+          <div class="mglow"></div>
+          <div class="mcard-label">Open Deals</div>
+          <div class="mcard-value" id="mCount">—</div>
+          <div class="mcard-sub">across all stages</div>
+          <div class="mcard-hint">CLICK TO EXPLORE →</div>
+        </div>
+        <div class="mcard green" id="mc2" onclick="drillWinRate()">
+          <div class="mglow"></div>
+          <div class="mcard-label">Win Rate</div>
+          <div class="mcard-value" id="mWin">—</div>
+          <div class="mcard-sub">last 30 days by count</div>
+          <div class="mcard-hint">CLICK TO EXPLORE →</div>
+        </div>
+        <div class="mcard red" id="mc3" onclick="drillOverdue()">
+          <div class="mglow"></div>
+          <div class="mcard-label">Overdue Deals</div>
+          <div class="mcard-value" id="mOverdue">—</div>
+          <div class="mcard-sub">close date passed, still open</div>
+          <div class="mcard-hint">CLICK TO EXPLORE →</div>
+        </div>
+      </div>
+
+      <!-- STAGES -->
+      <div class="slbl"><span>Pipeline by Stage</span><div class="slbll"></div></div>
+      <div class="stages-grid">
+        <div class="scard s1" id="sc0" onclick="drillStage(0)">
+          <div class="scard-hdr"><div class="scard-dot" style="background:var(--stage1)"></div><div class="scard-name">Opportunity Identified</div></div>
+          <div class="scard-count" id="s0c">—</div>
+          <div class="scard-val" id="s0v">—</div>
+          <div class="scard-bar-bg"><div class="scard-bar" style="background:var(--stage1)" id="s0b"></div></div>
+          <div class="scard-arrow">→</div>
+        </div>
+        <div class="scard s2" id="sc1" onclick="drillStage(1)">
+          <div class="scard-hdr"><div class="scard-dot" style="background:var(--stage2)"></div><div class="scard-name">Proposal Sent</div></div>
+          <div class="scard-count" id="s1c">—</div>
+          <div class="scard-val" id="s1v">—</div>
+          <div class="scard-bar-bg"><div class="scard-bar" style="background:var(--stage2)" id="s1b"></div></div>
+          <div class="scard-arrow">→</div>
+        </div>
+        <div class="scard s3" id="sc2" onclick="drillStage(2)">
+          <div class="scard-hdr"><div class="scard-dot" style="background:var(--stage3)"></div><div class="scard-name">Samples / Final Negotiation</div></div>
+          <div class="scard-count" id="s2c">—</div>
+          <div class="scard-val" id="s2v">—</div>
+          <div class="scard-bar-bg"><div class="scard-bar" style="background:var(--stage3)" id="s2b"></div></div>
+          <div class="scard-arrow">→</div>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW -->
+      <div class="slbl"><span>Overdue &amp; Activity</span><div class="slbll"></div></div>
+      <div class="bot-grid">
+        <div class="panel" id="panOd">
+          <div class="panel-hdr">
+            <div class="panel-title" style="color:var(--re)">Overdue by Salesperson</div>
+            <div class="panel-badge" id="odBadge">—</div>
+          </div>
+          <div id="odList"><div class="empty-state">Loading…</div></div>
+        </div>
+        <div class="panel" id="panAct">
+          <div class="panel-hdr">
+            <div class="panel-title" style="color:var(--or)">Recent Activity</div>
+            <div class="panel-badge" id="actBadge">—</div>
+          </div>
+          <div id="actList"><div class="empty-state">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- WON / LOST -->
+      <div class="slbl"><span>Last 30 Days — Closed Deals</span><div class="slbll"></div></div>
+      <div class="wl-grid">
+        <div class="wl-card won" id="wlWon">
+          <div class="wl-hdr"><div class="wl-dot" style="background:var(--gr)"></div><div class="wl-lbl">Won</div></div>
+          <div class="wl-count" style="color:var(--gr)" id="wlWonC">—</div>
+          <div class="wl-val" id="wlWonV">—</div>
+        </div>
+        <div class="wl-card lost" id="wlLost">
+          <div class="wl-hdr"><div class="wl-dot" style="background:var(--re)"></div><div class="wl-lbl">Lost</div></div>
+          <div class="wl-count" style="color:var(--re)" id="wlLostC">—</div>
+          <div class="wl-val" id="wlLostV">—</div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div><!-- /dashScreen -->
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+const CFG = {
+  clientId: "984139d6-9a6c-4da1-894d-34148ff1d570",
+  tenantId: "5f50e638-38b0-44d5-8e87-9a4d7d01717d",
+  dynamicsUrl: "https://pluspackaging.crm11.dynamics.com/api/data/v9.2",
+  scopes: ["https://pluspackaging.crm11.dynamics.com/user_impersonation"],
+  redirectUri: window.location.origin + window.location.pathname,
+};
+
+const STAGES = [
+  { label: "Opportunity Identified", keywords: ["opportunity identified", "1."] },
+  { label: "Proposal Sent",          keywords: ["proposal sent", "2."] },
+  { label: "Samples / Final Negotiation", keywords: ["sample", "final", "negotiation", "3."] },
+];
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let token = null;
+let busy = false, firstLoad = true, autoOn = true, intMins = 10, cdSecs = 600, ticker;
+let allOpen = [], wonDeals = [], lostDeals = [], callAct = [], apptAct = [];
+
+// ─────────────────────────────────────────────
+// AUTH — PKCE (matches existing dashboards)
+// ─────────────────────────────────────────────
+function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')}
+async function sha256(s){const e=new TextEncoder().encode(s);return crypto.subtle.digest('SHA-256',e)}
+function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')}
+
+async function signIn(){
+  const v=rnd(32),c=b64url(await sha256(v));
+  sessionStorage.setItem('pkce_v',v);
+  const p=new URLSearchParams({client_id:CFG.clientId,response_type:'code',redirect_uri:CFG.redirectUri,scope:CFG.scopes.join(' ')+' offline_access openid profile',code_challenge:c,code_challenge_method:'S256',response_mode:'query'});
+  window.location.href=`https://login.microsoftonline.com/${CFG.tenantId}/oauth2/v2.0/authorize?${p}`;
+}
+
+async function handleCallback(code){
+  const v=sessionStorage.getItem('pkce_v');
+  const body=new URLSearchParams({client_id:CFG.clientId,grant_type:'authorization_code',code,redirect_uri:CFG.redirectUri,code_verifier:v,scope:CFG.scopes.join(' ')+' offline_access openid profile'});
+  const r=await fetch(`https://login.microsoftonline.com/${CFG.tenantId}/oauth2/v2.0/token`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+  const d=await r.json();
+  if(d.error)throw new Error(d.error_description);
+  saveTok(d);
+  window.history.replaceState({},'',window.location.pathname);
+  showDash();
+}
+
+async function refreshTok(rt){
+  const body=new URLSearchParams({client_id:CFG.clientId,grant_type:'refresh_token',refresh_token:rt,scope:CFG.scopes.join(' ')+' offline_access openid profile'});
+  const r=await fetch(`https://login.microsoftonline.com/${CFG.tenantId}/oauth2/v2.0/token`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+  const d=await r.json();
+  if(d.error)throw new Error(d.error_description);
+  saveTok(d);
+}
+
+function saveTok(d){
+  token=d.access_token;
+  sessionStorage.setItem('tok',d.access_token);
+  sessionStorage.setItem('exp',Date.now()+d.expires_in*1000);
+  if(d.refresh_token)sessionStorage.setItem('rt',d.refresh_token);
+  if(d.id_token){try{const p=JSON.parse(atob(d.id_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));sessionStorage.setItem('uname',p.name||'')}catch{}}
+}
+
+async function ensureToken(){
+  const t=sessionStorage.getItem('tok'),exp=+sessionStorage.getItem('exp')||0;
+  if(t&&Date.now()<exp-60000){token=t;return}
+  const rt=sessionStorage.getItem('rt');
+  if(rt)await refreshTok(rt);
+  else throw new Error('Not authenticated');
+}
+
+// ─────────────────────────────────────────────
+// CRM API
+// ─────────────────────────────────────────────
+const hdrs=()=>({'Authorization':`Bearer ${token}`,'Accept':'application/json','OData-MaxVersion':'4.0','OData-Version':'4.0','Prefer':'odata.include-annotations="*"'});
+
+async function crmAll(path){
+  let results=[],url=CFG.dynamicsUrl+path;
+  while(url){
+    const r=await fetch(url,{headers:hdrs()});
+    if(!r.ok)throw new Error(`CRM ${r.status}: ${await r.text()}`);
+    const d=await r.json();
+    results=results.concat(d.value||[]);
+    url=d['@odata.nextLink']||null;
+  }
+  return results;
+}
+
+async function crmGet(path){
+  const r=await fetch(CFG.dynamicsUrl+path,{headers:hdrs()});
+  if(!r.ok)throw new Error(`CRM ${r.status}`);
+  return(await r.json()).value||[];
+}
+
+// ─────────────────────────────────────────────
+// FETCH DATA
+// ─────────────────────────────────────────────
+async function fetchData(){
+  if(busy)return;
+  busy=true;
+  setStatus('ld');
+  document.getElementById('btnr').disabled=true;
+  document.getElementById('btnr').textContent='Loading…';
+  if(firstLoad){document.getElementById('lwrap').style.display='flex';document.getElementById('content').style.display='none';ld('Authenticating…')}
+
+  try{
+    await ensureToken();
+    const now=new Date();
+    const ago30=new Date(now);ago30.setDate(ago30.getDate()-30);
+    const ago30s=ago30.toISOString(),nows=now.toISOString();
+
+    ld('Loading open opportunities…');
+    allOpen=await crmAll(`/opportunities?$select=name,estimatedvalue,closeprobability,estimatedclosedate,createdon,statuscode,stepname,_ownerid_value,_accountid_value&$filter=statecode eq 0&$orderby=estimatedvalue desc`);
+
+    ld('Loading won deals (30 days)…');
+    wonDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,_ownerid_value,_accountid_value&$filter=statecode eq 1 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
+
+    ld('Loading lost deals (30 days)…');
+    lostDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,_ownerid_value,_accountid_value&$filter=statecode eq 2 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
+
+    ld('Loading activity…');
+    callAct=await crmGet(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${ago30s}&$orderby=actualend desc&$top=50`);
+    apptAct=await crmGet(`/appointments?$select=subject,scheduledend,_ownerid_value&$filter=statecode eq 3 and scheduledend ge ${ago30s}&$orderby=scheduledend desc&$top=50`);
+
+    render(now);
+    setStatus('ok');
+    document.getElementById('lupd').style.display='block';
+    document.getElementById('lupdT').textContent=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('errb').style.display='none';
+    firstLoad=false;
+  }catch(e){
+    setStatus('er');
+    document.getElementById('lwrap').style.display='none';
+    document.getElementById('content').style.display='block';
+    const eb=document.getElementById('errb');
+    eb.style.display='block';
+    eb.innerHTML=`<strong>⚠ Could not load data:</strong> ${esc(e.message)}<br><small>Check your connection or refresh.</small>`;
+  }finally{
+    busy=false;
+    document.getElementById('btnr').disabled=false;
+    document.getElementById('btnr').textContent='⟳ Refresh';
+    restartCd();
+  }
+}
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+function render(now){
+  document.getElementById('lwrap').style.display='none';
+  document.getElementById('content').style.display='block';
+
+  const todayStr=now.toISOString().split('T')[0];
+  const ago30=new Date(now);ago30.setDate(ago30.getDate()-30);
+  document.getElementById('pgperiod').textContent=`OPEN: ALL · CLOSED: ${fmtD(ago30)} – ${fmtD(now)}`;
+
+  // Metrics
+  const totalVal=allOpen.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const overdue=allOpen.filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<todayStr);
+  const winRate=wonDeals.length+lostDeals.length>0?Math.round(wonDeals.length/(wonDeals.length+lostDeals.length)*100):0;
+
+  document.getElementById('mVal').textContent=fmtGBP(totalVal);
+  document.getElementById('mCount').textContent=allOpen.length;
+  document.getElementById('mWin').textContent=winRate+'%';
+  document.getElementById('mOverdue').textContent=overdue.length;
+
+  // Stage buckets
+  const buckets=[[],[],[]];
+  allOpen.forEach(d=>{
+    const st=(d.stepname||'').toLowerCase();
+    let idx=0;
+    for(let i=0;i<STAGES.length;i++){if(STAGES[i].keywords.some(k=>st.includes(k))){idx=i;break;}}
+    buckets[idx].push(d);
+  });
+  const sVals=buckets.map(b=>b.reduce((s,d)=>s+(d.estimatedvalue||0),0));
+  const maxV=Math.max(...sVals,1);
+  [0,1,2].forEach(i=>{
+    document.getElementById(`s${i}c`).textContent=buckets[i].length;
+    document.getElementById(`s${i}v`).textContent=fmtGBP(sVals[i]);
+    setTimeout(()=>{document.getElementById(`s${i}b`).style.width=Math.max(4,Math.round(sVals[i]/maxV*100))+'%';},300+i*120);
+  });
+
+  // Overdue by person
+  const odMap={},allMap={};
+  allOpen.forEach(d=>{
+    const n=ownerName(d);
+    allMap[n]=(allMap[n]||0)+1;
+    if(d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<todayStr)odMap[n]=(odMap[n]||0)+1;
+  });
+  const people=Object.keys(allMap).sort((a,b)=>(odMap[b]||0)-(odMap[a]||0));
+  document.getElementById('odBadge').textContent=overdue.length+' overdue';
+  document.getElementById('odList').innerHTML=people.length===0?'<div class="empty-state">No open deals</div>':
+    people.map(n=>`<div class="sp-row" onclick="drillPersonOd('${esc(n)}')">
+      <div><div class="sp-name">${esc(n)}</div><div class="sp-deals">${allMap[n]} open deal${allMap[n]!==1?'s':''}</div></div>
+      <div></div>
+      <div class="sp-od ${(odMap[n]||0)===0?'zero':''}">${(odMap[n]||0)===0?'—':(odMap[n]+' overdue')}</div>
+    </div>`).join('');
+
+  // Activity
+  const acts=[
+    ...callAct.map(a=>({type:'call',subject:a.subject||'Phone call',owner:ownerName(a),date:a.actualend})),
+    ...apptAct.map(a=>({type:'appt',subject:a.subject||'Appointment',owner:ownerName(a),date:a.scheduledend})),
+  ].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20);
+  document.getElementById('actBadge').textContent=acts.length+' items';
+  document.getElementById('actList').innerHTML=acts.length===0?'<div class="empty-state">No activity in last 30 days</div>':
+    acts.map(a=>`<div class="act-row">
+      <div class="act-icon ${a.type}">${a.type==='call'?'📞':'📅'}</div>
+      <div class="act-info"><div class="act-name">${esc(a.subject)}</div><div class="act-meta">${esc(a.owner)} · ${a.type==='call'?'Meaningful call':'Appointment'}</div></div>
+      <div class="act-date">${fmtD(new Date(a.date))}</div>
+    </div>`).join('');
+
+  // Won/Lost
+  const wonVal=wonDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const lostVal=lostDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  document.getElementById('wlWonC').textContent=wonDeals.length+' deal'+(wonDeals.length!==1?'s':'');
+  document.getElementById('wlWonV').textContent=fmtGBP(wonVal);
+  document.getElementById('wlLostC').textContent=lostDeals.length+' deal'+(lostDeals.length!==1?'s':'');
+  document.getElementById('wlLostV').textContent=fmtGBP(lostVal);
+
+  // Animate cards
+  const cards=['mc0','mc1','mc2','mc3','sc0','sc1','sc2','panOd','panAct','wlWon','wlLost'];
+  cards.forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add('vis');},i*60));
+}
+
+// ─────────────────────────────────────────────
+// DRILL-DOWN
+// ─────────────────────────────────────────────
+function openDrill(title,sub,deals){
+  document.getElementById('dTitle').textContent=title;
+  document.getElementById('dSub').textContent=sub;
+  const todayStr=new Date().toISOString().split('T')[0];
+  const totalVal=deals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const od=deals.filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<todayStr).length;
+  document.getElementById('dSummary').innerHTML=`
+    <div class="d-sum-item"><div class="d-sum-lbl">Deals</div><div class="d-sum-val">${deals.length}</div></div>
+    <div class="d-sum-item"><div class="d-sum-lbl">Total Value</div><div class="d-sum-val" style="color:var(--or)">${fmtGBP(totalVal)}</div></div>
+    <div class="d-sum-item"><div class="d-sum-lbl">Overdue</div><div class="d-sum-val" style="color:${od>0?'var(--re)':'var(--wh)'}">${od}</div></div>`;
+  renderDrillDeals(deals);
+  document.getElementById('dOverlay').classList.add('open');
+  document.getElementById('dPanel').classList.add('open');
+}
+
+function renderDrillDeals(deals){
+  const todayStr=new Date().toISOString().split('T')[0];
+  const el=document.getElementById('dBody');
+  if(!deals.length){el.innerHTML='<div class="empty-state">No deals to show</div>';return;}
+  el.innerHTML=deals.map(d=>{
+    const cd=d.estimatedclosedate||d.actualclosedate;
+    const closeStr=cd?cd.split('T')[0]:null;
+    const daysLeft=closeStr?Math.round((new Date(closeStr)-new Date())/86400000):null;
+    let ctag='';
+    if(closeStr){
+      if(daysLeft<0)ctag=`<span class="dtag overdue">⚠ ${Math.abs(daysLeft)}d overdue</span>`;
+      else if(daysLeft<=14)ctag=`<span class="dtag soon">🔔 ${daysLeft}d to close</span>`;
+      else ctag=`<span class="dtag">${fmtD(new Date(closeStr))}</span>`;
+    }
+    return `<div class="deal-row">
+      <div>
+        <div class="deal-name">${esc(d.name||'(Unnamed)')}</div>
+        <div class="deal-tags">
+          <span class="dtag">${esc(accountName(d))}</span>
+          <span class="dtag">${esc(d.stepname||'—')}</span>
+          ${ctag}
+        </div>
+      </div>
+      <div>
+        <div class="deal-val">${fmtGBP(d.estimatedvalue)}</div>
+        <div class="deal-owner">${esc(ownerName(d))}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function closeDrill(){document.getElementById('dOverlay').classList.remove('open');document.getElementById('dPanel').classList.remove('open');}
+function drillAll(){openDrill('All Open Deals',`${allOpen.length} opportunities across all stages`,allOpen);}
+function drillStage(i){
+  const deals=allOpen.filter(d=>STAGES[i].keywords.some(k=>(d.stepname||'').toLowerCase().includes(k)));
+  openDrill(STAGES[i].label,`${deals.length} deals in this stage`,deals);
+}
+function drillOverdue(){
+  const t=new Date().toISOString().split('T')[0];
+  const od=allOpen.filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t).sort((a,b)=>new Date(a.estimatedclosedate)-new Date(b.estimatedclosedate));
+  openDrill('Overdue Deals',`${od.length} open deals past their close date`,od);
+}
+function drillWinRate(){
+  const all=[...wonDeals,...lostDeals].sort((a,b)=>new Date(b.actualclosedate||0)-new Date(a.actualclosedate||0));
+  openDrill('Won & Lost — Last 30 Days',`${wonDeals.length} won · ${lostDeals.length} lost`,all);
+}
+function drillPersonOd(name){
+  const t=new Date().toISOString().split('T')[0];
+  const od=allOpen.filter(d=>ownerName(d)===name&&d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t);
+  openDrill(`${name} — Overdue`,`${od.length} overdue deal${od.length!==1?'s':''}`,od);
+}
+
+// ─────────────────────────────────────────────
+// AUTO-REFRESH (matches sales dashboard pattern)
+// ─────────────────────────────────────────────
+function restartCd(){clearInterval(ticker);if(!autoOn)return;cdSecs=intMins*60;updCd();ticker=setInterval(()=>{cdSecs--;updCd();if(cdSecs<=0)fetchData();},1000);}
+function updCd(){const m=Math.floor(cdSecs/60),s=String(cdSecs%60).padStart(2,'0');document.getElementById('acd').textContent=m+':'+s;}
+function toggleAuto(){autoOn=!autoOn;document.getElementById('atog').classList.toggle('off',!autoOn);const l=document.getElementById('arl');l.style.color=autoOn?'var(--or)':'var(--mu)';l.textContent=autoOn?'Auto':'Paused';document.getElementById('acd').style.display=autoOn?'':'none';document.getElementById('asel').style.display=autoOn?'':'none';autoOn?restartCd():clearInterval(ticker);}
+function changeInt(){intMins=parseInt(document.getElementById('asel').value);restartCd();}
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function ownerName(d){return d['_ownerid_value@OData.Community.Display.V1.FormattedValue']||d._ownerid_value||'Unknown'}
+function accountName(d){return d['_accountid_value@OData.Community.Display.V1.FormattedValue']||'—'}
+function fmtGBP(v){if(!v&&v!==0)return'—';if(v>=1000000)return'£'+(v/1000000).toFixed(1)+'M';if(v>=1000)return'£'+(v/1000).toFixed(1)+'K';return'£'+v.toFixed(0)}
+function fmtD(d){return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function setStatus(s){const d=document.getElementById('sdot'),t=document.getElementById('stxt');d.className='sdot'+(s==='ld'?' ld':s==='er'?' er':'');t.textContent=s==='ld'?'Fetching data…':s==='er'?'Connection error':'Live data'}
+function ld(t){document.getElementById('ldtxt').textContent=t}
+
+// ─────────────────────────────────────────────
+// SHOW DASHBOARD
+// ─────────────────────────────────────────────
+function showDash(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('dashScreen').style.display='block';
+  document.getElementById('sdt').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const name=sessionStorage.getItem('uname')||'';
+  document.getElementById('uname').textContent=name.split(' ')[0]||'';
+  document.getElementById('uavt').textContent=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()||'?';
+  fetchData();
+}
+
+// ─────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────
+async function boot(){
+  const p=new URLSearchParams(location.search);
+  if(p.has('code')){await handleCallback(p.get('code'));return;}
+  const t=sessionStorage.getItem('tok'),exp=+sessionStorage.getItem('exp')||0;
+  if(t&&Date.now()<exp-30000){token=t;showDash();return;}
+  const rt=sessionStorage.getItem('rt');
+  if(rt){try{await refreshTok(rt);showDash();return;}catch{}}
+  document.getElementById('loginScreen').style.display='flex';
+}
+
+boot();
+</script>
 </body>
 </html>
