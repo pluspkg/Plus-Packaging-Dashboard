@@ -585,14 +585,12 @@ async function fetchData(){
     lostDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,_ownerid_value,_parentaccountid_value&$filter=statecode eq 2 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
 
     ld('Loading phone calls…');
-    // Fetch from start of last month so all tabs work from one dataset
     const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
     const fetchFrom=lastMonthStart.toISOString();
-    callsData=await crmGet(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc&$top=500`);
+    callsData=await crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     ld('Loading site visits…');
-    // new_leadapp = Spoke to Buyer on site visit report entity
-    visitsData=await crmGet(`/new_sitevisitreports?$select=subject,actualend,new_completedon,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and actualend ge ${fetchFrom}&$orderby=actualend desc&$top=500`);
+    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,new_completedon,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     render(now);
     setStatus('ok');
