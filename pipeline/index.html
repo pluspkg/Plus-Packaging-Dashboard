@@ -486,9 +486,9 @@ const CFG = {
 };
 
 const STAGES = [
-  { label: "Opportunity Identified", keywords: ["opportunity identified", "1."] },
-  { label: "Proposal Sent",          keywords: ["proposal sent", "2."] },
-  { label: "Samples / Final Negotiation", keywords: ["sample", "final", "negotiation", "3."] },
+  { label: "Opportunity Identified", keywords: ["1."] },
+  { label: "Proposal Sent",          keywords: ["2."] },
+  { label: "Samples / Final Negotiation", keywords: ["3."] },
 ];
 
 // ─────────────────────────────────────────────
@@ -589,7 +589,7 @@ async function fetchData(){
     const ago30s=ago30.toISOString(),nows=now.toISOString();
 
     ld('Loading open opportunities…');
-    allOpen=await crmAll(`/opportunities?$select=name,estimatedvalue,closeprobability,estimatedclosedate,createdon,statuscode,_ownerid_value,_parentaccountid_value&$expand=stageid_processstage($select=stagename)&$filter=statecode eq 0&$orderby=estimatedvalue desc`);
+    allOpen=await crmAll(`/opportunities?$select=name,estimatedvalue,closeprobability,estimatedclosedate,createdon,statuscode,new_stage,_ownerid_value,_parentaccountid_value&$filter=statecode eq 0&$orderby=estimatedvalue desc`);
 
     ld('Loading won deals (30 days)…');
     wonDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,_ownerid_value,_parentaccountid_value&$filter=statecode eq 1 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
@@ -652,7 +652,7 @@ function render(now){
   // Stage buckets
   const buckets=[[],[],[]];
   allOpen.forEach(d=>{
-    const st=(d.stageid_processstage?.stagename||'').toLowerCase();
+    const st=(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase();
     let idx=0;
     for(let i=0;i<STAGES.length;i++){if(STAGES[i].keywords.some(k=>st.includes(k))){idx=i;break;}}
     buckets[idx].push(d);
@@ -860,7 +860,7 @@ function renderDrillDeals(deals){
         <div class="deal-name">${esc(d.name||'(Unnamed)')}</div>
         <div class="deal-tags">
           <span class="dtag">${esc(accountName(d))}</span>
-          <span class="dtag">${esc(d.stageid_processstage?.stagename||'—')}</span>
+          <span class="dtag">${esc(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'—')}</span>
           ${ctag}
         </div>
       </div>
@@ -875,7 +875,7 @@ function renderDrillDeals(deals){
 function closeDrill(){document.getElementById('dOverlay').classList.remove('open');document.getElementById('dPanel').classList.remove('open');}
 function drillAll(){openDrill('All Open Deals',`${allOpen.length} opportunities across all stages`,allOpen);}
 function drillStage(i){
-  const deals=allOpen.filter(d=>STAGES[i].keywords.some(k=>(d.stageid_processstage?.stagename||'').toLowerCase().includes(k)));
+  const deals=allOpen.filter(d=>STAGES[i].keywords.some(k=>(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase().includes(k)));
   openDrill(STAGES[i].label,`${deals.length} deals in this stage`,deals);
 }
 function drillOverdue(){
