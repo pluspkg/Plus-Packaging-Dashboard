@@ -225,14 +225,21 @@
   .act-panel.vis{opacity:1;transform:translateY(0)}
   .act-panel.calls{border-color:rgba(52,211,153,.2)}
   .act-panel.visits{border-color:rgba(244,124,32,.2)}
-  .act-panel-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .act-panel-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
   .act-panel-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-family:"Courier New",monospace}
-  .act-tabs{display:flex;gap:4px;margin-bottom:12px}
-  .act-tab{font-family:"Courier New",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:6px;border:1px solid var(--nb);background:transparent;color:var(--mu);cursor:pointer;transition:all .15s}
-  .act-tab:hover{color:var(--wh);border-color:var(--nb)}
-  .act-tab.active{background:var(--nb);color:var(--wh);border-color:transparent}
-  .act-tab.active.green{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:var(--gr)}
-  .act-tab.active.orange{background:rgba(244,124,32,.12);border-color:rgba(244,124,32,.3);color:var(--or)}
+
+  /* Period tiles — 4 across */
+  .act-periods{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .act-period{border-radius:10px;padding:12px 10px;border:1px solid var(--nb);background:var(--nm);cursor:pointer;text-align:center;transition:all .15s}
+  .act-period:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  .act-period.green:hover{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.06)}
+  .act-period.orange:hover{border-color:rgba(244,124,32,.4);background:rgba(244,124,32,.06)}
+  .act-period-lbl{font-family:"Courier New",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);margin-bottom:8px}
+  .act-period-num{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
+  .act-period-hint{font-size:9px;color:var(--mu);margin-top:4px;font-family:"Courier New",monospace;opacity:0;transition:opacity .15s}
+  .act-period:hover .act-period-hint{opacity:1}
+
+  /* Leaderboard drill rows */
   .lb-row{display:flex;align-items:center;gap:10px;padding:7px 6px;border-bottom:1px solid rgba(36,51,101,.5);cursor:pointer;border-radius:6px;transition:background .12s}
   .lb-row:last-child{border-bottom:none}
   .lb-row:hover{background:rgba(36,51,101,.4)}
@@ -245,9 +252,6 @@
   .lb-bar-bg{height:4px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
   .lb-bar{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.4,0,.2,1)}
   .lb-count{font-family:"Courier New",monospace;font-size:14px;font-weight:700;flex-shrink:0;min-width:28px;text-align:right}
-  .act-total{font-family:"Courier New",monospace;font-size:11px;color:var(--mu);margin-top:10px;text-align:right}
-
-  /* ── LEADERBOARD DRILL ── */
   .lb-drill-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 6px;border-bottom:1px solid rgba(36,51,101,.5);border-radius:4px;transition:background .1s}
   .lb-drill-row:last-child{border-bottom:none}
   .lb-drill-name{font-size:13px;font-weight:600}
@@ -424,32 +428,16 @@
         <div class="act-panel calls" id="actCalls">
           <div class="act-panel-hdr">
             <div class="act-panel-title" style="color:var(--gr)">📞 Meaningful Calls</div>
-            <div class="panel-badge" id="callsTotalBadge">—</div>
           </div>
-          <div class="act-tabs">
-            <button class="act-tab active green" onclick="setCallsTab('lastMonth')" id="cTab-lastMonth">Last Month</button>
-            <button class="act-tab" onclick="setCallsTab('thisMonth')" id="cTab-thisMonth">This Month</button>
-            <button class="act-tab" onclick="setCallsTab('thisWeek')" id="cTab-thisWeek">This Week</button>
-            <button class="act-tab" onclick="setCallsTab('today')" id="cTab-today">Today</button>
-          </div>
-          <div id="callsList"><div class="empty-state">Loading…</div></div>
-          <div class="act-total" id="callsTotal"></div>
+          <div class="act-periods" id="callsPeriods"></div>
         </div>
 
         <!-- SITE VISITS -->
         <div class="act-panel visits" id="actVisits">
           <div class="act-panel-hdr">
             <div class="act-panel-title" style="color:var(--or)">🏭 Site Visits (Spoke to Buyer)</div>
-            <div class="panel-badge" id="visitsTotalBadge">—</div>
           </div>
-          <div class="act-tabs">
-            <button class="act-tab active orange" onclick="setVisitsTab('lastMonth')" id="vTab-lastMonth">Last Month</button>
-            <button class="act-tab" onclick="setVisitsTab('thisMonth')" id="vTab-thisMonth">This Month</button>
-            <button class="act-tab" onclick="setVisitsTab('thisWeek')" id="vTab-thisWeek">This Week</button>
-            <button class="act-tab" onclick="setVisitsTab('today')" id="vTab-today">Today</button>
-          </div>
-          <div id="visitsList"><div class="empty-state">Loading…</div></div>
-          <div class="act-total" id="visitsTotal"></div>
+          <div class="act-periods" id="visitsPeriods"></div>
         </div>
 
       </div>
@@ -497,7 +485,6 @@ const STAGES = [
 let token = null;
 let busy = false, firstLoad = true, autoOn = true, intMins = 10, cdSecs = 600, ticker;
 let allOpen = [], wonDeals = [], lostDeals = [], callsData = [], visitsData = [];
-let callsTab = 'lastMonth', visitsTab = 'lastMonth';
 
 // ─────────────────────────────────────────────
 // AUTH — PKCE (matches existing dashboards)
@@ -684,140 +671,90 @@ function render(now){
 // ─────────────────────────────────────────────
 // ACTIVITY LEADERBOARDS
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// ACTIVITY — PERIOD TILES + LEADERBOARD DRILL
+// ─────────────────────────────────────────────
+const PERIODS = [
+  { key: 'lastMonth', label: 'Last Month' },
+  { key: 'thisMonth', label: 'This Month' },
+  { key: 'thisWeek',  label: 'This Week'  },
+  { key: 'today',     label: 'Today'      },
+];
+
 function getDateRange(tab, now) {
   now = now || new Date();
   const y = now.getFullYear(), m = now.getMonth();
-  const todayStr = now.toISOString().split('T')[0];
-  // Start of this week (Monday)
-  const dow = now.getDay(); // 0=Sun
+  const dow = now.getDay();
   const diffToMon = (dow === 0 ? -6 : 1 - dow);
   const weekStart = new Date(now); weekStart.setDate(now.getDate() + diffToMon); weekStart.setHours(0,0,0,0);
-
   switch(tab) {
     case 'lastMonth': return { from: new Date(y, m-1, 1), to: new Date(y, m, 0, 23, 59, 59) };
-    case 'thisMonth': return { from: new Date(y, m, 1), to: now };
-    case 'thisWeek':  return { from: weekStart, to: now };
-    case 'today':     return { from: new Date(todayStr+'T00:00:00'), to: now };
+    case 'thisMonth': return { from: new Date(y, m, 1),   to: now };
+    case 'thisWeek':  return { from: weekStart,            to: now };
+    case 'today':     return { from: new Date(new Date().toISOString().split('T')[0]+'T00:00:00'), to: now };
   }
 }
 
 function filterByTab(records, tab, dateField) {
   const { from, to } = getDateRange(tab);
-  return records.filter(r => {
-    const d = new Date(r[dateField]);
-    return d >= from && d <= to;
-  });
+  return records.filter(r => { const d = new Date(r[dateField]); return d >= from && d <= to; });
 }
-
-function buildLeaderboard(records, dateField) {
-  // Count per person
-  const map = {};
-  records.forEach(r => {
-    const n = ownerName(r);
-    map[n] = (map[n] || 0) + 1;
-  });
-  return Object.entries(map).sort((a, b) => b[1] - a[1]);
-}
-
-function renderLeaderboard(elId, totalElId, records, dateField, color, onClickFn) {
-  const sorted = buildLeaderboard(records, dateField);
-  const total = records.length;
-  const max = sorted.length > 0 ? sorted[0][1] : 1;
-  document.getElementById(totalElId).textContent = total + ' total';
-
-  if (sorted.length === 0) {
-    document.getElementById(elId).innerHTML = '<div class="empty-state">No activity in this period</div>';
-    return;
-  }
-
-  const rankClass = (i) => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
-  document.getElementById(elId).innerHTML = sorted.map(([name, count], i) => `
-    <div class="lb-row" onclick="${onClickFn}('${esc(name)}')">
-      <div class="lb-rank ${rankClass(i)}">${i+1}</div>
-      <div class="lb-bar-wrap">
-        <div class="lb-name">${esc(name)}</div>
-        <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round(count/max*100)}%;background:${color}"></div></div>
-      </div>
-      <div class="lb-count" style="color:${color}">${count}</div>
-    </div>
-  `).join('');
-}
-
-function renderCallsLeaderboard() {
-  const filtered = filterByTab(callsData, callsTab, 'actualend');
-  renderLeaderboard('callsList', 'callsTotalBadge', filtered, 'actualend', 'var(--gr)', 'drillCalls');
-  // Update tab styles
-  ['lastMonth','thisMonth','thisWeek','today'].forEach(t => {
-    const el = document.getElementById('cTab-'+t);
-    el.className = 'act-tab' + (t === callsTab ? ' active green' : '');
-  });
-}
-
-function renderVisitsLeaderboard() {
-  const filtered = filterByTab(visitsData, visitsTab, 'actualend');
-  renderLeaderboard('visitsList', 'visitsTotalBadge', filtered, 'actualend', 'var(--or)', 'drillVisits');
-  ['lastMonth','thisMonth','thisWeek','today'].forEach(t => {
-    const el = document.getElementById('vTab-'+t);
-    el.className = 'act-tab' + (t === visitsTab ? ' active orange' : '');
-  });
-}
-
-function setCallsTab(tab) { callsTab = tab; renderCallsLeaderboard(); }
-function setVisitsTab(tab) { visitsTab = tab; renderVisitsLeaderboard(); }
 
 function tabLabel(tab) {
   return { lastMonth: 'Last Month', thisMonth: 'This Month', thisWeek: 'This Week', today: 'Today' }[tab];
 }
 
-function drillCalls(name) {
-  const filtered = filterByTab(callsData, callsTab, 'actualend');
-  const person = filtered.filter(r => ownerName(r) === name);
-  const { from, to } = getDateRange(callsTab);
-  openDrillLeaderboard(
-    `📞 ${name}`,
-    `Meaningful calls · ${tabLabel(callsTab)} · ${person.length} total`,
-    person,
-    'actualend',
-    'var(--gr)'
-  );
+function renderActivityPeriods(elId, data, dateField, color, drillFn) {
+  const el = document.getElementById(elId);
+  el.innerHTML = PERIODS.map(p => {
+    const count = filterByTab(data, p.key, dateField).length;
+    return `<div class="act-period ${color}" onclick="${drillFn}('${p.key}')">
+      <div class="act-period-lbl">${p.label}</div>
+      <div class="act-period-num" style="color:var(--${color === 'green' ? 'gr' : 'or'})">${count}</div>
+      <div class="act-period-hint">LEADERBOARD →</div>
+    </div>`;
+  }).join('');
 }
 
-function drillVisits(name) {
-  const filtered = filterByTab(visitsData, visitsTab, 'actualend');
-  const person = filtered.filter(r => ownerName(r) === name);
-  openDrillLeaderboard(
-    `🏭 ${name}`,
-    `Site visits (Spoke to Buyer) · ${tabLabel(visitsTab)} · ${person.length} total`,
-    person,
-    'actualend',
-    'var(--or)'
-  );
+function renderCallsLeaderboard() { renderActivityPeriods('callsPeriods', callsData, 'actualend', 'green', 'drillCallsPeriod'); }
+function renderVisitsLeaderboard() { renderActivityPeriods('visitsPeriods', visitsData, 'actualend', 'orange', 'drillVisitsPeriod'); }
+
+function drillCallsPeriod(tab) {
+  const records = filterByTab(callsData, tab, 'actualend');
+  openDrillActivityLeaderboard('📞 Meaningful Calls', tab, records, 'actualend', 'var(--gr)');
 }
 
-function openDrillLeaderboard(title, sub, records, dateField, color) {
-  document.getElementById('dTitle').textContent = title;
-  document.getElementById('dSub').textContent = sub;
+function drillVisitsPeriod(tab) {
+  const records = filterByTab(visitsData, tab, 'actualend');
+  openDrillActivityLeaderboard('🏭 Site Visits', tab, records, 'actualend', 'var(--or)');
+}
 
-  // Summary: total, earliest, latest
-  const dates = records.map(r => new Date(r[dateField])).sort((a,b)=>a-b);
+function openDrillActivityLeaderboard(title, tab, records, dateField, color) {
+  document.getElementById('dTitle').textContent = title + ' — ' + tabLabel(tab);
+  document.getElementById('dSub').textContent = `${records.length} total · click a person to see their individual visits`;
+
+  const map = {};
+  records.forEach(r => { const n = ownerName(r); if(!map[n]) map[n]=[]; map[n].push(r); });
+  const sorted = Object.entries(map).sort((a,b) => b[1].length - a[1].length);
+  const max = sorted.length ? sorted[0][1].length : 1;
+  const rankClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
+
   document.getElementById('dSummary').innerHTML = `
     <div class="d-sum-item"><div class="d-sum-lbl">Total</div><div class="d-sum-val" style="color:${color}">${records.length}</div></div>
-    <div class="d-sum-item"><div class="d-sum-lbl">First</div><div class="d-sum-val">${dates.length ? fmtD(dates[0]) : '—'}</div></div>
-    <div class="d-sum-item"><div class="d-sum-lbl">Last</div><div class="d-sum-val">${dates.length ? fmtD(dates[dates.length-1]) : '—'}</div></div>
-  `;
+    <div class="d-sum-item"><div class="d-sum-lbl">Reps Active</div><div class="d-sum-val">${sorted.length}</div></div>
+    <div class="d-sum-item"><div class="d-sum-lbl">Period</div><div class="d-sum-val" style="font-size:14px">${tabLabel(tab)}</div></div>`;
 
-  // List of individual activity items newest first
-  const sorted = [...records].sort((a,b) => new Date(b[dateField]) - new Date(a[dateField]));
   document.getElementById('dBody').innerHTML = sorted.length === 0
-    ? '<div class="empty-state">No records</div>'
-    : sorted.map(r => `
-      <div class="lb-drill-row">
-        <div>
-          <div class="lb-drill-name">${esc(r.subject || '(No subject)')}</div>
-          <div class="lb-drill-meta">${fmtD(new Date(r[dateField]))}</div>
+    ? '<div class="empty-state">No activity in this period</div>'
+    : sorted.map(([name, recs], i) => `
+      <div class="lb-row">
+        <div class="lb-rank ${rankClass(i)}">${i+1}</div>
+        <div class="lb-bar-wrap">
+          <div class="lb-name">${esc(name)}</div>
+          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round(recs.length/max*100)}%;background:${color}"></div></div>
         </div>
-      </div>
-    `).join('');
+        <div class="lb-count" style="color:${color}">${recs.length}</div>
+      </div>`).join('');
 
   document.getElementById('dOverlay').classList.add('open');
   document.getElementById('dPanel').classList.add('open');
