@@ -644,7 +644,7 @@ function render(now){
   document.getElementById('mOverdue').textContent=overdue.length;
   const allClosed=[...wonDeals,...lostDeals];
   const vel=avgVelocity(allClosed);
-  document.getElementById('mVelocity').textContent=vel!==null?vel+'d':'—';
+  document.getElementById('mVelocity').textContent=vel!==null?vel+' Days':'—';
 
   // Stage buckets
   const buckets=[[],[],[]];
@@ -672,10 +672,10 @@ function render(now){
   const lostVel=avgVelocity(lostDeals);
   document.getElementById('wlWonC').textContent=wonDeals.length+' deal'+(wonDeals.length!==1?'s':'');
   document.getElementById('wlWonV').textContent=fmtGBP(wonVal);
-  document.getElementById('wlWonVel').textContent=wonVel!==null?'⚡ '+wonVel+'d avg velocity':'';
+  document.getElementById('wlWonVel').textContent=wonVel!==null?'⚡ '+wonVel+' days avg velocity':'';
   document.getElementById('wlLostC').textContent=lostDeals.length+' deal'+(lostDeals.length!==1?'s':'');
   document.getElementById('wlLostV').textContent=fmtGBP(lostVal);
-  document.getElementById('wlLostVel').textContent=lostVel!==null?'⚡ '+lostVel+'d avg velocity':'';
+  document.getElementById('wlLostVel').textContent=lostVel!==null?'⚡ '+lostVel+' days avg velocity':'';
 
   // Animate cards
   const cards=['mc0','mc1','mc2','mc3','mc4','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost'];
