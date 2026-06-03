@@ -604,8 +604,8 @@ async function fetchData(){
     callsData=await crmGet(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc&$top=500`);
 
     ld('Loading site visits…');
-    // new_leadapp = Spoke to Buyer flag on appointments
-    visitsData=await crmGet(`/appointments?$select=subject,scheduledend,actualend,_ownerid_value,new_leadapp&$filter=statecode eq 3 and new_leadapp eq true and scheduledend ge ${fetchFrom}&$orderby=scheduledend desc&$top=500`);
+    // new_leadapp = Spoke to Buyer on site visit report entity
+    visitsData=await crmGet(`/new_sitevisitreports?$select=subject,actualend,new_completedon,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and actualend ge ${fetchFrom}&$orderby=actualend desc&$top=500`);
 
     render(now);
     setStatus('ok');
@@ -754,8 +754,8 @@ function renderCallsLeaderboard() {
 }
 
 function renderVisitsLeaderboard() {
-  const filtered = filterByTab(visitsData, visitsTab, 'scheduledend');
-  renderLeaderboard('visitsList', 'visitsTotalBadge', filtered, 'scheduledend', 'var(--or)', 'drillVisits');
+  const filtered = filterByTab(visitsData, visitsTab, 'actualend');
+  renderLeaderboard('visitsList', 'visitsTotalBadge', filtered, 'actualend', 'var(--or)', 'drillVisits');
   ['lastMonth','thisMonth','thisWeek','today'].forEach(t => {
     const el = document.getElementById('vTab-'+t);
     el.className = 'act-tab' + (t === visitsTab ? ' active orange' : '');
@@ -783,13 +783,13 @@ function drillCalls(name) {
 }
 
 function drillVisits(name) {
-  const filtered = filterByTab(visitsData, visitsTab, 'scheduledend');
+  const filtered = filterByTab(visitsData, visitsTab, 'actualend');
   const person = filtered.filter(r => ownerName(r) === name);
   openDrillLeaderboard(
     `🏭 ${name}`,
     `Site visits (Spoke to Buyer) · ${tabLabel(visitsTab)} · ${person.length} total`,
     person,
-    'scheduledend',
+    'actualend',
     'var(--or)'
   );
 }
