@@ -116,8 +116,9 @@
   .mcard.red .mglow{background:radial-gradient(circle,rgba(248,113,113,.18),transparent 70%)}
   .mcard.red .mcard-value{color:var(--re)}
 
-  .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:4px}
-  @media(max-width:1100px){.metrics-grid{grid-template-columns:repeat(2,1fr)}}
+    .metrics-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:4px}
+    @media(max-width:1200px){.metrics-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:900px){.metrics-grid{grid-template-columns:repeat(2,1fr)}}
 
   /* ── STAGE CARDS ── */
   .stages-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
@@ -392,6 +393,12 @@
           <div class="mcard-sub">close date passed, still open</div>
           <div class="mcard-hint">CLICK TO EXPLORE →</div>
         </div>
+        <div class="mcard" id="mc4" style="--card-accent:var(--pu);border-color:rgba(167,139,250,.25);background:linear-gradient(135deg,#150f2a,#1c1436)">
+          <div class="mglow" style="background:radial-gradient(circle,rgba(167,139,250,.18),transparent 70%)"></div>
+          <div class="mcard-label">Avg Deal Velocity</div>
+          <div class="mcard-value" style="color:var(--pu)" id="mVelocity">—</div>
+          <div class="mcard-sub">created → closed · last 30 days</div>
+        </div>
       </div>
 
       <!-- STAGES -->
@@ -449,11 +456,13 @@
           <div class="wl-hdr"><div class="wl-dot" style="background:var(--gr)"></div><div class="wl-lbl">Won</div></div>
           <div class="wl-count" style="color:var(--gr)" id="wlWonC">—</div>
           <div class="wl-val" id="wlWonV">—</div>
+          <div class="wl-val" id="wlWonVel" style="margin-top:4px;color:var(--pu)"></div>
         </div>
         <div class="wl-card lost" id="wlLost" onclick="drillLost()" style="cursor:pointer">
           <div class="wl-hdr"><div class="wl-dot" style="background:var(--re)"></div><div class="wl-lbl">Lost</div></div>
           <div class="wl-count" style="color:var(--re)" id="wlLostC">—</div>
           <div class="wl-val" id="wlLostV">—</div>
+          <div class="wl-val" id="wlLostVel" style="margin-top:4px;color:var(--pu)"></div>
         </div>
       </div>
 
@@ -633,6 +642,9 @@ function render(now){
   document.getElementById('mCount').textContent=allOpen.length;
   document.getElementById('mWin').textContent=winRate+'%';
   document.getElementById('mOverdue').textContent=overdue.length;
+  const allClosed=[...wonDeals,...lostDeals];
+  const vel=avgVelocity(allClosed);
+  document.getElementById('mVelocity').textContent=vel!==null?vel+'d':'—';
 
   // Stage buckets
   const buckets=[[],[],[]];
@@ -656,13 +668,17 @@ function render(now){
   // Won/Lost
   const wonVal=wonDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
   const lostVal=lostDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const wonVel=avgVelocity(wonDeals);
+  const lostVel=avgVelocity(lostDeals);
   document.getElementById('wlWonC').textContent=wonDeals.length+' deal'+(wonDeals.length!==1?'s':'');
   document.getElementById('wlWonV').textContent=fmtGBP(wonVal);
+  document.getElementById('wlWonVel').textContent=wonVel!==null?'⚡ '+wonVel+'d avg velocity':'';
   document.getElementById('wlLostC').textContent=lostDeals.length+' deal'+(lostDeals.length!==1?'s':'');
   document.getElementById('wlLostV').textContent=fmtGBP(lostVal);
+  document.getElementById('wlLostVel').textContent=lostVel!==null?'⚡ '+lostVel+'d avg velocity':'';
 
   // Animate cards
-  const cards=['mc0','mc1','mc2','mc3','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost'];
+  const cards=['mc0','mc1','mc2','mc3','mc4','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost'];
   cards.forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add('vis');},i*60));
 }
 
