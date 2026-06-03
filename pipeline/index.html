@@ -810,10 +810,85 @@ function renderDrillDeals(deals){
 }
 
 function closeDrill(){document.getElementById('dOverlay').classList.remove('open');document.getElementById('dPanel').classList.remove('open');}
-function drillAll(){openDrill('All Open Deals',`${allOpen.length} opportunities across all stages`,allOpen);}
-function drillStage(i){
-  const deals=allOpen.filter(d=>STAGES[i].keywords.some(k=>(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase().includes(k)));
-  openDrill(STAGES[i].label,`${deals.length} deals in this stage`,deals);
+
+// ── Shared: open a leaderboard by owner, sorted by total value desc, click → individual deals ──
+function openDrillOwnerLeaderboard(title, subtitle, deals, accentColor, dateField) {
+  const totalVal = deals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const avgVal = deals.length ? totalVal/deals.length : 0;
+
+  document.getElementById('dTitle').textContent = title;
+  document.getElementById('dSub').textContent = subtitle;
+  document.getElementById('dSummary').innerHTML = `
+    <div class="d-sum-item"><div class="d-sum-lbl">Deals</div><div class="d-sum-val" style="color:${accentColor}">${deals.length}</div></div>
+    <div class="d-sum-item"><div class="d-sum-lbl">Total Value</div><div class="d-sum-val" style="color:var(--or)">${fmtGBP(totalVal)}</div></div>
+    <div class="d-sum-item"><div class="d-sum-lbl">Avg Value</div><div class="d-sum-val">${fmtGBP(avgVal)}</div></div>`;
+
+  // Group by owner, sort by total value desc
+  const map = {};
+  deals.forEach(d => { const n=ownerName(d); if(!map[n]) map[n]=[]; map[n].push(d); });
+  const sorted = Object.entries(map).sort((a,b) =>
+    b[1].reduce((s,d)=>s+(d.estimatedvalue||0),0) - a[1].reduce((s,d)=>s+(d.estimatedvalue||0),0)
+  );
+  const maxVal = sorted.length ? sorted[0][1].reduce((s,d)=>s+(d.estimatedvalue||0),0) : 1;
+  const rankClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
+
+  // Store deals for person drill-through, keyed by name
+  window._lbDrillDeals = {};
+  window._lbDrillTitle = title;
+  sorted.forEach(([name, ds]) => { window._lbDrillDeals[name] = ds; });
+
+  document.getElementById('dBody').innerHTML = sorted.length === 0
+    ? '<div class="empty-state">No deals to show</div>'
+    : sorted.map(([name, ds], i) => {
+        const val = ds.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+        return `<div class="lb-row" onclick="drillPersonDeals('${esc(name)}')">
+          <div class="lb-rank ${rankClass(i)}">${i+1}</div>
+          <div class="lb-bar-wrap">
+            <div class="lb-name">${esc(name)}
+              <span style="color:var(--mu);font-size:10px;font-family:'Courier New',monospace;margin-left:6px">${ds.length} deal${ds.length!==1?'s':''}</span>
+            </div>
+            <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round(val/maxVal*100)}%;background:${accentColor}"></div></div>
+          </div>
+          <div class="lb-count" style="color:${accentColor}">${fmtGBP(val)}</div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('dOverlay').classList.add('open');
+  document.getElementById('dPanel').classList.add('open');
+}
+
+function drillPersonDeals(name) {
+  const deals = (window._lbDrillDeals || {})[name] || [];
+  openDrill(`${name}`, `${deals.length} deal${deals.length!==1?'s':''} · ${window._lbDrillTitle||''}`, deals);
+}
+
+function drillAll() {
+  openDrillOwnerLeaderboard(
+    'All Open Deals', `${allOpen.length} opportunities · ranked by pipeline value`,
+    allOpen, 'var(--stage1)', null
+  );
+}
+
+function drillStage(i) {
+  const deals = allOpen.filter(d => STAGES[i].keywords.some(k=>(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase().includes(k)));
+  openDrillOwnerLeaderboard(
+    STAGES[i].label, `${deals.length} deals in this stage · ranked by value`,
+    deals, 'var(--stage1)', null
+  );
+}
+
+function drillWon() {
+  openDrillOwnerLeaderboard(
+    'Won Deals — Last 30 Days', `${wonDeals.length} deals closed won · ranked by value`,
+    wonDeals, 'var(--gr)', 'actualclosedate'
+  );
+}
+
+function drillLost() {
+  openDrillOwnerLeaderboard(
+    'Lost Deals — Last 30 Days', `${lostDeals.length} deals closed lost · ranked by value`,
+    lostDeals, 'var(--re)', 'actualclosedate'
+  );
 }
 function drillOverdue(){
   const t=new Date().toISOString().split('T')[0];
@@ -855,34 +930,6 @@ function drillPersonOd(name){
   const od=allOpen.filter(d=>ownerName(d)===name&&d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t)
     .sort((a,b)=>new Date(a.estimatedclosedate)-new Date(b.estimatedclosedate));
   openDrill(`${name} — Overdue`,`${od.length} overdue deal${od.length!==1?'s':''}`,od);
-}
-
-function drillWon(){
-  const sorted=[...wonDeals].sort((a,b)=>new Date(b.actualclosedate||0)-new Date(a.actualclosedate||0));
-  const totalVal=sorted.reduce((s,d)=>s+(d.estimatedvalue||0),0);
-  document.getElementById('dTitle').textContent='Won Deals — Last 30 Days';
-  document.getElementById('dSub').textContent=`${sorted.length} deals closed won`;
-  document.getElementById('dSummary').innerHTML=`
-    <div class="d-sum-item"><div class="d-sum-lbl">Deals</div><div class="d-sum-val" style="color:var(--gr)">${sorted.length}</div></div>
-    <div class="d-sum-item"><div class="d-sum-lbl">Total Value</div><div class="d-sum-val" style="color:var(--or)">${fmtGBP(totalVal)}</div></div>
-    <div class="d-sum-item"><div class="d-sum-lbl">Avg Value</div><div class="d-sum-val">${sorted.length?fmtGBP(totalVal/sorted.length):'—'}</div></div>`;
-  renderDrillDeals(sorted);
-  document.getElementById('dOverlay').classList.add('open');
-  document.getElementById('dPanel').classList.add('open');
-}
-
-function drillLost(){
-  const sorted=[...lostDeals].sort((a,b)=>new Date(b.actualclosedate||0)-new Date(a.actualclosedate||0));
-  const totalVal=sorted.reduce((s,d)=>s+(d.estimatedvalue||0),0);
-  document.getElementById('dTitle').textContent='Lost Deals — Last 30 Days';
-  document.getElementById('dSub').textContent=`${sorted.length} deals closed lost`;
-  document.getElementById('dSummary').innerHTML=`
-    <div class="d-sum-item"><div class="d-sum-lbl">Deals</div><div class="d-sum-val" style="color:var(--re)">${sorted.length}</div></div>
-    <div class="d-sum-item"><div class="d-sum-lbl">Total Value</div><div class="d-sum-val" style="color:var(--or)">${fmtGBP(totalVal)}</div></div>
-    <div class="d-sum-item"><div class="d-sum-lbl">Avg Value</div><div class="d-sum-val">${sorted.length?fmtGBP(totalVal/sorted.length):'—'}</div></div>`;
-  renderDrillDeals(sorted);
-  document.getElementById('dOverlay').classList.add('open');
-  document.getElementById('dPanel').classList.add('open');
 }
 
 // ─────────────────────────────────────────────
