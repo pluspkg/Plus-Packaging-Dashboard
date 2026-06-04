@@ -219,6 +219,9 @@
   .dtag.soon{color:var(--am);background:rgba(251,191,36,.06);border-color:rgba(251,191,36,.2)}
   .deal-val{font-family:"Courier New",monospace;font-size:13px;font-weight:700;color:var(--or);white-space:nowrap;text-align:right}
   .deal-owner{font-size:11px;color:var(--mu);margin-top:3px;text-align:right}
+  .crm-link{color:var(--or);text-decoration:none;font-size:11px;font-weight:700;margin-left:6px;opacity:0;transition:opacity .15s;vertical-align:middle}
+  .deal-row:hover .crm-link{opacity:1}
+  .crm-link:hover{color:#fff}
   .empty-state{text-align:center;padding:40px 16px;color:var(--mu);font-size:13px}
 
   /* ── ACTIVITY LEADERBOARD ── */
@@ -628,19 +631,19 @@ async function fetchData(){
     const ago30s=ago30.toISOString(),nows=now.toISOString();
 
     ld('Loading open opportunities…');
-    allOpen=await crmAll(`/opportunities?$select=name,estimatedvalue,closeprobability,estimatedclosedate,createdon,statuscode,new_stage,_ownerid_value,_parentaccountid_value&$filter=statecode eq 0&$orderby=estimatedvalue desc`);
+    allOpen=await crmAll(`/opportunities?$select=name,estimatedvalue,closeprobability,estimatedclosedate,createdon,statuscode,new_stage,opportunityid,_ownerid_value,_parentaccountid_value&$filter=statecode eq 0&$orderby=estimatedvalue desc`);
 
     ld('Loading won deals (30 days)…');
-    wonDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,_ownerid_value,_parentaccountid_value&$filter=statecode eq 1 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
+    wonDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,opportunityid,_ownerid_value,_parentaccountid_value&$filter=statecode eq 1 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
 
     ld('Loading lost deals (30 days)…');
-    lostDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,_ownerid_value,_parentaccountid_value&$filter=statecode eq 2 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
+    lostDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,opportunityid,_ownerid_value,_parentaccountid_value&$filter=statecode eq 2 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
 
     ld('Loading this week\'s closed deals…');
     const dow=now.getDay(),diffToMon=dow===0?-6:1-dow;
     const weekStart=new Date(now);weekStart.setDate(now.getDate()+diffToMon);weekStart.setHours(0,0,0,0);
     const weekStartS=weekStart.toISOString();
-    weekClosed=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,statecode,_ownerid_value,_parentaccountid_value&$filter=(statecode eq 1 or statecode eq 2) and actualclosedate ge ${weekStartS} and actualclosedate le ${nows}`);
+    weekClosed=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,statecode,opportunityid,_ownerid_value,_parentaccountid_value&$filter=(statecode eq 1 or statecode eq 2) and actualclosedate ge ${weekStartS} and actualclosedate le ${nows}`);
 
     ld('Loading phone calls…');
     const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
@@ -883,9 +886,10 @@ function renderDrillDeals(deals){
       else if(daysLeft<=14)ctag=`<span class="dtag soon">🔔 ${daysLeft}d to close</span>`;
       else ctag=`<span class="dtag">${fmtD(new Date(closeStr))}</span>`;
     }
+    const crmUrl=d.opportunityid?`https://pluspackaging.crm11.dynamics.com/main.aspx?etn=opportunity&id=${d.opportunityid}&pagetype=entityrecord`:'';
     return `<div class="deal-row">
       <div>
-        <div class="deal-name">${esc(d.name||'(Unnamed)')}</div>
+        <div class="deal-name">${esc(d.name||'(Unnamed)')}${crmUrl?` <a href="${crmUrl}" target="_blank" class="crm-link" onclick="event.stopPropagation()" title="Open in CRM">↗</a>`:''}</div>
         <div class="deal-tags">
           <span class="dtag">${esc(accountName(d))}</span>
           <span class="dtag">${esc(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'—')}</span>
