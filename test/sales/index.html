@@ -356,8 +356,8 @@ async function getToken(params){
   const j=await r.json();
   if(j.error)throw new Error(j.error_description||j.error);
   token=j.access_token;
-  sessionStorage.setItem("tok",token);sessionStorage.setItem("exp",Date.now()+j.expires_in*1000);
-  if(j.refresh_token)sessionStorage.setItem("rt",j.refresh_token);
+  localStorage.setItem("tok",token);localStorage.setItem("exp",Date.now()+j.expires_in*1000);
+  if(j.refresh_token)localStorage.setItem("rt",j.refresh_token);
 }
 async function handleCallback(code,state){
   if(state!==sessionStorage.getItem("pkce_st")){alert("Auth error.");return;}
@@ -367,17 +367,17 @@ async function handleCallback(code,state){
   history.replaceState({},document.title,REDIRECT_URI);showDash();
 }
 async function ensureToken(){
-  const exp=+sessionStorage.getItem("exp")||0;
+  const exp=+localStorage.getItem("exp")||0;
   if(Date.now()<exp-60000)return true;
-  const rt=sessionStorage.getItem("rt");if(!rt)return false;
+  const rt=localStorage.getItem("rt");if(!rt)return false;
   const allScopes=[...CFG.scopes,...CFG.dynamicsScopes].join(" ");
   try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:allScopes});return true;}
   catch{return false;}
 }
-function signOut(){sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
+function signOut(){localStorage.removeItem("tok");localStorage.removeItem("rt");localStorage.removeItem("exp");localStorage.removeItem("dynExp");sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
 async function graphJSON(url){
   if(!await ensureToken()){signOut();throw new Error("Session expired.");}
-  const r=await fetch("https://graph.microsoft.com/v1.0"+url,{headers:{Authorization:"Bearer "+(token||sessionStorage.getItem("tok"))}});
+  const r=await fetch("https://graph.microsoft.com/v1.0"+url,{headers:{Authorization:"Bearer "+(token||localStorage.getItem("tok"))}});
   if(r.status===401){signOut();throw new Error("Session expired.");}
   if(!r.ok)throw new Error("Graph "+r.status+": "+r.statusText);
   return r.json();
@@ -452,9 +452,9 @@ async function readDataDump(){
   return{sales:find("Total Sales"),pm:find("Total Margin","Product Margin","Total PM"),salesTarget,pmTarget,salesYesterday,pmYesterday,ordersTarget,newCustomers,shippedToday,ordersToday};
 }
 async function getDynToken(){
-  const exp=+sessionStorage.getItem("dynExp")||0;
+  const exp=+localStorage.getItem("dynExp")||0;
   if(dynToken&&Date.now()<exp-60000)return dynToken;
-  const rt=sessionStorage.getItem("rt");
+  const rt=localStorage.getItem("rt");
   if(!rt)throw new Error("No refresh token — please sign in again.");
   const r=await fetch("https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/token",
     {method:"POST",body:new URLSearchParams({
@@ -477,8 +477,8 @@ async function getDynToken(){
     throw new Error("Dynamics auth: "+j.error_description);
   }
   dynToken=j.access_token;
-  sessionStorage.setItem("dynExp",Date.now()+j.expires_in*1000);
-  if(j.refresh_token)sessionStorage.setItem("rt",j.refresh_token);
+  localStorage.setItem("dynExp",Date.now()+j.expires_in*1000);
+  if(j.refresh_token)localStorage.setItem("rt",j.refresh_token);
   return dynToken;
 }
 
@@ -691,9 +691,9 @@ function showDash(){document.getElementById("loginScreen").style.display="none";
 async function boot(){
   const p=new URLSearchParams(location.search);
   if(p.has("code")){await handleCallback(p.get("code"),p.get("state"));return;}
-  const t=sessionStorage.getItem("tok"),exp=+sessionStorage.getItem("exp")||0;
+  const t=localStorage.getItem("tok"),exp=+localStorage.getItem("exp")||0;
   if(t&&Date.now()<exp-30000){token=t;showDash();return;}
-  const rt=sessionStorage.getItem("rt");
+  const rt=localStorage.getItem("rt");
   if(rt){try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});showDash();return;}catch{}}
   document.getElementById("loginScreen").style.display="flex";
 }
