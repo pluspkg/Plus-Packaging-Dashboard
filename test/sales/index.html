@@ -598,15 +598,15 @@ const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{m
 const INT=v=>(v==null||isNaN(+v))?"—":Number(v).toLocaleString("en-GB");
 function renderHero(cardId,valId,tgtId,pctId,badgeId,barId,varId,value,target){
   const card=document.getElementById(cardId);
-  const pct=value&&target?Math.min(100,(value/target)*100):null;
+  const pct=value&&target?Math.round((value/target)*1000)/10:null;
   const onTarget=pct!=null&&pct>=100;
   card.className="hero-card "+(pct==null?"neutral":onTarget?"green":"red")+" vis";
   document.getElementById(valId).textContent=GBP(value);
   document.getElementById(tgtId).textContent=GBP(target);
   document.getElementById(pctId).textContent=pct!=null?pct.toFixed(1)+"%":"—";
-  document.getElementById(badgeId).textContent=pct==null?"—":onTarget?"On Target ✓":"Below Target";
+  document.getElementById(badgeId).textContent=pct==null?"—":pct>100?"Above Target ✓":pct>=100?"On Target ✓":"Below Target";
   if(value!=null&&target!=null){const diff=value-target,sign=diff>=0?"+":"";document.getElementById(varId).textContent=sign+GBP(diff)+" vs MTD Target";}
-  setTimeout(()=>{document.getElementById(barId).style.width=(pct??0)+"%";},400);
+  setTimeout(()=>{document.getElementById(barId).style.width=Math.min(100,(pct??0))+"%";},400);
 }
 function render(d){
   renderHero("heroSales","hSalesVal","hSalesTgt","hSalesPct","hSalesBadge","hSalesBar","hSalesVar",d.sales,d.salesTarget);
