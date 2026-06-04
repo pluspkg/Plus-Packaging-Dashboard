@@ -648,7 +648,7 @@ async function fetchData(){
     callsData=await crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     ld('Loading site visits…');
-    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,sortdate,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and createdon ge ${fetchFrom}&$orderby=createdon desc`);
+    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,sortdate,_ownerid_value,new_leadapp&$filter=new_leadapp eq true and createdon ge ${fetchFrom}&$orderby=createdon desc`);
 
     render(now);
     setStatus('ok');
