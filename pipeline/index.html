@@ -648,7 +648,7 @@ async function fetchData(){
     callsData=await crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     ld('Loading site visits…');
-    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
+    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,sortdate,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and createdon ge ${fetchFrom}&$orderby=createdon desc`);
 
     render(now);
     setStatus('ok');
@@ -808,7 +808,7 @@ function renderActivityPeriods(elId, data, dateField, color, drillFn) {
 }
 
 function renderCallsLeaderboard() { renderActivityPeriods('callsPeriods', callsData, 'actualend', 'green', 'drillCallsPeriod'); }
-function renderVisitsLeaderboard() { renderActivityPeriods('visitsPeriods', visitsData, 'actualend', 'orange', 'drillVisitsPeriod'); }
+function renderVisitsLeaderboard() { renderActivityPeriods('visitsPeriods', visitsData, 'createdon', 'orange', 'drillVisitsPeriod'); }
 
 function drillCallsPeriod(tab) {
   const records = filterByTab(callsData, tab, 'actualend');
@@ -816,8 +816,8 @@ function drillCallsPeriod(tab) {
 }
 
 function drillVisitsPeriod(tab) {
-  const records = filterByTab(visitsData, tab, 'actualend');
-  openDrillActivityLeaderboard('🏭 Site Visits', tab, records, 'actualend', 'var(--or)');
+  const records = filterByTab(visitsData, tab, 'createdon');
+  openDrillActivityLeaderboard('🏭 Site Visits', tab, records, 'createdon', 'var(--or)');
 }
 
 function openDrillActivityLeaderboard(title, tab, records, dateField, color) {
