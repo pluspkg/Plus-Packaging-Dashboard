@@ -383,8 +383,8 @@ async function getToken(params){
   const j=await r.json();
   if(j.error)throw new Error(j.error_description||j.error);
   token=j.access_token;
-  sessionStorage.setItem("tok",token);sessionStorage.setItem("exp",Date.now()+j.expires_in*1000);
-  if(j.refresh_token)sessionStorage.setItem("rt",j.refresh_token);
+  localStorage.setItem("tok",token);localStorage.setItem("exp",Date.now()+j.expires_in*1000);
+  if(j.refresh_token)localStorage.setItem("rt",j.refresh_token);
 }
 async function handleCallback(code,state){
   if(state!==sessionStorage.getItem("pkce_st")){alert("Auth error.");return;}
@@ -393,16 +393,16 @@ async function handleCallback(code,state){
   history.replaceState({},document.title,REDIRECT_URI);showDash();
 }
 async function ensureToken(){
-  const exp=+sessionStorage.getItem("exp")||0;
+  const exp=+localStorage.getItem("exp")||0;
   if(Date.now()<exp-60000)return true;
-  const rt=sessionStorage.getItem("rt");if(!rt)return false;
+  const rt=localStorage.getItem("rt");if(!rt)return false;
   try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});return true;}
   catch{return false;}
 }
-function signOut(){sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
+function signOut(){localStorage.removeItem("tok");localStorage.removeItem("rt");localStorage.removeItem("exp");localStorage.removeItem("dynExp");sessionStorage.clear();token=null;clearInterval(ticker);document.getElementById("dashScreen").style.display="none";document.getElementById("loginScreen").style.display="flex";}
 async function graphJSON(url){
   if(!await ensureToken()){signOut();throw new Error("Session expired.");}
-  const r=await fetch("https://graph.microsoft.com/v1.0"+url,{headers:{Authorization:"Bearer "+(token||sessionStorage.getItem("tok"))}});
+  const r=await fetch("https://graph.microsoft.com/v1.0"+url,{headers:{Authorization:"Bearer "+(token||localStorage.getItem("tok"))}});
   if(r.status===401){signOut();throw new Error("Session expired.");}
   if(!r.ok)throw new Error("Graph "+r.status+": "+r.statusText);
   return r.json();
@@ -557,15 +557,15 @@ const PCT=v=>(v==null||isNaN(+v))?"—":Number(v).toFixed(1)+"%";
 
 function renderHero(cardId,valId,tgtId,pctId,badgeId,barId,varId,value,target){
   const card=document.getElementById(cardId);
-  const pct=value&&target?Math.min(100,(value/target)*100):null;
+  const pct=value&&target?Math.round((value/target)*1000)/10:null;
   const onTarget=pct!=null&&pct>=100;
   card.className="hero-card "+(pct==null?"neutral":onTarget?"green":"red")+" vis";
   document.getElementById(valId).textContent=GBP(value);
   document.getElementById(tgtId).textContent=GBP(target);
   document.getElementById(pctId).textContent=pct!=null?pct.toFixed(1)+"%":"—";
-  document.getElementById(badgeId).textContent=pct==null?"—":onTarget?"On Target ✓":"Below Target";
+  document.getElementById(badgeId).textContent=pct==null?"—":pct>100?"Above Target ✓":pct>=100?"On Target ✓":"Below Target";
   if(value!=null&&target!=null){const diff=value-target,sign=diff>=0?"+":"";document.getElementById(varId).textContent=sign+GBP(diff)+" vs MTD Target";}
-  setTimeout(()=>{document.getElementById(barId).style.width=(pct??0)+"%";},400);
+  setTimeout(()=>{document.getElementById(barId).style.width=Math.min(100,(pct??0))+"%";},400);
 }
 
 function render(d){
@@ -666,9 +666,9 @@ function showDash(){document.getElementById("loginScreen").style.display="none";
 async function boot(){
   const p=new URLSearchParams(location.search);
   if(p.has("code")){await handleCallback(p.get("code"),p.get("state"));return;}
-  const t=sessionStorage.getItem("tok"),exp=+sessionStorage.getItem("exp")||0;
+  const t=localStorage.getItem("tok"),exp=+localStorage.getItem("exp")||0;
   if(t&&Date.now()<exp-30000){token=t;showDash();return;}
-  const rt=sessionStorage.getItem("rt");
+  const rt=localStorage.getItem("rt");
   if(rt){try{await getToken({client_id:CFG.clientId,grant_type:"refresh_token",refresh_token:rt,scope:CFG.scopes.join(" ")});showDash();return;}catch{}}
   document.getElementById("loginScreen").style.display="flex";
 }
