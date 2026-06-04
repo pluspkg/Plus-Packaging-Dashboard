@@ -258,6 +258,20 @@
   .lb-drill-name{font-size:13px;font-weight:600}
   .lb-drill-meta{font-size:11px;color:var(--mu);margin-top:2px;font-family:"Courier New",monospace}
   .lb-drill-count{font-family:"Courier New",monospace;font-size:18px;font-weight:700}
+
+  /* ── THIS WEEK CARDS ── */
+  .week-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
+  @media(max-width:900px){.week-grid{grid-template-columns:1fr}}
+  .week-card{border-radius:14px;padding:16px 20px;border:1px solid rgba(255,255,255,.06);background:var(--nc);cursor:pointer;opacity:0;transform:translateY(18px);transition:opacity .45s ease,transform .45s ease,border-color .15s,box-shadow .15s;position:relative;overflow:hidden}
+  .week-card.vis{opacity:1;transform:translateY(0)}
+  .week-card:hover{box-shadow:0 6px 28px rgba(0,0,0,.3);transform:translateY(-2px)!important}
+  .week-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .week-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .week-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.8px;font-family:"Courier New",monospace;color:var(--mu)}
+  .week-count{font-size:38px;font-weight:800;letter-spacing:-1.5px;line-height:1;margin-bottom:4px}
+  .week-val{font-family:"Courier New",monospace;font-size:13px;color:var(--mu)}
+  .week-hint{position:absolute;bottom:10px;right:12px;font-size:10px;color:var(--mu);font-family:"Courier New",monospace;opacity:0;transition:opacity .15s}
+  .week-card:hover .week-hint{opacity:1}
 </style>
 </head>
 <body>
@@ -466,6 +480,29 @@
         </div>
       </div>
 
+      <!-- THIS WEEK -->
+      <div class="slbl"><span>This Week</span><div class="slbll"></div></div>
+      <div class="week-grid">
+        <div class="week-card" id="wwOpened" onclick="drillWeek('opened')" style="--wc:var(--stage1)">
+          <div class="week-hdr"><div class="week-dot" style="background:var(--stage1)"></div><div class="week-lbl">Deals Opened</div></div>
+          <div class="week-count" style="color:var(--stage1)" id="wwOpenedC">—</div>
+          <div class="week-val" id="wwOpenedV">—</div>
+          <div class="week-hint">CLICK TO EXPLORE →</div>
+        </div>
+        <div class="week-card" id="wwClosed" onclick="drillWeek('closed')" style="--wc:var(--gr)">
+          <div class="week-hdr"><div class="week-dot" style="background:var(--gr)"></div><div class="week-lbl">Deals Closed</div></div>
+          <div class="week-count" style="color:var(--gr)" id="wwClosedC">—</div>
+          <div class="week-val" id="wwClosedV">—</div>
+          <div class="week-hint">CLICK TO EXPLORE →</div>
+        </div>
+        <div class="week-card" id="wwDue" onclick="drillWeek('due')" style="--wc:var(--am)">
+          <div class="week-hdr"><div class="week-dot" style="background:var(--am)"></div><div class="week-lbl">Due to Close</div></div>
+          <div class="week-count" style="color:var(--am)" id="wwDueC">—</div>
+          <div class="week-val" id="wwDueV">—</div>
+          <div class="week-hint">CLICK TO EXPLORE →</div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </main>
 </div><!-- /dashScreen -->
@@ -493,7 +530,7 @@ const STAGES = [
 // ─────────────────────────────────────────────
 let token = null;
 let busy = false, firstLoad = true, autoOn = true, intMins = 10, cdSecs = 600, ticker;
-let allOpen = [], wonDeals = [], lostDeals = [], callsData = [], visitsData = [];
+let allOpen = [], wonDeals = [], lostDeals = [], callsData = [], visitsData = [], weekClosed = [];
 
 // ─────────────────────────────────────────────
 // AUTH — PKCE (matches existing dashboards)
@@ -593,6 +630,12 @@ async function fetchData(){
     ld('Loading lost deals (30 days)…');
     lostDeals=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,_ownerid_value,_parentaccountid_value&$filter=statecode eq 2 and actualclosedate ge ${ago30s} and actualclosedate le ${nows}`);
 
+    ld('Loading this week\'s closed deals…');
+    const dow=now.getDay(),diffToMon=dow===0?-6:1-dow;
+    const weekStart=new Date(now);weekStart.setDate(now.getDate()+diffToMon);weekStart.setHours(0,0,0,0);
+    const weekStartS=weekStart.toISOString();
+    weekClosed=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,statecode,_ownerid_value,_parentaccountid_value&$filter=(statecode eq 1 or statecode eq 2) and actualclosedate ge ${weekStartS} and actualclosedate le ${nows}`);
+
     ld('Loading phone calls…');
     const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
     const fetchFrom=lastMonthStart.toISOString();
@@ -665,6 +708,29 @@ function render(now){
   renderCallsLeaderboard();
   renderVisitsLeaderboard();
 
+  // This Week
+  const dow2=now.getDay(),diffMon=dow2===0?-6:1-dow2;
+  const wkStart=new Date(now);wkStart.setDate(now.getDate()+diffMon);wkStart.setHours(0,0,0,0);
+  const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+4);wkEnd.setHours(23,59,59,999); // Mon-Fri
+
+  const weekOpened=allOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
+  const weekDue=allOpen.filter(d=>{
+    if(!d.estimatedclosedate)return false;
+    const cd=new Date(d.estimatedclosedate);
+    return cd>=wkStart&&cd<=wkEnd;
+  });
+
+  const weekOpenedVal=weekOpened.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const weekClosedVal=weekClosed.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const weekDueVal=weekDue.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+
+  document.getElementById('wwOpenedC').textContent=weekOpened.length;
+  document.getElementById('wwOpenedV').textContent=fmtGBP(weekOpenedVal);
+  document.getElementById('wwClosedC').textContent=weekClosed.length;
+  document.getElementById('wwClosedV').textContent=fmtGBP(weekClosedVal);
+  document.getElementById('wwDueC').textContent=weekDue.length;
+  document.getElementById('wwDueV').textContent=fmtGBP(weekDueVal);
+
   // Won/Lost
   const wonVal=wonDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
   const lostVal=lostDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
@@ -678,7 +744,7 @@ function render(now){
   document.getElementById('wlLostVel').textContent=lostVel!==null?'⚡ '+lostVel+' days avg velocity':'';
 
   // Animate cards
-  const cards=['mc0','mc1','mc2','mc3','mc4','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost'];
+  const cards=['mc0','mc1','mc2','mc3','mc4','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost','wwOpened','wwClosed','wwDue'];
   cards.forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add('vis');},i*60));
 }
 
@@ -949,6 +1015,36 @@ function drillPersonOd(name){
   const od=allOpen.filter(d=>ownerName(d)===name&&d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t)
     .sort((a,b)=>new Date(a.estimatedclosedate)-new Date(b.estimatedclosedate));
   openDrill(`${name} — Overdue`,`${od.length} overdue deal${od.length!==1?'s':''}`,od);
+}
+
+function drillWeek(type) {
+  const now=new Date();
+  const dow=now.getDay(),diffMon=dow===0?-6:1-dow;
+  const wkStart=new Date(now);wkStart.setDate(now.getDate()+diffMon);wkStart.setHours(0,0,0,0);
+  const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+4);wkEnd.setHours(23,59,59,999);
+
+  let deals, title, subtitle, color;
+  if(type==='opened'){
+    deals=allOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
+    title='Deals Opened This Week';
+    subtitle=`${deals.length} new opportunities created this week`;
+    color='var(--stage1)';
+  } else if(type==='closed'){
+    deals=weekClosed;
+    title='Deals Closed This Week';
+    subtitle=`${deals.length} deals closed (won or lost) this week`;
+    color='var(--gr)';
+  } else {
+    deals=allOpen.filter(d=>{
+      if(!d.estimatedclosedate)return false;
+      const cd=new Date(d.estimatedclosedate);
+      return cd>=wkStart&&cd<=wkEnd;
+    });
+    title='Due to Close This Week';
+    subtitle=`${deals.length} open deals with close date this week`;
+    color='var(--am)';
+  }
+  openDrillOwnerLeaderboard(title, subtitle, deals, color, null, false);
 }
 
 // ─────────────────────────────────────────────
