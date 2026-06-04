@@ -55,6 +55,8 @@
   .btnr{background:var(--or);border:none;color:var(--wh);padding:7px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 18px rgba(244,124,32,.35);transition:opacity .15s}
   .btnr:hover{opacity:.85}
   .btnr:disabled{opacity:.45;cursor:default;box-shadow:none}
+  .btnsignout{background:none;border:1px solid var(--nb);color:var(--mu);padding:7px 14px;border-radius:10px;font-size:12px;font-family:var(--font-body,"Segoe UI",sans-serif);cursor:pointer;transition:all .15s}
+  .btnsignout:hover{border-color:var(--re);color:var(--re)}
   .uinfo{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
   .uavt{width:30px;height:30px;border-radius:50%;background:var(--nb);border:1px solid var(--or);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--or)}
 
@@ -320,10 +322,7 @@
           <div class="hbot">Pipeline Dashboard</div>
         </div>
         <nav class="hnav">
-          <a href="/sales/">Sales</a>
-          <a href="/customer-service/">Customer Service</a>
-          <a href="/warehouse/">Warehouse</a>
-          <a href="/pipeline/" class="active">Pipeline</a>
+          <a href="https://dashboards.pluspkg.com">← Dashboards</a>
         </nav>
       </div>
       <div class="hrgt">
@@ -347,6 +346,7 @@
           <div class="uavt" id="uavt">—</div>
           <span id="uname"></span>
         </div>
+        <button class="btnsignout" onclick="signOut()">Sign Out</button>
       </div>
     </div>
   </header>
@@ -482,17 +482,23 @@
 
       <!-- THIS WEEK -->
       <div class="slbl"><span>This Week</span><div class="slbll"></div></div>
-      <div class="week-grid">
+      <div class="week-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="week-card" id="wwOpened" onclick="drillWeek('opened')" style="--wc:var(--stage1)">
           <div class="week-hdr"><div class="week-dot" style="background:var(--stage1)"></div><div class="week-lbl">Deals Opened</div></div>
           <div class="week-count" style="color:var(--stage1)" id="wwOpenedC">—</div>
           <div class="week-val" id="wwOpenedV">—</div>
           <div class="week-hint">CLICK TO EXPLORE →</div>
         </div>
-        <div class="week-card" id="wwClosed" onclick="drillWeek('closed')" style="--wc:var(--gr)">
-          <div class="week-hdr"><div class="week-dot" style="background:var(--gr)"></div><div class="week-lbl">Deals Closed</div></div>
-          <div class="week-count" style="color:var(--gr)" id="wwClosedC">—</div>
-          <div class="week-val" id="wwClosedV">—</div>
+        <div class="week-card" id="wwWon" onclick="drillWeek('won')" style="--wc:var(--gr)">
+          <div class="week-hdr"><div class="week-dot" style="background:var(--gr)"></div><div class="week-lbl">Deals Won</div></div>
+          <div class="week-count" style="color:var(--gr)" id="wwWonC">—</div>
+          <div class="week-val" id="wwWonV">—</div>
+          <div class="week-hint">CLICK TO EXPLORE →</div>
+        </div>
+        <div class="week-card" id="wwLost" onclick="drillWeek('lost')" style="--wc:var(--re)">
+          <div class="week-hdr"><div class="week-dot" style="background:var(--re)"></div><div class="week-lbl">Deals Lost</div></div>
+          <div class="week-count" style="color:var(--re)" id="wwLostC">—</div>
+          <div class="week-val" id="wwLostV">—</div>
           <div class="week-hint">CLICK TO EXPLORE →</div>
         </div>
         <div class="week-card" id="wwDue" onclick="drillWeek('due')" style="--wc:var(--am)">
@@ -642,7 +648,7 @@ async function fetchData(){
     callsData=await crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     ld('Loading site visits…');
-    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,new_completedon,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
+    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,_ownerid_value,new_leadapp&$filter=statecode eq 1 and new_leadapp eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     render(now);
     setStatus('ok');
@@ -714,6 +720,8 @@ function render(now){
   const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+4);wkEnd.setHours(23,59,59,999); // Mon-Fri
 
   const weekOpened=allOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
+  const weekWon=weekClosed.filter(d=>d.statecode===1);
+  const weekLost=weekClosed.filter(d=>d.statecode===2);
   const weekDue=allOpen.filter(d=>{
     if(!d.estimatedclosedate)return false;
     const cd=new Date(d.estimatedclosedate);
@@ -721,13 +729,16 @@ function render(now){
   });
 
   const weekOpenedVal=weekOpened.reduce((s,d)=>s+(d.estimatedvalue||0),0);
-  const weekClosedVal=weekClosed.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const weekWonVal=weekWon.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const weekLostVal=weekLost.reduce((s,d)=>s+(d.estimatedvalue||0),0);
   const weekDueVal=weekDue.reduce((s,d)=>s+(d.estimatedvalue||0),0);
 
   document.getElementById('wwOpenedC').textContent=weekOpened.length;
   document.getElementById('wwOpenedV').textContent=fmtGBP(weekOpenedVal);
-  document.getElementById('wwClosedC').textContent=weekClosed.length;
-  document.getElementById('wwClosedV').textContent=fmtGBP(weekClosedVal);
+  document.getElementById('wwWonC').textContent=weekWon.length;
+  document.getElementById('wwWonV').textContent=fmtGBP(weekWonVal);
+  document.getElementById('wwLostC').textContent=weekLost.length;
+  document.getElementById('wwLostV').textContent=fmtGBP(weekLostVal);
   document.getElementById('wwDueC').textContent=weekDue.length;
   document.getElementById('wwDueV').textContent=fmtGBP(weekDueVal);
 
@@ -744,7 +755,7 @@ function render(now){
   document.getElementById('wlLostVel').textContent=lostVel!==null?'⚡ '+lostVel+' days avg velocity':'';
 
   // Animate cards
-  const cards=['mc0','mc1','mc2','mc3','mc4','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost','wwOpened','wwClosed','wwDue'];
+  const cards=['mc0','mc1','mc2','mc3','mc4','sc0','sc1','sc2','actCalls','actVisits','wlWon','wlLost','wwOpened','wwWon','wwLost','wwDue'];
   cards.forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add('vis');},i*60));
 }
 
@@ -1029,11 +1040,16 @@ function drillWeek(type) {
     title='Deals Opened This Week';
     subtitle=`${deals.length} new opportunities created this week`;
     color='var(--stage1)';
-  } else if(type==='closed'){
-    deals=weekClosed;
-    title='Deals Closed This Week';
-    subtitle=`${deals.length} deals closed (won or lost) this week`;
+  } else if(type==='won'){
+    deals=weekClosed.filter(d=>d.statecode===1);
+    title='Deals Won This Week';
+    subtitle=`${deals.length} deals won this week`;
     color='var(--gr)';
+  } else if(type==='lost'){
+    deals=weekClosed.filter(d=>d.statecode===2);
+    title='Deals Lost This Week';
+    subtitle=`${deals.length} deals lost this week`;
+    color='var(--re)';
   } else {
     deals=allOpen.filter(d=>{
       if(!d.estimatedclosedate)return false;
@@ -1089,6 +1105,11 @@ function showDash(){
 // ─────────────────────────────────────────────
 // BOOT
 // ─────────────────────────────────────────────
+function signOut(){
+  sessionStorage.clear();
+  window.location.href=`https://login.microsoftonline.com/${CFG.tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(window.location.origin+window.location.pathname)}`;
+}
+
 async function boot(){
   const p=new URLSearchParams(location.search);
   if(p.has('code')){await handleCallback(p.get('code'));return;}
