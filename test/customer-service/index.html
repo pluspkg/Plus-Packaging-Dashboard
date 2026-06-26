@@ -611,11 +611,17 @@ function render(d){
   document.getElementById("sMailTotal").textContent=d.mailTotal!=null?d.mailTotal:"—";
   const mailFoldersEl=document.getElementById("sMailFolders");
   if(d.mailFolders&&Object.keys(d.mailFolders).length>0){
-    mailFoldersEl.innerHTML=Object.values(d.mailFolders).map(f=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(52,211,153,.1);">
-        <span style="font-size:10px;color:rgba(255,255,255,.5);">${f.label}</span>
-        <span style="font-size:13px;font-weight:700;color:#34d399;">${f.count}</span>
-      </div>`).join("");
+    const folders=Object.values(d.mailFolders);
+    const col1=folders.slice(0,3);
+    const col2=folders.slice(3,6);
+    const row=f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(52,211,153,.1);">
+      <span style="font-size:11px;color:rgba(255,255,255,.5);">${f.label}</span>
+      <span style="font-size:18px;font-weight:800;color:#34d399;min-width:28px;text-align:right;">${f.count}</span>
+    </div>`;
+    mailFoldersEl.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">
+      <div>${col1.map(row).join("")}</div>
+      <div>${col2.map(row).join("")}</div>
+    </div>`;
   }else if(d.mailTotal===null){
     mailFoldersEl.innerHTML='<div style="font-size:10px;color:rgba(255,255,255,.4);font-style:italic;margin-top:4px;">Awaiting permissions</div>';
   }
