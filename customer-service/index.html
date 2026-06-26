@@ -101,9 +101,17 @@
   .hero-card.red .hero-var{color:var(--re)}
 
   /* Stat cards row */
-  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:1100px){.stat-row{grid-template-columns:repeat(3,1fr)}}
   @media(max-width:900px){.stat-row{grid-template-columns:1fr 1fr}}
   @media(max-width:600px){.stat-row{grid-template-columns:1fr}}
+  @media(max-width:900px){
+    #lbRow{grid-template-columns:1fr 1fr!important;}
+    #lbRow>*:first-child{grid-column:1/-1;}
+  }
+  @media(max-width:600px){
+    #lbRow{grid-template-columns:1fr!important;}
+  }
   .stat-card{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
   .stat-card.vis{opacity:1;transform:translateY(0)}
   .stat-card.nps{background:linear-gradient(135deg,#1a1040,#241558);border-color:rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.15)}
@@ -311,25 +319,31 @@
           <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
         </div>
 
+        <!-- NPS -->
+        <div class="stat-card nps" id="sc3">
+          <div class="stat-label">NPS Score</div>
+          <div class="stat-sub" id="sNpsSub">AskNicely NPS</div>
+          <div class="stat-value" id="sNps">&#8212;</div>
+          <div class="stat-period">Last 30 days &bull; AskNicely</div>
+        </div>
+
       </div>
 
-      <!-- NPS + Leaderboards -->
+      <!-- Customer Experience -->
       <div class="slbl"><span>Customer Experience</span><div class="slbll"></div></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;align-items:flex-start;" id="lbRow">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px;align-items:start;" id="lbRow">
 
-        <!-- NPS -->
-        <div style="min-width:240px;">
-          <div class="stat-card nps" id="sc3">
-            <div class="stat-label">NPS Score</div>
-            <div class="stat-sub" id="sNpsSub">Loading&hellip;</div>
-            <div class="stat-value" id="sNps">&#8212;</div>
-            <div class="stat-period">Last 30 days &bull; AskNicely</div>
-          </div>
+        <!-- Open CS Emails -->
+        <div class="stat-card" id="sc7" style="background:linear-gradient(135deg,#0d2418,#0f3020);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.1);">
+          <div class="stat-label">Open CS Emails</div>
+          <div class="stat-sub">sales@pluspkg.com</div>
+          <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;color:#34d399;margin:6px 0;" id="sMailTotal">&#8212;</div>
+          <div id="sMailFolders" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;"></div>
         </div>
 
         <!-- Order Processors -->
-        <div style="flex:1;min-width:260px;">
-          <div class="stat-label" style="margin-bottom:10px;">Order Processors Today</div>
+        <div>
+          <div class="stat-label" style="margin-bottom:8px;">Order Processors Today</div>
           <div class="lb-card" id="sc4">
             <div class="lb-total" id="lbTotal">&#8212;</div>
             <div class="lb-total-label">Total Orders Processed Today</div>
@@ -338,8 +352,8 @@
         </div>
 
         <!-- Calls by Person -->
-        <div style="flex:1;min-width:260px;">
-          <div class="stat-label" style="margin-bottom:10px;">Top Callers Today</div>
+        <div>
+          <div class="stat-label" style="margin-bottom:8px;">Top Callers Today</div>
           <div class="lb-card" id="sc5" style="border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.1);">
             <div class="lb-total" id="rcTotal" style="color:var(--cy);">&#8212;</div>
             <div class="lb-total-label">Total Inbound Calls Today</div>
@@ -552,6 +566,15 @@ async function readNPS(){
   }catch(e){console.warn("NPS:",e.message);return{score:null};}
 }
 
+async function readMailCounts(){
+  try{
+    const r=await fetch(NAV_WORKER_URL+"/mail/counts",{signal:AbortSignal.timeout(15000)});
+    if(!r.ok)throw new Error("Mail "+r.status);
+    const j=await r.json();
+    return{mailTotal:j.mailTotal??null,mailFolders:j.mailFolders??{}};
+  }catch(e){console.warn("Mail:",e.message);return{mailTotal:null,mailFolders:{}};}
+}
+
 const GBP=v=>(v==null||isNaN(+v))?"—":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
 const PCT=v=>(v==null||isNaN(+v))?"—":Number(v).toFixed(1)+"%";
 
@@ -583,6 +606,25 @@ function render(d){
   // Catalogue in stock
   document.getElementById("sCat").textContent=PCT(d.cataloguePct);
   document.getElementById("sAccuracy").textContent=d.orderAccuracy!=null?d.orderAccuracy.toFixed(1)+"%":"—";
+
+  // Open CS Emails
+  document.getElementById("sMailTotal").textContent=d.mailTotal!=null?d.mailTotal:"—";
+  const mailFoldersEl=document.getElementById("sMailFolders");
+  if(d.mailFolders&&Object.keys(d.mailFolders).length>0){
+    const folders=Object.values(d.mailFolders);
+    const col1=folders.slice(0,3);
+    const col2=folders.slice(3,6);
+    const row=f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(52,211,153,.1);">
+      <span style="font-size:11px;color:rgba(255,255,255,.5);">${f.label}</span>
+      <span style="font-size:18px;font-weight:800;color:#34d399;min-width:28px;text-align:right;">${f.count}</span>
+    </div>`;
+    mailFoldersEl.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">
+      <div>${col1.map(row).join("")}</div>
+      <div>${col2.map(row).join("")}</div>
+    </div>`;
+  }else if(d.mailTotal===null){
+    mailFoldersEl.innerHTML='<div style="font-size:10px;color:rgba(255,255,255,.4);font-style:italic;margin-top:4px;">Awaiting permissions</div>';
+  }
 
   // NPS
   const score=d.score!=null?Math.round(d.score):null;
@@ -635,7 +677,7 @@ function render(d){
   document.getElementById("lwrap").style.display="none";
   document.getElementById("content").style.display="block";
   document.getElementById("errb").style.display="none";
-  ["sc0","sc1","sc2","sc3","sc4","sc5","sc6"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
+  ["sc0","sc1","sc2","sc3","sc4","sc5","sc6","sc7"].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add("vis");},i*80));
   document.getElementById("lupd").style.display="block";
   document.getElementById("lupdT").textContent=new Date().toLocaleTimeString("en-GB");
 }
@@ -647,9 +689,9 @@ async function fetchData(){
   if(firstLoad){setStatus("ld");document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";}
   if(firstLoad){document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";document.querySelectorAll(".hero-card,.stat-card").forEach(c=>c.classList.remove("vis"));}
   try{
-    const[dd,otif,nps,rc]=await Promise.all([readDataDump(),readOTIF(),readNPS(),readCallsByPerson()]);
+    const[dd,otif,nps,rc,mail]=await Promise.all([readDataDump(),readOTIF(),readNPS(),readCallsByPerson(),readMailCounts()]);
     const navData = NAV_ENABLED ? await readNAV(dd) : {};
-    render({...dd,...otif,...nps,...rc,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
+    render({...dd,...otif,...nps,...rc,...mail,...navData});setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
