@@ -103,7 +103,14 @@
   /* Stat cards row */
   .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   @media(max-width:900px){.stat-row{grid-template-columns:1fr 1fr}}
-  @media(max-width:600px){.stat-row{grid-template-columns:1fr}}
+  @media(max-width:900px){
+    #lbRow{grid-template-columns:1fr 1fr!important;}
+    #lbRow>*:first-child{grid-column:1/-1;}
+    #lbRow>#sc7{grid-column:1/-1;}
+  }
+  @media(max-width:600px){
+    #lbRow{grid-template-columns:1fr!important;}
+  }.stat-row{grid-template-columns:1fr}}
   .stat-card{border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid transparent;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;display:flex;flex-direction:column;justify-content:center}
   .stat-card.vis{opacity:1;transform:translateY(0)}
   .stat-card.nps{background:linear-gradient(135deg,#1a1040,#241558);border-color:rgba(167,139,250,.35);box-shadow:0 8px 40px rgba(167,139,250,.15)}
@@ -312,37 +319,23 @@
           <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
         </div>
 
-        <!-- Open CS Emails -->
-        <div class="stat-card" id="sc7" style="background:linear-gradient(135deg,#0d2418,#0f3020);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.1);grid-column:1/-1;">
-          <div style="display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;">
-            <div style="flex-shrink:0;">
-              <div class="stat-label">Open Customer Service Emails</div>
-              <div class="stat-sub">sales@pluspkg.com &bull; Live count</div>
-              <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;color:#34d399;margin-top:4px;" id="sMailTotal">&#8212;</div>
-            </div>
-            <div id="sMailFolders" style="flex:1;min-width:200px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;align-content:start;margin-top:4px;"></div>
-          </div>
-        </div>
-
       </div>
 
-      <!-- NPS + Leaderboards -->
+      <!-- Customer Experience + Email -->
       <div class="slbl"><span>Customer Experience</span><div class="slbll"></div></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;align-items:flex-start;" id="lbRow">
+      <div style="display:grid;grid-template-columns:160px 1fr 1fr 220px;gap:12px;margin-bottom:24px;align-items:start;" id="lbRow">
 
         <!-- NPS -->
-        <div style="min-width:240px;">
-          <div class="stat-card nps" id="sc3">
-            <div class="stat-label">NPS Score</div>
-            <div class="stat-sub" id="sNpsSub">Loading&hellip;</div>
-            <div class="stat-value" id="sNps">&#8212;</div>
-            <div class="stat-period">Last 30 days &bull; AskNicely</div>
-          </div>
+        <div class="stat-card nps" id="sc3" style="height:100%;box-sizing:border-box;">
+          <div class="stat-label">NPS Score</div>
+          <div class="stat-sub" id="sNpsSub">Loading&hellip;</div>
+          <div class="stat-value" id="sNps">&#8212;</div>
+          <div class="stat-period">Last 30 days &bull; AskNicely</div>
         </div>
 
         <!-- Order Processors -->
-        <div style="flex:1;min-width:260px;">
-          <div class="stat-label" style="margin-bottom:10px;">Order Processors Today</div>
+        <div>
+          <div class="stat-label" style="margin-bottom:8px;">Order Processors Today</div>
           <div class="lb-card" id="sc4">
             <div class="lb-total" id="lbTotal">&#8212;</div>
             <div class="lb-total-label">Total Orders Processed Today</div>
@@ -351,13 +344,21 @@
         </div>
 
         <!-- Calls by Person -->
-        <div style="flex:1;min-width:260px;">
-          <div class="stat-label" style="margin-bottom:10px;">Top Callers Today</div>
+        <div>
+          <div class="stat-label" style="margin-bottom:8px;">Top Callers Today</div>
           <div class="lb-card" id="sc5" style="border-color:rgba(56,189,248,.35);box-shadow:0 8px 40px rgba(56,189,248,.1);">
             <div class="lb-total" id="rcTotal" style="color:var(--cy);">&#8212;</div>
             <div class="lb-total-label">Total Inbound Calls Today</div>
             <div class="lb-list" id="rcList"><div class="lb-empty">Loading&hellip;</div></div>
           </div>
+        </div>
+
+        <!-- Open CS Emails -->
+        <div class="stat-card" id="sc7" style="background:linear-gradient(135deg,#0d2418,#0f3020);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.1);height:100%;box-sizing:border-box;">
+          <div class="stat-label">Open CS Emails</div>
+          <div class="stat-sub">sales@pluspkg.com</div>
+          <div style="font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1;color:#34d399;margin:6px 0;" id="sMailTotal">&#8212;</div>
+          <div id="sMailFolders" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;"></div>
         </div>
 
       </div>
@@ -611,12 +612,12 @@ function render(d){
   const mailFoldersEl=document.getElementById("sMailFolders");
   if(d.mailFolders&&Object.keys(d.mailFolders).length>0){
     mailFoldersEl.innerHTML=Object.values(d.mailFolders).map(f=>`
-      <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:8px 12px;">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:2px;">${f.label}</div>
-        <div style="font-size:22px;font-weight:800;color:#34d399;">${f.count}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(52,211,153,.1);">
+        <span style="font-size:10px;color:rgba(255,255,255,.5);">${f.label}</span>
+        <span style="font-size:13px;font-weight:700;color:#34d399;">${f.count}</span>
       </div>`).join("");
   }else if(d.mailTotal===null){
-    mailFoldersEl.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,.4);font-style:italic;">Awaiting permissions — see setup notes</div>';
+    mailFoldersEl.innerHTML='<div style="font-size:10px;color:rgba(255,255,255,.4);font-style:italic;margin-top:4px;">Awaiting permissions</div>';
   }
 
   // NPS
