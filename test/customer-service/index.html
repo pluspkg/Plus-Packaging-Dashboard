@@ -101,12 +101,12 @@
   .hero-card.red .hero-var{color:var(--re)}
 
   /* Stat cards row */
-  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:1100px){.stat-row{grid-template-columns:repeat(3,1fr)}}
   @media(max-width:900px){.stat-row{grid-template-columns:1fr 1fr}}
   @media(max-width:900px){
     #lbRow{grid-template-columns:1fr 1fr!important;}
     #lbRow>*:first-child{grid-column:1/-1;}
-    #lbRow>#sc7{grid-column:1/-1;}
   }
   @media(max-width:600px){
     #lbRow{grid-template-columns:1fr!important;}
@@ -319,18 +319,26 @@
           <div class="stat-value" id="sAccuracy" style="color:var(--pu);">&#8212;</div>
         </div>
 
-      </div>
-
-      <!-- Customer Experience + Email -->
-      <div class="slbl"><span>Customer Experience</span><div class="slbll"></div></div>
-      <div style="display:grid;grid-template-columns:160px 1fr 1fr 220px;gap:12px;margin-bottom:24px;align-items:start;" id="lbRow">
-
         <!-- NPS -->
-        <div class="stat-card nps" id="sc3" style="height:100%;box-sizing:border-box;">
+        <div class="stat-card nps" id="sc3">
           <div class="stat-label">NPS Score</div>
-          <div class="stat-sub" id="sNpsSub">Loading&hellip;</div>
+          <div class="stat-sub" id="sNpsSub">AskNicely NPS</div>
           <div class="stat-value" id="sNps">&#8212;</div>
           <div class="stat-period">Last 30 days &bull; AskNicely</div>
+        </div>
+
+      </div>
+
+      <!-- Customer Experience -->
+      <div class="slbl"><span>Customer Experience</span><div class="slbll"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px;align-items:start;" id="lbRow">
+
+        <!-- Open CS Emails -->
+        <div class="stat-card" id="sc7" style="background:linear-gradient(135deg,#0d2418,#0f3020);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.1);">
+          <div class="stat-label">Open CS Emails</div>
+          <div class="stat-sub">sales@pluspkg.com</div>
+          <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;color:#34d399;margin:6px 0;" id="sMailTotal">&#8212;</div>
+          <div id="sMailFolders" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;"></div>
         </div>
 
         <!-- Order Processors -->
@@ -351,14 +359,6 @@
             <div class="lb-total-label">Total Inbound Calls Today</div>
             <div class="lb-list" id="rcList"><div class="lb-empty">Loading&hellip;</div></div>
           </div>
-        </div>
-
-        <!-- Open CS Emails -->
-        <div class="stat-card" id="sc7" style="background:linear-gradient(135deg,#0d2418,#0f3020);border-color:rgba(52,211,153,.35);box-shadow:0 8px 40px rgba(52,211,153,.1);height:100%;box-sizing:border-box;">
-          <div class="stat-label">Open CS Emails</div>
-          <div class="stat-sub">sales@pluspkg.com</div>
-          <div style="font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1;color:#34d399;margin:6px 0;" id="sMailTotal">&#8212;</div>
-          <div id="sMailFolders" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;"></div>
         </div>
 
       </div>
