@@ -57,6 +57,10 @@
   .btnr:disabled{opacity:.45;cursor:default;box-shadow:none}
   .btnsignout{background:none;border:1px solid var(--nb);color:var(--mu);padding:7px 14px;border-radius:10px;font-size:12px;font-family:var(--font-body,"Segoe UI",sans-serif);cursor:pointer;transition:all .15s}
   .btnsignout:hover{border-color:var(--re);color:var(--re)}
+  .sp-filter{display:flex;align-items:center;gap:8px;background:var(--nc);border:1px solid var(--nb);border-radius:10px;padding:5px 12px}
+  .sp-filter-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);font-family:"Courier New",monospace;white-space:nowrap}
+  .sp-filter-sel{background:transparent;border:none;color:var(--wh);font-size:13px;font-weight:600;cursor:pointer;outline:none;font-family:"Segoe UI",sans-serif;min-width:80px}
+  .sp-filter-sel option{background:var(--nm);color:var(--wh)}
   .uinfo{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
   .uavt{width:30px;height:30px;border-radius:50%;background:var(--nb);border:1px solid var(--or);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--or)}
 
@@ -345,6 +349,12 @@
           <span class="arcd" id="acd"></span>
         </div>
         <button class="btnr" id="btnr" onclick="fetchData()">⟳ Refresh</button>
+        <div class="sp-filter">
+          <label class="sp-filter-lbl">Salesperson</label>
+          <select class="sp-filter-sel" id="spFilter" onchange="applySpFilter()">
+            <option value="ALL">All</option>
+          </select>
+        </div>
         <div class="uinfo">
           <div class="uavt" id="uavt">—</div>
           <span id="uname"></span>
@@ -540,6 +550,7 @@ const STAGES = [
 let token = null;
 let busy = false, firstLoad = true, autoOn = true, intMins = 10, cdSecs = 600, ticker;
 let allOpen = [], wonDeals = [], lostDeals = [], callsData = [], visitsData = [], weekClosed = [];
+let accountsMap = {}, activeSpCode = 'ALL'; // accountid → salesperson code
 
 // ─────────────────────────────────────────────
 // AUTH — PKCE (matches existing dashboards)
@@ -626,6 +637,27 @@ async function fetchData(){
 
   try{
     await ensureToken();
+
+    // Fetch accounts salesperson map (paginate to get all)
+    if(Object.keys(accountsMap).length === 0) {
+      ld('Loading salesperson codes…');
+      let accUrl = CFG.dynamicsUrl + `/accounts?$select=accountid,new_calculatedsalesperson&$filter=new_calculatedsalesperson ne null`;
+      while(accUrl) {
+        const ar = await fetch(accUrl, {headers:hdrs()});
+        const ad = await ar.json();
+        (ad.value||[]).forEach(a => {
+          if(a.new_calculatedsalesperson) {
+            accountsMap[a.accountid] = a.new_calculatedsalesperson.toUpperCase().trim();
+          }
+        });
+        accUrl = ad['@odata.nextLink'] || null;
+      }
+      // Populate dropdown with unique sorted codes (exclude INACTIVE, 99)
+      const excluded = ['INACTIVE','99'];
+      const codes = [...new Set(Object.values(accountsMap))].filter(c=>!excluded.includes(c)).sort();
+      const sel = document.getElementById('spFilter');
+      codes.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+    }
     const now=new Date();
     const ago30=new Date(now);ago30.setDate(ago30.getDate()-30);
     const ago30s=ago30.toISOString(),nows=now.toISOString();
@@ -648,10 +680,10 @@ async function fetchData(){
     ld('Loading phone calls…');
     const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
     const fetchFrom=lastMonthStart.toISOString();
-    callsData=await crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
+    callsData=await crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,_regardingobjectid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${fetchFrom}&$orderby=actualend desc`);
 
     ld('Loading site visits…');
-    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,sortdate,_ownerid_value,new_leadapp&$filter=new_leadapp eq true and createdon ge ${fetchFrom}&$orderby=createdon desc`);
+    visitsData=await crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,_ownerid_value,_regardingobjectid_value,new_leadapp&$filter=new_leadapp eq true and createdon ge ${fetchFrom}&$orderby=createdon desc`);
 
     render(now);
     setStatus('ok');
@@ -675,6 +707,37 @@ async function fetchData(){
 }
 
 // ─────────────────────────────────────────────
+// SALESPERSON FILTER
+// ─────────────────────────────────────────────
+function applySpFilter() {
+  activeSpCode = document.getElementById('spFilter').value;
+  render(new Date());
+}
+
+function spFilterDeals(deals) {
+  if(activeSpCode === 'ALL') return deals;
+  return deals.filter(d => {
+    const accId = d._parentaccountid_value;
+    if(!accId) return false;
+    return (accountsMap[accId]||'').toUpperCase() === activeSpCode;
+  });
+}
+
+function spFilterActivity(records) {
+  if(activeSpCode === 'ALL') return records;
+  // For activity, filter by owner matching accounts with this salesperson code
+  // Get all account IDs for this salesperson code
+  const accIds = new Set(Object.entries(accountsMap).filter(([,v])=>v===activeSpCode).map(([k])=>k));
+  // Also match by regardingobjectid for site visits
+  return records.filter(r => {
+    const regarding = r._regardingobjectid_value;
+    if(regarding && accIds.has(regarding)) return true;
+    // Fallback: owner name match isn't reliable, so just use regarding
+    return false;
+  });
+}
+
+// ─────────────────────────────────────────────
 // RENDER
 // ─────────────────────────────────────────────
 function render(now){
@@ -685,22 +748,34 @@ function render(now){
   const ago30=new Date(now);ago30.setDate(ago30.getDate()-30);
   document.getElementById('pgperiod').textContent=`OPEN: ALL · CLOSED: ${fmtD(ago30)} – ${fmtD(now)}`;
 
+  // Apply salesperson filter to all data sets
+  const fOpen   = spFilterDeals(allOpen);
+  const fWon    = spFilterDeals(wonDeals);
+  const fLost   = spFilterDeals(lostDeals);
+  const fClosed = spFilterDeals(weekClosed);
+  const fCalls  = activeSpCode==='ALL' ? callsData : spFilterActivity(callsData);
+  const fVisits = activeSpCode==='ALL' ? visitsData : spFilterActivity(visitsData);
+
+  // Update filter badge in header
+  const badge = document.getElementById('spFilterBadge');
+  if(badge) badge.textContent = activeSpCode==='ALL' ? '' : activeSpCode;
+
   // Metrics
-  const totalVal=allOpen.reduce((s,d)=>s+(d.estimatedvalue||0),0);
-  const overdue=allOpen.filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<todayStr);
-  const winRate=wonDeals.length+lostDeals.length>0?Math.round(wonDeals.length/(wonDeals.length+lostDeals.length)*100):0;
+  const totalVal=fOpen.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const overdue=fOpen.filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<todayStr);
+  const winRate=fWon.length+fLost.length>0?Math.round(fWon.length/(fWon.length+fLost.length)*100):0;
 
   document.getElementById('mVal').textContent=fmtGBP(totalVal);
-  document.getElementById('mCount').textContent=allOpen.length;
+  document.getElementById('mCount').textContent=fOpen.length;
   document.getElementById('mWin').textContent=winRate+'%';
   document.getElementById('mOverdue').textContent=overdue.length;
-  const allClosed=[...wonDeals,...lostDeals];
+  const allClosed=[...fWon,...fLost];
   const vel=avgVelocity(allClosed);
   document.getElementById('mVelocity').textContent=vel!==null?vel+' Days':'—';
 
   // Stage buckets
   const buckets=[[],[],[]];
-  allOpen.forEach(d=>{
+  fOpen.forEach(d=>{
     const st=(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase();
     let idx=0;
     for(let i=0;i<STAGES.length;i++){if(STAGES[i].keywords.some(k=>st.includes(k))){idx=i;break;}}
@@ -714,18 +789,18 @@ function render(now){
     setTimeout(()=>{document.getElementById(`s${i}b`).style.width=Math.max(4,Math.round(sVals[i]/maxV*100))+'%';},300+i*120);
   });
 
-  renderCallsLeaderboard();
-  renderVisitsLeaderboard();
+  renderCallsLeaderboard(fCalls);
+  renderVisitsLeaderboard(fVisits);
 
   // This Week
   const dow2=now.getDay(),diffMon=dow2===0?-6:1-dow2;
   const wkStart=new Date(now);wkStart.setDate(now.getDate()+diffMon);wkStart.setHours(0,0,0,0);
-  const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+4);wkEnd.setHours(23,59,59,999); // Mon-Fri
+  const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+4);wkEnd.setHours(23,59,59,999);
 
-  const weekOpened=allOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
-  const weekWon=weekClosed.filter(d=>d.statecode===1);
-  const weekLost=weekClosed.filter(d=>d.statecode===2);
-  const weekDue=allOpen.filter(d=>{
+  const weekOpened=fOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
+  const weekWon=fClosed.filter(d=>d.statecode===1);
+  const weekLost=fClosed.filter(d=>d.statecode===2);
+  const weekDue=fOpen.filter(d=>{
     if(!d.estimatedclosedate)return false;
     const cd=new Date(d.estimatedclosedate);
     return cd>=wkStart&&cd<=wkEnd;
@@ -746,14 +821,14 @@ function render(now){
   document.getElementById('wwDueV').textContent=fmtGBP(weekDueVal);
 
   // Won/Lost
-  const wonVal=wonDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
-  const lostVal=lostDeals.reduce((s,d)=>s+(d.estimatedvalue||0),0);
-  const wonVel=avgVelocity(wonDeals);
-  const lostVel=avgVelocity(lostDeals);
-  document.getElementById('wlWonC').textContent=wonDeals.length+' deal'+(wonDeals.length!==1?'s':'');
+  const wonVal=fWon.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const lostVal=fLost.reduce((s,d)=>s+(d.estimatedvalue||0),0);
+  const wonVel=avgVelocity(fWon);
+  const lostVel=avgVelocity(fLost);
+  document.getElementById('wlWonC').textContent=fWon.length+' deal'+(fWon.length!==1?'s':'');
   document.getElementById('wlWonV').textContent=fmtGBP(wonVal);
   document.getElementById('wlWonVel').textContent=wonVel!==null?'⚡ '+wonVel+' days avg velocity':'';
-  document.getElementById('wlLostC').textContent=lostDeals.length+' deal'+(lostDeals.length!==1?'s':'');
+  document.getElementById('wlLostC').textContent=fLost.length+' deal'+(fLost.length!==1?'s':'');
   document.getElementById('wlLostV').textContent=fmtGBP(lostVal);
   document.getElementById('wlLostVel').textContent=lostVel!==null?'⚡ '+lostVel+' days avg velocity':'';
 
@@ -810,16 +885,18 @@ function renderActivityPeriods(elId, data, dateField, color, drillFn) {
   }).join('');
 }
 
-function renderCallsLeaderboard() { renderActivityPeriods('callsPeriods', callsData, 'actualend', 'green', 'drillCallsPeriod'); }
-function renderVisitsLeaderboard() { renderActivityPeriods('visitsPeriods', visitsData, 'createdon', 'orange', 'drillVisitsPeriod'); }
+function renderCallsLeaderboard(data) { renderActivityPeriods('callsPeriods', data||callsData, 'actualend', 'green', 'drillCallsPeriod'); }
+function renderVisitsLeaderboard(data) { renderActivityPeriods('visitsPeriods', data||visitsData, 'createdon', 'orange', 'drillVisitsPeriod'); }
 
 function drillCallsPeriod(tab) {
-  const records = filterByTab(callsData, tab, 'actualend');
+  const data = activeSpCode==='ALL' ? callsData : spFilterActivity(callsData);
+  const records = filterByTab(data, tab, 'actualend');
   openDrillActivityLeaderboard('📞 Meaningful Calls', tab, records, 'actualend', 'var(--gr)');
 }
 
 function drillVisitsPeriod(tab) {
-  const records = filterByTab(visitsData, tab, 'createdon');
+  const data = activeSpCode==='ALL' ? visitsData : spFilterActivity(visitsData);
+  const records = filterByTab(data, tab, 'createdon');
   openDrillActivityLeaderboard('🏭 Site Visits', tab, records, 'createdon', 'var(--or)');
 }
 
@@ -963,36 +1040,28 @@ function drillPersonDeals(name) {
 }
 
 function drillAll() {
-  openDrillOwnerLeaderboard(
-    'All Open Deals', `${allOpen.length} opportunities · ranked by pipeline value`,
-    allOpen, 'var(--stage1)', null
-  );
+  const deals=spFilterDeals(allOpen);
+  openDrillOwnerLeaderboard('All Open Deals',`${deals.length} opportunities · ranked by pipeline value`,deals,'var(--stage1)',null,false);
 }
 
 function drillStage(i) {
-  const deals = allOpen.filter(d => STAGES[i].keywords.some(k=>(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase().includes(k)));
-  openDrillOwnerLeaderboard(
-    STAGES[i].label, `${deals.length} deals in this stage · ranked by value`,
-    deals, 'var(--stage1)', null
-  );
+  const deals=spFilterDeals(allOpen).filter(d=>STAGES[i].keywords.some(k=>(d['new_stage@OData.Community.Display.V1.FormattedValue']||d.new_stage||'').toLowerCase().includes(k)));
+  openDrillOwnerLeaderboard(STAGES[i].label,`${deals.length} deals in this stage · ranked by value`,deals,'var(--stage1)',null,false);
 }
 
 function drillWon() {
-  openDrillOwnerLeaderboard(
-    'Won Deals — Last 30 Days', `${wonDeals.length} deals closed won · ranked by value`,
-    wonDeals, 'var(--gr)', 'actualclosedate', true
-  );
+  const deals=spFilterDeals(wonDeals);
+  openDrillOwnerLeaderboard('Won Deals — Last 30 Days',`${deals.length} deals closed won · ranked by value`,deals,'var(--gr)','actualclosedate',true);
 }
 
 function drillLost() {
-  openDrillOwnerLeaderboard(
-    'Lost Deals — Last 30 Days', `${lostDeals.length} deals closed lost · ranked by value`,
-    lostDeals, 'var(--re)', 'actualclosedate', true
-  );
+  const deals=spFilterDeals(lostDeals);
+  openDrillOwnerLeaderboard('Lost Deals — Last 30 Days',`${deals.length} deals closed lost · ranked by value`,deals,'var(--re)','actualclosedate',true);
 }
+
 function drillOverdue(){
   const t=new Date().toISOString().split('T')[0];
-  const od=allOpen.filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t);
+  const od=spFilterDeals(allOpen).filter(d=>d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t);
   const totalVal=od.reduce((s,d)=>s+(d.estimatedvalue||0),0);
 
   document.getElementById('dTitle').textContent='Overdue Deals';
@@ -1002,7 +1071,6 @@ function drillOverdue(){
     <div class="d-sum-item"><div class="d-sum-lbl">Total Value</div><div class="d-sum-val" style="color:var(--or)">${fmtGBP(totalVal)}</div></div>
     <div class="d-sum-item"><div class="d-sum-lbl">Salespeople</div><div class="d-sum-val">${new Set(od.map(d=>ownerName(d))).size}</div></div>`;
 
-  // Build per-person leaderboard sorted by overdue count desc
   const map={};
   od.forEach(d=>{const n=ownerName(d);map[n]=(map[n]||[]);map[n].push(d);});
   const sorted=Object.entries(map).sort((a,b)=>b[1].length-a[1].length);
@@ -1027,7 +1095,7 @@ function drillOverdue(){
 
 function drillPersonOd(name){
   const t=new Date().toISOString().split('T')[0];
-  const od=allOpen.filter(d=>ownerName(d)===name&&d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t)
+  const od=spFilterDeals(allOpen).filter(d=>ownerName(d)===name&&d.estimatedclosedate&&d.estimatedclosedate.split('T')[0]<t)
     .sort((a,b)=>new Date(a.estimatedclosedate)-new Date(b.estimatedclosedate));
   openDrill(`${name} — Overdue`,`${od.length} overdue deal${od.length!==1?'s':''}`,od);
 }
@@ -1037,32 +1105,22 @@ function drillWeek(type) {
   const dow=now.getDay(),diffMon=dow===0?-6:1-dow;
   const wkStart=new Date(now);wkStart.setDate(now.getDate()+diffMon);wkStart.setHours(0,0,0,0);
   const wkEnd=new Date(wkStart);wkEnd.setDate(wkStart.getDate()+4);wkEnd.setHours(23,59,59,999);
+  const fOpen=spFilterDeals(allOpen);
+  const fClosed=spFilterDeals(weekClosed);
 
   let deals, title, subtitle, color;
   if(type==='opened'){
-    deals=allOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
-    title='Deals Opened This Week';
-    subtitle=`${deals.length} new opportunities created this week`;
-    color='var(--stage1)';
+    deals=fOpen.filter(d=>d.createdon&&new Date(d.createdon)>=wkStart&&new Date(d.createdon)<=now);
+    title='Deals Opened This Week'; subtitle=`${deals.length} new opportunities created this week`; color='var(--stage1)';
   } else if(type==='won'){
-    deals=weekClosed.filter(d=>d.statecode===1);
-    title='Deals Won This Week';
-    subtitle=`${deals.length} deals won this week`;
-    color='var(--gr)';
+    deals=fClosed.filter(d=>d.statecode===1);
+    title='Deals Won This Week'; subtitle=`${deals.length} deals won this week`; color='var(--gr)';
   } else if(type==='lost'){
-    deals=weekClosed.filter(d=>d.statecode===2);
-    title='Deals Lost This Week';
-    subtitle=`${deals.length} deals lost this week`;
-    color='var(--re)';
+    deals=fClosed.filter(d=>d.statecode===2);
+    title='Deals Lost This Week'; subtitle=`${deals.length} deals lost this week`; color='var(--re)';
   } else {
-    deals=allOpen.filter(d=>{
-      if(!d.estimatedclosedate)return false;
-      const cd=new Date(d.estimatedclosedate);
-      return cd>=wkStart&&cd<=wkEnd;
-    });
-    title='Due to Close This Week';
-    subtitle=`${deals.length} open deals with close date this week`;
-    color='var(--am)';
+    deals=fOpen.filter(d=>{if(!d.estimatedclosedate)return false;const cd=new Date(d.estimatedclosedate);return cd>=wkStart&&cd<=wkEnd;});
+    title='Due to Close This Week'; subtitle=`${deals.length} open deals with close date this week`; color='var(--am)';
   }
   openDrillOwnerLeaderboard(title, subtitle, deals, color, null, false);
 }
