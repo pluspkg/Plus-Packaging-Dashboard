@@ -638,26 +638,6 @@ async function fetchData(){
   try{
     await ensureToken();
 
-    // Fetch accounts salesperson map (paginate to get all)
-    if(Object.keys(accountsMap).length === 0) {
-      ld('Loading salesperson codes…');
-      let accUrl = CFG.dynamicsUrl + `/accounts?$select=accountid,new_calculatedsalesperson&$filter=new_calculatedsalesperson ne null`;
-      while(accUrl) {
-        const ar = await fetch(accUrl, {headers:hdrs()});
-        const ad = await ar.json();
-        (ad.value||[]).forEach(a => {
-          if(a.new_calculatedsalesperson) {
-            accountsMap[a.accountid] = a.new_calculatedsalesperson.toUpperCase().trim();
-          }
-        });
-        accUrl = ad['@odata.nextLink'] || null;
-      }
-      // Populate dropdown with unique sorted codes (exclude INACTIVE, 99)
-      const excluded = ['INACTIVE','99'];
-      const codes = [...new Set(Object.values(accountsMap))].filter(c=>!excluded.includes(c)).sort();
-      const sel = document.getElementById('spFilter');
-      codes.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
-    }
     const now=new Date();
     const ago30=new Date(now);ago30.setDate(ago30.getDate()-30);
     const ago30s=ago30.toISOString(),nows=now.toISOString();
@@ -676,6 +656,30 @@ async function fetchData(){
     const weekStart=new Date(now);weekStart.setDate(now.getDate()+diffToMon);weekStart.setHours(0,0,0,0);
     const weekStartS=weekStart.toISOString();
     weekClosed=await crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,createdon,statecode,opportunityid,_ownerid_value,_parentaccountid_value&$filter=(statecode eq 1 or statecode eq 2) and actualclosedate ge ${weekStartS} and actualclosedate le ${nows}`);
+
+    // Fetch accounts salesperson map then build dropdown from actual deals
+    ld('Loading salesperson codes…');
+    accountsMap = {};
+    let accUrl = CFG.dynamicsUrl + `/accounts?$select=accountid,new_calculatedsalesperson&$filter=new_calculatedsalesperson ne null`;
+    while(accUrl) {
+      const ar = await fetch(accUrl, {headers:hdrs()});
+      const ad = await ar.json();
+      (ad.value||[]).forEach(a => {
+        if(a.new_calculatedsalesperson) accountsMap[a.accountid] = a.new_calculatedsalesperson.toUpperCase().trim();
+      });
+      accUrl = ad['@odata.nextLink'] || null;
+    }
+    // Only show codes that appear on actual deals
+    const allDeals = [...allOpen, ...wonDeals, ...lostDeals, ...weekClosed];
+    const codesWithDeals = new Set(
+      allDeals.map(d => accountsMap[d._parentaccountid_value]).filter(c => c && !['INACTIVE','99'].includes(c))
+    );
+    const spCodes = [...codesWithDeals].sort();
+    const sel = document.getElementById('spFilter');
+    while(sel.options.length > 1) sel.remove(1);
+    spCodes.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+    if(activeSpCode !== 'ALL' && !codesWithDeals.has(activeSpCode)) { activeSpCode='ALL'; sel.value='ALL'; }
+    else { sel.value = activeSpCode; }
 
     ld('Loading phone calls…');
     const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
