@@ -28,6 +28,30 @@
   .sdot.ld{background:var(--am)}.sdot.er{background:var(--re);animation:none}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
+  /* ── SALESPERSON FILTER ── */
+  /* color-scheme is the important line: the dropdown PANEL is drawn by the OS,
+     not by our CSS, so without this it renders light and our near-white option
+     text becomes invisible against it. Styling `option` alone does not fix
+     the panel background on every browser. */
+  #repFilter{
+    color-scheme:dark;
+    background:#1a2a4a;
+    color:var(--ow);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:5px 8px;
+    font-size:11px;
+    font-weight:600;
+    font-family:inherit;
+    cursor:pointer;
+    max-width:190px;
+  }
+  #repFilter:hover{border-color:rgba(255,255,255,.22)}
+  #repFilter option{
+    background:#13213f;
+    color:var(--ow);
+  }
+
   /* ── LAYOUT ── */
   #dashScreen{display:none;height:100vh;flex-direction:column}
   #dashScreen.show{display:flex}
@@ -155,8 +179,7 @@
     <img src="/favicon.png" class="nav-logo">
     <div class="nav-title">Plus Packaging &mdash; Management</div>
     <div class="nav-meta">Updated <span id="updTime">—</span><br><span class="sdot" id="sdot"></span><span id="stxt">Loading…</span></div>
-    <select id="repFilter" onchange="applyRepFilter(this.value)" title="Filter by salesperson code"
-            style="background:rgba(255,255,255,.08);color:var(--ow);border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;max-width:190px;">
+    <select id="repFilter" onchange="applyRepFilter(this.value)" title="Filter by salesperson code">
       <option value="">All salespeople</option>
     </select>
     <a href="/" class="nav-link">&#8592; Dashboards</a>
