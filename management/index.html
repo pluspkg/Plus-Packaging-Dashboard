@@ -155,6 +155,10 @@
     <img src="/favicon.png" class="nav-logo">
     <div class="nav-title">Plus Packaging &mdash; Management</div>
     <div class="nav-meta">Updated <span id="updTime">—</span><br><span class="sdot" id="sdot"></span><span id="stxt">Loading…</span></div>
+    <select id="repFilter" onchange="applyRepFilter(this.value)" title="Filter by salesperson code"
+            style="background:rgba(255,255,255,.08);color:var(--ow);border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;max-width:190px;">
+      <option value="">All salespeople</option>
+    </select>
     <a href="/" class="nav-link">&#8592; Dashboards</a>
     <button class="nav-btn" id="btnr" onclick="fetchData()">&#x27F3; Refresh</button>
     <button class="nav-btn" style="background:rgba(255,255,255,.1);" onclick="signOut()">Sign out</button>
@@ -317,6 +321,9 @@ const CFG={
 };
 const NAV_WORKER_URL="https://nav-data.darren-clayson.workers.dev";
 let token=null,dynToken=null,busy=false,firstLoad=true;
+// Salesperson filter. lastData keeps the most recent fetch so changing the
+// dropdown re-renders immediately rather than re-querying NAV and CRM.
+let repFilter="",lastData=null;
 // Store drill-down data
 let drillData={};
 
@@ -617,6 +624,7 @@ async function readNAV(dd){
       ordersToday:j.ordersToday??null,
       ordersMarginPct:j.ordersMarginPct??null,
       salesTodayByRep:j.salesTodayByRep??[],
+      ordersTodayByRep:j.ordersTodayByRep??[],
       shippedToday:j.shippedToday??null,
       shipmentsToday:j.shipmentsToday??null,
       orderProcessorCounts:j.orderProcessorCounts??{},
@@ -690,15 +698,58 @@ async function readNPS(){
 async function readCRM(){
   try{
     const from=monthStart(),to=nowISO();
-    const[calls,visits,dealsOpen,dealsWon,dealsLost,allOpen]=await Promise.all([
-      crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${from} and actualend le ${to}&$orderby=actualend desc`),
+    const[calls,visits,dealsOpen,dealsWon,dealsLost,allOpen,accounts,contacts]=await Promise.all([
+      crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,_regardingobjectid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${from} and actualend le ${to}&$orderby=actualend desc`),
       crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,_ownerid_value,_regardingobjectid_value,new_leadapp&$filter=new_leadapp eq true and createdon ge ${from}&$orderby=createdon desc`),
       crmAll(`/opportunities?$select=name,estimatedvalue,createdon,_ownerid_value,_parentaccountid_value&$filter=statecode eq 0 and createdon ge ${from} and createdon le ${to}&$orderby=estimatedvalue desc`),
       crmAll(`/opportunities?$select=name,estimatedvalue,actualclosedate,_ownerid_value,_parentaccountid_value&$filter=statecode eq 1 and actualclosedate ge ${from} and actualclosedate le ${to}&$orderby=estimatedvalue desc`),
       crmAll(`/opportunities?$select=opportunityid&$filter=statecode eq 2 and actualclosedate ge ${from} and actualclosedate le ${to}`),
       // ALL open deals — not just this month — for true pipeline value
-      crmAll(`/opportunities?$select=estimatedvalue&$filter=statecode eq 0`),
+      crmAll(`/opportunities?$select=estimatedvalue,_parentaccountid_value&$filter=statecode eq 0`),
+      // Salesperson code sits on the ORGANISATION (account), so the full
+      // account list is needed to build accountid → code for the filter.
+      crmAll(`/accounts?$select=accountid,new_calculatedsalesperson`),
+      // Activities are often logged against a contact, so this resolves
+      // contact → parent account as a second hop.
+      crmAll(`/contacts?$select=contactid,_parentcustomerid_value`),
     ]);
+
+    // ── Salesperson code resolution ──────────────────────────────────────────
+    const acctToRep={};
+    for(const a of accounts){
+      const code=(a.new_calculatedsalesperson||"").trim();
+      if(a.accountid&&code)acctToRep[a.accountid.toLowerCase()]=code.toUpperCase();
+    }
+    const contactToAcct={};
+    for(const ct of contacts){
+      if(ct.contactid&&ct._parentcustomerid_value)
+        contactToAcct[ct.contactid.toLowerCase()]=ct._parentcustomerid_value.toLowerCase();
+    }
+    // regardingobjectid can point at an account, a contact, or something else,
+    // so the lookup's logical name decides how to follow it.
+    const repOf=r=>{
+      const direct=r._parentaccountid_value;
+      if(direct)return acctToRep[direct.toLowerCase()]||null;
+      const reg=r._regardingobjectid_value;
+      if(!reg)return null;
+      const kind=r["_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname"];
+      const id=reg.toLowerCase();
+      if(kind==="contact"){
+        const acct=contactToAcct[id];
+        return acct?(acctToRep[acct]||null):null;
+      }
+      return acctToRep[id]||(contactToAcct[id]?acctToRep[contactToAcct[id]]:null)||null;
+    };
+    const byRep=arr=>{
+      const map={};
+      for(const r of arr){
+        const code=repOf(r)||"Unassigned";
+        if(!map[code])map[code]={code,count:0,value:0};
+        map[code].count++;
+        map[code].value+=(r.estimatedvalue||0);
+      }
+      return Object.values(map).sort((a,b)=>b.count-a.count);
+    };
 
     // Aggregate by person
     const byPerson=(arr,nameField="_ownerid_value")=>{
@@ -722,7 +773,22 @@ async function readCRM(){
     drillData.dealsWon=dealsWon.sort((a,b)=>(b.estimatedvalue||0)-(a.estimatedvalue||0));
     drillData.dealsWonByPerson=byPerson(dealsWon);
 
-    return{msiCalls:calls.length,siteVisits:visits.length,dealsOpened:dealsOpen.length,dealsWonCount:dealsWon.length,dealsWonValue:dealsWon.reduce((s,r)=>s+(r.estimatedvalue||0),0),winRate,pipelineValue};
+    // Win rate per code needs won and lost split the same way
+    const wonByRep=byRep(dealsWon),lostByRep=byRep(dealsLost);
+    const winRateByRep={};
+    for(const w of wonByRep)winRateByRep[w.code]={won:w.count,lost:0};
+    for(const l of lostByRep){
+      if(!winRateByRep[l.code])winRateByRep[l.code]={won:0,lost:0};
+      winRateByRep[l.code].lost=l.count;
+    }
+    for(const code of Object.keys(winRateByRep)){
+      const{won,lost}=winRateByRep[code];
+      winRateByRep[code].rate=(won+lost)>0?Math.round(won/(won+lost)*100):null;
+    }
+
+    return{msiCalls:calls.length,siteVisits:visits.length,dealsOpened:dealsOpen.length,dealsWonCount:dealsWon.length,dealsWonValue:dealsWon.reduce((s,r)=>s+(r.estimatedvalue||0),0),winRate,pipelineValue,
+      callsByRep:byRep(calls),visitsByRep:byRep(visits),dealsOpenByRep:byRep(dealsOpen),
+      dealsWonByRep:wonByRep,pipelineByRep:byRep(allOpen),winRateByRep};
   }catch(e){console.warn("CRM:",e.message);return{msiCalls:null,siteVisits:null,dealsOpened:null,dealsWonCount:null,winRate:null,pipelineValue:null};}
 }
 
@@ -1036,7 +1102,107 @@ function updateClock(){
 let ticker=null,cdSecs=300,autoOn=true,intMins=5;
 function restartCd(){clearInterval(ticker);cdSecs=intMins*60;ticker=setInterval(()=>{cdSecs--;if(cdSecs<=0&&autoOn)fetchData();},1000);}
 
-function render(d){
+// ── SALESPERSON FILTER ────────────────────────────────────────────────────────
+// Only NAV-sourced figures carry a salesperson code. The CRM cards are keyed
+// by owner NAME, and the remaining Data Dump figures are single company-wide
+// values — neither can be split by code without work that doesn't exist yet.
+// Rather than leave those cards silently showing company totals next to
+// filtered ones, they're dimmed and labelled. UNFILTERABLE lists the card IDs
+// that get that treatment.
+// Cards with no salesperson dimension at all: New Customers, Orders Booked
+// (single Data Dump figures), NPS (single score) and the catalogue/inventory
+// figures. CRM cards are NOT here — they resolve a code via the account.
+const UNFILTERABLE=["mc3","mc3b","mc8","mc9","mc10","mc11"];
+
+function applyRepFilter(code){
+  repFilter=code||"";
+  if(lastData)render(lastData);
+}
+
+// Populate the dropdown from the codes actually present in the data, so it
+// never offers a code with nothing behind it.
+function buildRepOptions(d){
+  const sel=document.getElementById("repFilter");
+  if(!sel)return;
+  const names=d.repNames||{};
+  const codes=Object.keys(names).length?Object.keys(names)
+             :[...new Set((d.salesTodayByRep||[]).map(r=>r.code))];
+  const current=sel.value;
+  sel.innerHTML='<option value="">All salespeople</option>'+
+    codes.sort().map(code=>`<option value="${code}">${code}${names[code]?" — "+names[code]:""}</option>`).join("");
+  sel.value=current; // preserve selection across refreshes
+}
+
+// Returns a copy of the dataset with the NAV figures narrowed to one code.
+function filterData(d){
+  if(!repFilter)return d;
+  const code=repFilter.toUpperCase();
+  const today=(d.salesTodayByRep||[]).find(r=>(r.code||"").toUpperCase()===code)||{};
+  const ord=(d.ordersTodayByRep||[]).find(r=>(r.code||"").toUpperCase()===code)||{};
+  const tgt=(d.repTargets||{})[code]||{};
+  const salesY=(d.repSalesY||{})[code]??0;
+  const marginY=(d.repMarginY||{})[code]??0;
+
+  return{...d,
+    sales:        salesY+(today.sales??0),
+    pm:           marginY+(today.margin??0),
+    salesTarget:  tgt.salesTgt??null,
+    pmTarget:     tgt.marginTgt??null,
+    ordersToday:  ord.value??0,
+    shippedToday: today.sales??0,
+    // Per-order margin % can't be recomputed per rep from the aggregates we
+    // hold, so it's suppressed rather than shown as a company figure.
+    ordersMarginPct:null,
+
+    // CRM, resolved via the account's salesperson code
+    msiCalls:      pick(d.callsByRep,code)?.count      ?? 0,
+    siteVisits:    pick(d.visitsByRep,code)?.count     ?? 0,
+    dealsOpened:   pick(d.dealsOpenByRep,code)?.count  ?? 0,
+    dealsWonCount: pick(d.dealsWonByRep,code)?.count   ?? 0,
+    dealsWonValue: pick(d.dealsWonByRep,code)?.value   ?? 0,
+    pipelineValue: pick(d.pipelineByRep,code)?.value   ?? 0,
+    winRate:       d.winRateByRep?.[code]?.rate        ?? null,
+
+    // CRM activity targets are set per PERSON, not per salesperson code, and
+    // a code can cover two people (PP1 = Nicole and Charlie). Summing them
+    // would need a reliable name→code map that doesn't exist yet, so targets
+    // are suppressed while filtering rather than shown against a subset.
+    crmTargets: null,
+  };
+}
+
+// Find a code's row in a byRep array, case-insensitively
+function pick(arr,code){
+  return (arr||[]).find(r=>(r.code||"").toUpperCase()===code);
+}
+
+function render(raw){
+  lastData=raw;
+  buildRepOptions(raw);
+  const d=filterData(raw);
+
+  // Dim and label the cards the filter can't reach
+  const filtering=!!repFilter;
+  UNFILTERABLE.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.style.opacity=filtering?"0.45":"1";
+    let tag=el.querySelector(".cw-tag");
+    if(filtering){
+      if(!tag){
+        tag=document.createElement("div");
+        tag.className="cw-tag";
+        tag.style.cssText="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--am);margin-top:3px;";
+        tag.textContent="Company-wide";
+        el.appendChild(tag);
+      }
+    }else if(tag)tag.remove();
+  });
+
+  renderInner(d);
+}
+
+function renderInner(d){
   renderHero("hcSales","hSalesVal","hSalesTgt","hSalesPct","hSalesBadge","hSalesBar","hSalesVar",d.sales,d.salesTarget);
   renderHero("hcPM","hPMVal","hPMTgt","hPMPct","hPMBadge","hPMBar","hPMVar",d.pm,d.pmTarget);
 
