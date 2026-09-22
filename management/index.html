@@ -347,6 +347,11 @@ let token=null,dynToken=null,busy=false,firstLoad=true;
 // Salesperson filter. lastData keeps the most recent fetch so changing the
 // dropdown re-renders immediately rather than re-querying NAV and CRM.
 let repFilter="",lastData=null;
+// Raw CRM records from the last fetch, and the account→salesperson maps.
+// Kept separate because the maps load lazily in the background.
+let crmRaw=null, acctToRep=null, contactToAcct=null, repMapsReady=false;
+const REP_MAP_CACHE_KEY="repMaps_v1";
+const REP_MAP_TTL_MS=60*60*1000; // 1 hour — reassignments are rare
 // Store drill-down data
 let drillData={};
 
@@ -721,7 +726,11 @@ async function readNPS(){
 async function readCRM(){
   try{
     const from=monthStart(),to=nowISO();
-    const[calls,visits,dealsOpen,dealsWon,dealsLost,allOpen,accounts,contacts]=await Promise.all([
+    // Accounts/contacts are NOT fetched here. They are only needed for the
+    // salesperson filter, are large tables, and change rarely — so they load
+    // in the background after first paint (see loadRepMaps below) rather than
+    // holding up every figure on the page.
+    const[calls,visits,dealsOpen,dealsWon,dealsLost,allOpen]=await Promise.all([
       crmAll(`/phonecalls?$select=subject,actualend,_ownerid_value,_regardingobjectid_value,new_meaningfulsalesinteraction&$filter=directioncode eq true and statecode eq 1 and new_meaningfulsalesinteraction eq true and actualend ge ${from} and actualend le ${to}&$orderby=actualend desc`),
       crmAll(`/new_sitevisitreports?$select=subject,actualend,createdon,_ownerid_value,_regardingobjectid_value,new_leadapp&$filter=new_leadapp eq true and createdon ge ${from}&$orderby=createdon desc`),
       crmAll(`/opportunities?$select=name,estimatedvalue,createdon,_ownerid_value,_parentaccountid_value&$filter=statecode eq 0 and createdon ge ${from} and createdon le ${to}&$orderby=estimatedvalue desc`),
@@ -729,50 +738,11 @@ async function readCRM(){
       crmAll(`/opportunities?$select=opportunityid&$filter=statecode eq 2 and actualclosedate ge ${from} and actualclosedate le ${to}`),
       // ALL open deals — not just this month — for true pipeline value
       crmAll(`/opportunities?$select=estimatedvalue,_parentaccountid_value&$filter=statecode eq 0`),
-      // Salesperson code sits on the ORGANISATION (account), so the full
-      // account list is needed to build accountid → code for the filter.
-      crmAll(`/accounts?$select=accountid,new_calculatedsalesperson`),
-      // Activities are often logged against a contact, so this resolves
-      // contact → parent account as a second hop.
-      crmAll(`/contacts?$select=contactid,_parentcustomerid_value`),
     ]);
 
-    // ── Salesperson code resolution ──────────────────────────────────────────
-    const acctToRep={};
-    for(const a of accounts){
-      const code=(a.new_calculatedsalesperson||"").trim();
-      if(a.accountid&&code)acctToRep[a.accountid.toLowerCase()]=code.toUpperCase();
-    }
-    const contactToAcct={};
-    for(const ct of contacts){
-      if(ct.contactid&&ct._parentcustomerid_value)
-        contactToAcct[ct.contactid.toLowerCase()]=ct._parentcustomerid_value.toLowerCase();
-    }
-    // regardingobjectid can point at an account, a contact, or something else,
-    // so the lookup's logical name decides how to follow it.
-    const repOf=r=>{
-      const direct=r._parentaccountid_value;
-      if(direct)return acctToRep[direct.toLowerCase()]||null;
-      const reg=r._regardingobjectid_value;
-      if(!reg)return null;
-      const kind=r["_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname"];
-      const id=reg.toLowerCase();
-      if(kind==="contact"){
-        const acct=contactToAcct[id];
-        return acct?(acctToRep[acct]||null):null;
-      }
-      return acctToRep[id]||(contactToAcct[id]?acctToRep[contactToAcct[id]]:null)||null;
-    };
-    const byRep=arr=>{
-      const map={};
-      for(const r of arr){
-        const code=repOf(r)||"Unassigned";
-        if(!map[code])map[code]={code,count:0,value:0};
-        map[code].count++;
-        map[code].value+=(r.estimatedvalue||0);
-      }
-      return Object.values(map).sort((a,b)=>b.count-a.count);
-    };
+    // Keep the raw records so the per-salesperson breakdowns can be computed
+    // later, once the account maps have loaded, without re-querying CRM.
+    crmRaw={calls,visits,dealsOpen,dealsWon,dealsLost,allOpen};
 
     // Aggregate by person
     const byPerson=(arr,nameField="_ownerid_value")=>{
@@ -796,22 +766,8 @@ async function readCRM(){
     drillData.dealsWon=dealsWon.sort((a,b)=>(b.estimatedvalue||0)-(a.estimatedvalue||0));
     drillData.dealsWonByPerson=byPerson(dealsWon);
 
-    // Win rate per code needs won and lost split the same way
-    const wonByRep=byRep(dealsWon),lostByRep=byRep(dealsLost);
-    const winRateByRep={};
-    for(const w of wonByRep)winRateByRep[w.code]={won:w.count,lost:0};
-    for(const l of lostByRep){
-      if(!winRateByRep[l.code])winRateByRep[l.code]={won:0,lost:0};
-      winRateByRep[l.code].lost=l.count;
-    }
-    for(const code of Object.keys(winRateByRep)){
-      const{won,lost}=winRateByRep[code];
-      winRateByRep[code].rate=(won+lost)>0?Math.round(won/(won+lost)*100):null;
-    }
-
     return{msiCalls:calls.length,siteVisits:visits.length,dealsOpened:dealsOpen.length,dealsWonCount:dealsWon.length,dealsWonValue:dealsWon.reduce((s,r)=>s+(r.estimatedvalue||0),0),winRate,pipelineValue,
-      callsByRep:byRep(calls),visitsByRep:byRep(visits),dealsOpenByRep:byRep(dealsOpen),
-      dealsWonByRep:wonByRep,pipelineByRep:byRep(allOpen),winRateByRep};
+      ...computeCrmByRep()};
   }catch(e){console.warn("CRM:",e.message);return{msiCalls:null,siteVisits:null,dealsOpened:null,dealsWonCount:null,winRate:null,pipelineValue:null};}
 }
 
@@ -1125,6 +1081,111 @@ function updateClock(){
 let ticker=null,cdSecs=300,autoOn=true,intMins=5;
 function restartCd(){clearInterval(ticker);cdSecs=intMins*60;ticker=setInterval(()=>{cdSecs--;if(cdSecs<=0&&autoOn)fetchData();},1000);}
 
+// ── ACCOUNT → SALESPERSON MAPS (loaded lazily, cached per session) ───────────
+// These two tables are large and change rarely, so fetching them on every
+// 5-minute refresh was the cause of the slow load. They now load once in the
+// background after first paint, and are cached in sessionStorage for an hour.
+async function loadRepMaps(){
+  // Cache hit — instant on refreshes and on returning to the tab
+  try{
+    const raw=sessionStorage.getItem(REP_MAP_CACHE_KEY);
+    if(raw){
+      const cached=JSON.parse(raw);
+      if(Date.now()-cached.at<REP_MAP_TTL_MS){
+        acctToRep=cached.acct; contactToAcct=cached.contact; repMapsReady=true;
+        return true;
+      }
+    }
+  }catch(e){/* corrupt cache — fall through and refetch */}
+
+  try{
+    // Only accounts that actually carry a code: everything else can never
+    // match, so fetching them is wasted payload.
+    const accounts=await crmAll(`/accounts?$select=accountid,new_calculatedsalesperson&$filter=new_calculatedsalesperson ne null`);
+    acctToRep={};
+    for(const a of accounts){
+      const code=(a.new_calculatedsalesperson||"").trim();
+      if(a.accountid&&code)acctToRep[a.accountid.toLowerCase()]=code.toUpperCase();
+    }
+
+    // Contacts are only needed if some activity is actually logged against a
+    // contact rather than an account. Check the already-fetched records first
+    // and skip the whole query when it isn't required.
+    const needsContacts=[...(crmRaw?.calls||[]),...(crmRaw?.visits||[])]
+      .some(r=>r["_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname"]==="contact");
+    contactToAcct={};
+    if(needsContacts){
+      const contacts=await crmAll(`/contacts?$select=contactid,_parentcustomerid_value&$filter=_parentcustomerid_value ne null`);
+      for(const ct of contacts){
+        if(ct.contactid&&ct._parentcustomerid_value)
+          contactToAcct[ct.contactid.toLowerCase()]=ct._parentcustomerid_value.toLowerCase();
+      }
+    }
+
+    try{
+      sessionStorage.setItem(REP_MAP_CACHE_KEY,JSON.stringify({at:Date.now(),acct:acctToRep,contact:contactToAcct}));
+    }catch(e){/* storage full — not fatal, just means no caching */}
+
+    repMapsReady=true;
+    return true;
+  }catch(e){
+    console.warn("Rep maps:",e.message);
+    return false;
+  }
+}
+
+// Resolve a record's salesperson code from whichever lookup it carries.
+function repOf(r){
+  if(!acctToRep)return null;
+  const direct=r._parentaccountid_value;
+  if(direct)return acctToRep[direct.toLowerCase()]||null;
+  const reg=r._regardingobjectid_value;
+  if(!reg)return null;
+  const kind=r["_regardingobjectid_value@Microsoft.Dynamics.CRM.lookuplogicalname"];
+  const id=reg.toLowerCase();
+  if(kind==="contact"){
+    const acct=contactToAcct?.[id];
+    return acct?(acctToRep[acct]||null):null;
+  }
+  return acctToRep[id]||(contactToAcct?.[id]?acctToRep[contactToAcct[id]]:null)||null;
+}
+
+// Build the per-code breakdowns from the raw records already in memory.
+// Returns empty when the maps aren't loaded yet, so the page renders without
+// them and picks them up on the next render.
+function computeCrmByRep(){
+  if(!repMapsReady||!crmRaw)return{};
+  const byRep=arr=>{
+    const map={};
+    for(const r of arr||[]){
+      const code=repOf(r)||"Unassigned";
+      if(!map[code])map[code]={code,count:0,value:0};
+      map[code].count++;
+      map[code].value+=(r.estimatedvalue||0);
+    }
+    return Object.values(map).sort((a,b)=>b.count-a.count);
+  };
+  const wonByRep=byRep(crmRaw.dealsWon),lostByRep=byRep(crmRaw.dealsLost);
+  const winRateByRep={};
+  for(const w of wonByRep)winRateByRep[w.code]={won:w.count,lost:0};
+  for(const l of lostByRep){
+    if(!winRateByRep[l.code])winRateByRep[l.code]={won:0,lost:0};
+    winRateByRep[l.code].lost=l.count;
+  }
+  for(const code of Object.keys(winRateByRep)){
+    const{won,lost}=winRateByRep[code];
+    winRateByRep[code].rate=(won+lost)>0?Math.round(won/(won+lost)*100):null;
+  }
+  return{
+    callsByRep:byRep(crmRaw.calls),
+    visitsByRep:byRep(crmRaw.visits),
+    dealsOpenByRep:byRep(crmRaw.dealsOpen),
+    dealsWonByRep:wonByRep,
+    pipelineByRep:byRep(crmRaw.allOpen),
+    winRateByRep,
+  };
+}
+
 // ── SALESPERSON FILTER ────────────────────────────────────────────────────────
 // Only NAV-sourced figures carry a salesperson code. The CRM cards are keyed
 // by owner NAME, and the remaining Data Dump figures are single company-wide
@@ -1147,6 +1208,14 @@ function applyRepFilter(code){
 function buildRepOptions(d){
   const sel=document.getElementById("repFilter");
   if(!sel)return;
+  // Disabled until the account maps have loaded, so nobody selects a code and
+  // sees zeros that look like real figures.
+  if(!repMapsReady){
+    sel.disabled=true;
+    sel.innerHTML='<option value="">Loading salespeople…</option>';
+    return;
+  }
+  sel.disabled=false;
   const names=d.repNames||{};
   const codes=Object.keys(names).length?Object.keys(names)
              :[...new Set((d.salesTodayByRep||[]).map(r=>r.code))];
@@ -1329,11 +1398,22 @@ async function fetchData(){
     // for the card totals.
     drillData.crmTargets=dd.crmTargets||null;
 
-    render({...dd,...nps,...crm,...nav,
+    const payload={...dd,...nps,...crm,...nav,
       callsTarget:    dd.crmTargets?.calls?.overall     ?? null,
       visitsTarget:   dd.crmTargets?.visits?.overall    ?? null,
       dealsOpenTarget:dd.crmTargets?.dealsOpen?.overall ?? null,
-    });
+    };
+    render(payload);
+
+    // Load the account→salesperson maps in the background, AFTER the page has
+    // painted. On a cache hit this is instant; on a cold load it takes a few
+    // seconds but nothing is blocked while it runs. Re-renders when ready so
+    // the filter becomes available without a manual refresh.
+    if(!repMapsReady){
+      loadRepMaps().then(ok=>{
+        if(ok&&lastData)render({...lastData,...computeCrmByRep()});
+      });
+    }
     setStatus("ok");document.getElementById("errb").style.display="none";
   }catch(e){
     setStatus("er");
