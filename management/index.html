@@ -804,6 +804,39 @@ function fmtTgtLine(actual,target){
 }
 
 // ── DRILL-DOWN ────────────────────────────────────────────────────────────────
+// ── DRILL-DOWN FILTERING ──────────────────────────────────────────────────────
+// The cards respect the salesperson filter, so the lists behind them must too
+// — otherwise a filtered total sits above an unfiltered list and the two
+// visibly disagree.
+
+// NAV lists (orders, shipped) carry a rep code on each row already.
+function filterByRep(rows){
+  if(!repFilter)return rows||[];
+  const code=repFilter.toUpperCase();
+  return (rows||[]).filter(r=>(r.rep||"").toUpperCase()===code);
+}
+
+// CRM lists are grouped by owner NAME, so they have to be rebuilt from the
+// raw records — filtering by the account's salesperson code, then regrouping.
+function byPersonFiltered(key){
+  const raw=crmRaw?.[key]||[];
+  const code=repFilter?repFilter.toUpperCase():null;
+  const map={};
+  for(const r of raw){
+    if(code&&(repOf(r)||"")!==code)continue;
+    const name=r["_ownerid_value@OData.Community.Display.V1.FormattedValue"]||r._ownerid_value||"Unknown";
+    if(!map[name])map[name]={name,count:0,value:0};
+    map[name].count++;
+    map[name].value+=(r.estimatedvalue||0);
+  }
+  return Object.values(map).sort((a,b)=>b.count-a.count);
+}
+
+// Suffix for modal titles so the active filter is never ambiguous
+function drillSuffix(){
+  return repFilter?` — ${repFilter}`:"";
+}
+
 function openDrill(type){
   const overlay=document.getElementById("drillOverlay");
   const title=document.getElementById("drillTitle");
@@ -852,21 +885,23 @@ function openDrill(type){
   };
 
   if(type==="calls"){
-    title.textContent="MSI Calls This Month — By Person";
-    const tgts=drillData.crmTargets?.calls?.byPerson||{};
-    const data=mergeWithTargets(drillData.calls||[],tgts);
+    title.textContent="MSI Calls This Month — By Person"+drillSuffix();
+    // Targets are per person and can't be apportioned to a code, so they are
+    // dropped while a filter is active rather than shown against a subset.
+    const tgts=repFilter?{}:(drillData.crmTargets?.calls?.byPerson||{});
+    const data=mergeWithTargets(byPersonFiltered("calls"),tgts);
     body.innerHTML=data.length?data.map((p,i)=>personTargetRow(i+1,p.name,p.count,tgts)).join(""):`<div class="modal-empty">No calls recorded this month</div>`;
   }
   else if(type==="visits"){
-    title.textContent="Site Visits This Month — By Person";
-    const tgts=drillData.crmTargets?.visits?.byPerson||{};
-    const data=mergeWithTargets(drillData.visits||[],tgts);
+    title.textContent="Site Visits This Month — By Person"+drillSuffix();
+    const tgts=repFilter?{}:(drillData.crmTargets?.visits?.byPerson||{});
+    const data=mergeWithTargets(byPersonFiltered("visits"),tgts);
     body.innerHTML=data.length?data.map((p,i)=>personTargetRow(i+1,p.name,p.count,tgts)).join(""):`<div class="modal-empty">No site visits recorded this month</div>`;
   }
   else if(type==="dealsOpen"){
-    title.textContent="Deals Opened This Month — By Person";
-    const tgts=drillData.crmTargets?.dealsOpen?.byPerson||{};
-    const data=mergeWithTargets(drillData.dealsOpen||[],tgts);
+    title.textContent="Deals Opened This Month — By Person"+drillSuffix();
+    const tgts=repFilter?{}:(drillData.crmTargets?.dealsOpen?.byPerson||{});
+    const data=mergeWithTargets(byPersonFiltered("dealsOpen"),tgts);
     body.innerHTML=data.length?data.map((p,i)=>{
       const norm=s=>(s||"").toString().trim().toLowerCase();
       const key=Object.keys(tgts).find(k=>norm(k)===norm(p.name));
@@ -885,8 +920,11 @@ function openDrill(type){
     }).join(""):`<div class="modal-empty">No deals opened this month</div>`;
   }
   else if(type==="dealsWon"){
-    title.textContent="Deals Won This Month";
-    const data=drillData.dealsWon||[];
+    title.textContent="Deals Won This Month"+drillSuffix();
+    // Individual deals rather than a per-person grouping, so filter on each
+    // deal's own account lookup.
+    const code=repFilter?repFilter.toUpperCase():null;
+    const data=(drillData.dealsWon||[]).filter(p=>!code||(repOf(p)||"")===code);
     body.innerHTML=data.length?data.map((p,i)=>{
       const org=p["_parentaccountid_value@OData.Community.Display.V1.FormattedValue"]||p.name||"Unknown organisation";
       const owner=p["_ownerid_value@OData.Community.Display.V1.FormattedValue"]||"Unknown";
@@ -895,7 +933,7 @@ function openDrill(type){
         <div class="modal-name" style="display:flex;flex-direction:column;align-items:flex-start;"><span>${org}</span><span style="font-size:10px;color:var(--mu);">${owner}</span></div>
         <div class="modal-val" style="color:var(--gr);">${GBP(p.estimatedvalue)}</div>
       </div>`;
-    }).join(""):`<div class="modal-empty">No deals won this month</div>`;
+    }).join(""):`<div class="modal-empty">No deals won this month${repFilter?" for "+repFilter:""}</div>`;
   }
   else if(type==="nps"){
     title.textContent="NPS — Latest Responses";
@@ -968,11 +1006,14 @@ function openDrill(type){
         const sub=isMargin
           ?(mPct!=null?`${mPct.toFixed(1)}% of ${GBP(r.sales)} sales`:"")
           :(r.margin?`Margin ${GBP(r.margin)}${mPct!=null?` &bull; ${mPct.toFixed(1)}%`:""}`:"");
+        // This list exists to compare codes, so it is NOT filtered down to a
+        // single row — the selected code is highlighted instead.
+        const isSelected=repFilter&&r.code.toUpperCase()===repFilter.toUpperCase();
         return`
-        <div class="modal-row" style="align-items:center;">
+        <div class="modal-row" style="align-items:center;${isSelected?"background:rgba(244,124,32,.12);border-color:rgba(244,124,32,.35);":""}">
           <div class="modal-rank">${i+1}</div>
           <div class="modal-name" style="display:flex;flex-direction:column;align-items:flex-start;">
-            <span style="${r.isOther?"color:var(--mu);":""}">${r.code}${r.name?` <span style="color:var(--mu);font-weight:400;font-size:10px;">${r.name}</span>`:""}</span>
+            <span style="${r.isOther?"color:var(--mu);":isSelected?"color:var(--or);":""}">${r.code}${r.name?` <span style="color:var(--mu);font-weight:400;font-size:10px;">${r.name}</span>`:""}</span>
             ${sub?`<span style="font-size:10px;color:var(--mu);">${sub}</span>`:""}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;">
@@ -984,13 +1025,13 @@ function openDrill(type){
     }
   }
   else if(type==="orders"){
-    title.textContent="Orders Today — Highest First";
+    title.textContent="Orders Today — Highest First"+drillSuffix();
     renderOrders("list");
   }
   else if(type==="shipped"){
-    title.textContent="Shipped Today — By Customer";
-    const data=drillData.shippedByCustomer||[];
-    if(!data.length){body.innerHTML=`<div class="modal-empty">No shipments recorded today</div>`;}
+    title.textContent="Shipped Today — By Customer"+drillSuffix();
+    const data=filterByRep(drillData.shippedByCustomer);
+    if(!data.length){body.innerHTML=`<div class="modal-empty">No shipments recorded today${repFilter?" for "+repFilter:""}</div>`;}
     else{
       const total=data.reduce((s,c)=>s+c.sales,0);
       const n=drillData.shippedCustomerCount||data.length;
@@ -1020,7 +1061,7 @@ function renderOrders(mode){
 
   let rowsHtml;
   if(mode==="cust"){
-    const data=drillData.ordersByCustomer||[];
+    const data=filterByRep(drillData.ordersByCustomer);
     rowsHtml=data.length?data.map((c,i)=>`
       <div class="modal-row">
         <div class="modal-rank">${i+1}</div>
@@ -1031,7 +1072,7 @@ function renderOrders(mode){
         <div class="modal-val" style="color:var(--cy);">${GBPd(c.value)}</div>
       </div>`).join(""):`<div class="modal-empty">No orders in yet today</div>`;
   }else{
-    const data=drillData.orderList||[];
+    const data=filterByRep(drillData.orderList);
     rowsHtml=data.length?data.map((o,i)=>`
       <div class="modal-row">
         <div class="modal-rank">${i+1}</div>
