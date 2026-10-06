@@ -768,7 +768,13 @@ async function readCRM(){
 
     return{msiCalls:calls.length,siteVisits:visits.length,dealsOpened:dealsOpen.length,dealsWonCount:dealsWon.length,dealsWonValue:dealsWon.reduce((s,r)=>s+(r.estimatedvalue||0),0),winRate,pipelineValue,
       ...computeCrmByRep()};
-  }catch(e){console.warn("CRM:",e.message);return{msiCalls:null,siteVisits:null,dealsOpened:null,dealsWonCount:null,winRate:null,pipelineValue:null};}
+  }catch(e){
+    console.warn("CRM:",e.message);
+    // Surface the reason rather than returning bare nulls. Blank cards with a
+    // target underneath read as "achieved nothing", which is a very different
+    // message from "couldn't reach Dynamics".
+    return{msiCalls:null,siteVisits:null,dealsOpened:null,dealsWonCount:null,winRate:null,pipelineValue:null,crmError:e.message};
+  }
 }
 
 // ── NAV DRILL-DOWN DATA ───────────────────────────────────────────────────────
@@ -1350,11 +1356,25 @@ function renderInner(d){
   document.getElementById("mOrdersBooked").textContent=INT(d.ordersBooked);
   document.getElementById("mNewCustTgt").innerHTML=fmtTgtLine(d.newCustomers,d.newCustomersTarget);
   document.getElementById("mCalls").textContent=INT(d.msiCalls);
-  document.getElementById("mCallsTgt").innerHTML=fmtTgtLine(d.msiCalls,d.callsTarget);
   document.getElementById("mVisits").textContent=INT(d.siteVisits);
-  document.getElementById("mVisitsTgt").innerHTML=fmtTgtLine(d.siteVisits,d.visitsTarget);
   document.getElementById("mDeals").textContent=INT(d.dealsOpened);
-  document.getElementById("mDealsTgt").innerHTML=fmtTgtLine(d.dealsOpened,d.dealsOpenTarget);
+  if(d.crmError){
+    // Replace the target lines with the failure reason — a target next to a
+    // blank figure is actively misleading.
+    const msg=`<span style="color:var(--am);">CRM unavailable</span>`;
+    document.getElementById("mCallsTgt").innerHTML=msg;
+    document.getElementById("mVisitsTgt").innerHTML=msg;
+    document.getElementById("mDealsTgt").innerHTML=msg;
+    const eb=document.getElementById("errb");
+    if(eb){
+      eb.style.display="block";
+      document.getElementById("errmsg").textContent="CRM data unavailable: "+d.crmError;
+    }
+  }else{
+    document.getElementById("mCallsTgt").innerHTML=fmtTgtLine(d.msiCalls,d.callsTarget);
+    document.getElementById("mVisitsTgt").innerHTML=fmtTgtLine(d.siteVisits,d.visitsTarget);
+    document.getElementById("mDealsTgt").innerHTML=fmtTgtLine(d.dealsOpened,d.dealsOpenTarget);
+  }
   document.getElementById("mDealsWon").textContent=INT(d.dealsWonCount);
   document.getElementById("mDealsWonVal").textContent=d.dealsWonValue?GBP(d.dealsWonValue)+" won":"";
   document.getElementById("mWinRate").textContent=d.winRate!=null?d.winRate+"%":"—";
