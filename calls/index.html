@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outbound Calls — Plus Packaging</title>
+<link rel="icon" href="/favicon.png">
+<style>
+  :root{
+    --nb:#0d1b38;--or:#f47c20;--gr:#34d399;--cy:#38bdf8;
+    --re:#f87171;--am:#fbbf24;--pu:#a78bfa;--mu:rgba(255,255,255,.45);
+    --ow:rgba(255,255,255,.88);--card:#13213f;--border:rgba(255,255,255,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--nb);color:var(--ow);min-height:100%}
+  body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0}
+
+  .nav{position:sticky;top:0;z-index:50;background:rgba(13,27,56,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:10px;height:46px}
+  .nav img{height:26px}
+  .nav-title{font-size:13px;font-weight:700;flex:1}
+  .nav-link{font-size:11px;color:var(--mu);text-decoration:none;padding:4px 8px;border-radius:6px;border:1px solid var(--border)}
+  .nav-link:hover{color:var(--ow)}
+  .btn{background:var(--or);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn:hover{opacity:.88}
+  .btn:disabled{opacity:.5;cursor:default}
+
+  main{position:relative;z-index:1;padding:16px;max-width:1100px;margin:0 auto}
+
+  /* Controls */
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;font-family:"Courier New",monospace;color:var(--mu)}
+  .field input,.field select{color-scheme:dark;background:#1a2a4a;color:var(--ow);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:12px;font-family:inherit}
+  .preset{background:rgba(255,255,255,.06);color:var(--mu);border:1px solid var(--border);border-radius:99px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:inherit}
+  .preset:hover{color:var(--ow);border-color:rgba(255,255,255,.25)}
+
+  .slbl{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
+  .slbl span{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:"Courier New",monospace;color:var(--mu);white-space:nowrap}
+  .slbll{flex:1;height:1px;background:var(--border)}
+
+  .grid{display:grid;gap:10px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-family:"Courier New",monospace;color:var(--mu);margin-bottom:3px}
+  .card-sub{font-size:10px;color:var(--mu);margin-bottom:6px}
+  .card-val{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1}
+  .c-hero{border-color:rgba(52,211,153,.3);background:linear-gradient(135deg,#0a1f14,#0d2a1c)}
+  .c-mu{background:linear-gradient(135deg,#131f3a,#18264a)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;font-family:"Courier New",monospace;color:var(--mu);padding:8px 10px;border-bottom:1px solid var(--border)}
+  th.num,td.num{text-align:right}
+  td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+  tbody tr:hover{background:rgba(255,255,255,.03)}
+  .rank{color:var(--mu);width:28px}
+
+  .bar-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+  .bar-label{font-size:11px;color:var(--mu);width:60px;flex-shrink:0}
+  .bar-track{flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,#1a8a5a,var(--gr));border-radius:4px;transition:width .5s}
+  .bar-val{font-size:11px;font-weight:700;width:52px;text-align:right;flex-shrink:0}
+
+  .note{font-size:11px;color:var(--mu);line-height:1.5;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px 12px;margin-top:8px}
+  .errb{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--re);display:none}
+  .loading{font-size:12px;color:var(--mu);font-style:italic;padding:20px 0}
+
+  @media(max-width:800px){.g3,.g4{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.g3,.g4{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <img src="/favicon.png">
+  <div class="nav-title">Outbound Calls &mdash; Connected</div>
+  <a href="/" class="nav-link">&#8592; Dashboards</a>
+</nav>
+
+<main>
+  <div class="errb" id="errb"></div>
+
+  <div class="controls">
+    <div class="field">
+      <label for="dFrom">From</label>
+      <input type="date" id="dFrom">
+    </div>
+    <div class="field">
+      <label for="dTo">To</label>
+      <input type="date" id="dTo">
+    </div>
+    <div class="field">
+      <label for="dMin">Min duration (sec)</label>
+      <input type="number" id="dMin" value="15" min="0" max="600" step="1" style="width:110px">
+    </div>
+    <button class="btn" id="btnRun" onclick="run()">Run</button>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+      <button class="preset" onclick="preset('mtd')">This month</button>
+      <button class="preset" onclick="preset('lastmonth')">Last month</button>
+      <button class="preset" onclick="preset('7d')">Last 7 days</button>
+      <button class="preset" onclick="preset('today')">Today</button>
+    </div>
+  </div>
+
+  <div id="results" style="display:none">
+
+    <div class="slbl"><span>Headline</span><div class="slbll"></div></div>
+    <div class="grid g4">
+      <div class="card c-hero">
+        <div class="card-label">Connected Calls</div>
+        <div class="card-sub" id="hSub">over 15s</div>
+        <div class="card-val" id="hQual" style="color:var(--gr);">&mdash;</div>
+      </div>
+      <div class="card c-mu">
+        <div class="card-label">All Connected</div>
+        <div class="card-sub">any duration</div>
+        <div class="card-val" id="hConn" style="color:var(--cy);">&mdash;</div>
+      </div>
+      <div class="card c-mu">
+        <div class="card-label">All Outbound</div>
+        <div class="card-sub">incl. unanswered</div>
+        <div class="card-val" id="hTotal" style="color:var(--mu);">&mdash;</div>
+      </div>
+      <div class="card c-mu">
+        <div class="card-label">Talk Time</div>
+        <div class="card-sub">qualifying calls</div>
+        <div class="card-val" id="hTime" style="color:var(--pu);">&mdash;</div>
+      </div>
+    </div>
+
+    <div class="slbl"><span>By Person</span><div class="slbll"></div></div>
+    <div class="card" style="padding:4px 6px">
+      <table>
+        <thead><tr>
+          <th class="rank"></th><th>Agent</th><th>Ext</th>
+          <th class="num">Calls</th><th class="num">Total time</th><th class="num">Avg</th>
+        </tr></thead>
+        <tbody id="peopleBody"></tbody>
+      </table>
+    </div>
+
+    <div class="slbl"><span>Validation &mdash; is 15s the right threshold?</span><div class="slbll"></div></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div class="card">
+        <div class="card-label" style="margin-bottom:8px">Duration spread</div>
+        <div class="card-sub" style="margin-bottom:8px">Connected calls only</div>
+        <div id="buckets"></div>
+      </div>
+      <div class="card">
+        <div class="card-label" style="margin-bottom:8px">Call results</div>
+        <div class="card-sub" style="margin-bottom:8px">All outbound in range</div>
+        <div id="resultsBreakdown"></div>
+        <div class="note" id="vmNote" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="slbl"><span>Longest calls &mdash; spot check against RingCentral</span><div class="slbll"></div></div>
+    <div class="card" style="padding:4px 6px">
+      <table>
+        <thead><tr>
+          <th>When</th><th>Agent</th><th>Number</th><th class="num">Duration</th>
+        </tr></thead>
+        <tbody id="sampleBody"></tbody>
+      </table>
+    </div>
+
+    <div class="note" id="truncNote" style="display:none"></div>
+  </div>
+
+  <div class="loading" id="loading" style="display:none">Fetching call log&hellip;</div>
+</main>
+
+<script>
+const RC_WORKER="https://rc-answer-time.darren-clayson.workers.dev";
+
+const iso=d=>d.toISOString().slice(0,10);
+const fmtDur=s=>{
+  if(s==null)return"—";
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h)return`${h}h ${m}m`;
+  if(m)return`${m}m ${sec}s`;
+  return`${sec}s`;
+};
+const INT=v=>v==null?"—":Number(v).toLocaleString("en-GB");
+
+function preset(kind){
+  const now=new Date();
+  let from,to=now;
+  if(kind==="mtd")       from=new Date(now.getFullYear(),now.getMonth(),1);
+  else if(kind==="lastmonth"){
+    from=new Date(now.getFullYear(),now.getMonth()-1,1);
+    to  =new Date(now.getFullYear(),now.getMonth(),0);
+  }
+  else if(kind==="7d")   from=new Date(now.getTime()-6*86400000);
+  else if(kind==="today")from=now;
+  document.getElementById("dFrom").value=iso(from);
+  document.getElementById("dTo").value=iso(to);
+  run();
+}
+
+async function run(){
+  const from=document.getElementById("dFrom").value;
+  const to=document.getElementById("dTo").value;
+  const min=document.getElementById("dMin").value||"15";
+  if(!from||!to){showErr("Pick both a from and a to date.");return;}
+  if(from>to){showErr("'From' is after 'to'.");return;}
+
+  const btn=document.getElementById("btnRun");
+  btn.disabled=true;btn.textContent="Running…";
+  document.getElementById("loading").style.display="block";
+  document.getElementById("errb").style.display="none";
+
+  try{
+    const url=`${RC_WORKER}/outbound-connected?from=${from}&to=${to}&min=${encodeURIComponent(min)}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(60000)});
+    const j=await r.json();
+    if(!r.ok||j.error)throw new Error(j.error||`Worker ${r.status}`);
+    render(j);
+    document.getElementById("results").style.display="block";
+  }catch(e){
+    showErr("Could not load call data: "+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent="Run";
+    document.getElementById("loading").style.display="none";
+  }
+}
+
+function showErr(msg){
+  const eb=document.getElementById("errb");
+  eb.textContent="⚠ "+msg;
+  eb.style.display="block";
+}
+
+function render(d){
+  document.getElementById("hSub").textContent=`over ${d.minSeconds}s`;
+  document.getElementById("hQual").textContent=INT(d.qualifyingCount);
+  document.getElementById("hConn").textContent=INT(d.connectedCount);
+  document.getElementById("hTotal").textContent=INT(d.totalOutbound);
+  document.getElementById("hTime").textContent=fmtDur(d.totalSeconds);
+
+  // People
+  const pb=document.getElementById("peopleBody");
+  pb.innerHTML=(d.byPerson||[]).length
+    ?d.byPerson.map((p,i)=>`<tr>
+        <td class="rank">${i+1}</td>
+        <td style="font-weight:600">${esc(p.name)}</td>
+        <td style="color:var(--mu)">${esc(p.ext||"—")}</td>
+        <td class="num" style="font-weight:800;color:var(--gr)">${INT(p.count)}</td>
+        <td class="num" style="color:var(--mu)">${fmtDur(p.seconds)}</td>
+        <td class="num" style="color:var(--mu)">${fmtDur(p.avgSeconds)}</td>
+      </tr>`).join("")
+    :`<tr><td colspan="6" style="color:var(--mu);font-style:italic;padding:16px 10px">No qualifying calls in this range</td></tr>`;
+
+  // Duration buckets — the threshold sanity check
+  const buckets=d.durationBuckets||{};
+  const maxB=Math.max(1,...Object.values(buckets));
+  document.getElementById("buckets").innerHTML=Object.entries(buckets).map(([label,n])=>{
+    // Dim the buckets that fall below the threshold so it's visually obvious
+    // how much activity the cut-off is excluding.
+    const below=(label==="0-5s")||(label==="6-15s"&&d.minSeconds>=15);
+    return`<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${n/maxB*100}%;${below?"background:rgba(255,255,255,.18)":""}"></div></div>
+      <div class="bar-val" style="${below?"color:var(--mu)":""}">${INT(n)}</div>
+    </div>`;
+  }).join("");
+
+  // Result spread — this is what exposes the voicemail question
+  const res=d.byResult||{};
+  const sorted=Object.entries(res).sort((a,b)=>b[1]-a[1]);
+  const maxR=Math.max(1,...Object.values(res));
+  document.getElementById("resultsBreakdown").innerHTML=sorted.map(([label,n])=>`
+    <div class="bar-row">
+      <div class="bar-label" style="width:auto;min-width:96px">${esc(label)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${n/maxR*100}%;${label!=="Call connected"?"background:linear-gradient(90deg,#8a6a1a,var(--am))":""}"></div></div>
+      <div class="bar-val">${INT(n)}</div>
+    </div>`).join("");
+
+  // Flag the voicemail risk explicitly — if no separate Voicemail result
+  // appears, voicemails are probably being counted as connected.
+  const vm=document.getElementById("vmNote");
+  const hasVoicemail=Object.keys(res).some(k=>/voicemail/i.test(k));
+  if(!hasVoicemail&&d.connectedCount>0){
+    vm.style.display="block";
+    vm.innerHTML="No separate <strong>Voicemail</strong> result appears in this range. Calls that reached an answerphone may be recorded as <strong>Call connected</strong> — worth spot-checking a few of the longest calls below before this replaces the MSI measure.";
+  }else{
+    vm.style.display="none";
+  }
+
+  // Sample
+  const sb=document.getElementById("sampleBody");
+  sb.innerHTML=(d.sample||[]).length
+    ?d.sample.map(s=>`<tr>
+        <td style="color:var(--mu)">${new Date(s.startTime).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</td>
+        <td>${esc(s.agent)}</td>
+        <td style="color:var(--mu)">${esc(s.to)}</td>
+        <td class="num" style="font-weight:700">${fmtDur(s.duration)}</td>
+      </tr>`).join("")
+    :`<tr><td colspan="4" style="color:var(--mu);font-style:italic;padding:16px 10px">Nothing to show</td></tr>`;
+
+  const tn=document.getElementById("truncNote");
+  if(d.truncated){
+    tn.style.display="block";
+    tn.textContent="⚠ This range returned more records than the worker will page through, so the figures above are incomplete. Narrow the date range.";
+  }else tn.style.display="none";
+}
+
+function esc(s){
+  return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+// Default to month-to-date on open
+preset("mtd");
+</script>
+</body>
+</html>
