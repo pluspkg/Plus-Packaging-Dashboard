@@ -69,11 +69,19 @@
   #fleet td:nth-child(2), #fleet td:nth-child(3), #fleet td:nth-child(6), #fleet td:nth-child(8), #fleet td:nth-child(9) { white-space: nowrap; }
   .drops { white-space: nowrap; }
   .drops .progress { width: 6rem; display: inline-block; vertical-align: middle; margin: 0 0 0 .5rem; }
+  .drop-note { display: block; font-size: .8rem; color: var(--muted); white-space: normal; }
   .small { font-size: .82rem; color: var(--muted); }
   .ahead { color: var(--blue); font-weight: 700; }
   .behind { color: var(--bad); font-weight: 700; }
   .fail { color: var(--bad); font-weight: 700; }
 
+  tr.run-row td { font-size: .86rem; color: var(--muted); padding-top: .25rem; padding-bottom: .25rem; background: #fbfcfe; }
+  tr.run-row td.run-label { padding-left: 1.6rem; color: var(--navy); font-weight: 700; white-space: nowrap; }
+  tr.run-row .pill { font-size: .75rem; }
+  .run-summary { display: none; }
+  .pill-run { font-size: .78rem; color: var(--muted); margin-left: .35rem; white-space: nowrap; }
+  .info { background: var(--light); color: var(--navy); border-left: 4px solid var(--blue); padding: .6rem 1rem; margin-bottom: 1rem; border-radius: 0 4px 4px 0; }
+  .info b { font-weight: 900; }
   .pill { display: inline-block; padding: .1rem .55rem; border-radius: 3px; font-size: .82rem; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
   .pill.out { background: var(--light); color: var(--blue); }
   .pill.returning { background: var(--navy); color: var(--white); }
@@ -108,7 +116,10 @@
     .kpi { border-right: 0; border-bottom: 1px solid var(--line); }
     .kpi.lead { grid-column: auto; }
     /* Fleet and report tables become cards rather than scrolling sideways */
+    table.cards, table.cards tbody { display: block; width: 100%; }
     table.cards thead { display: none; }
+    table.cards td.drops { white-space: normal; }
+    table.cards td .cv { min-width: 0; overflow-wrap: anywhere; }
     table.cards tr { display: block; border-bottom: 1px solid var(--line); padding: .5rem .2rem; }
     table.cards tr.group { border-bottom: 2px solid var(--navy); }
     table.cards td, table.cards th { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; border: 0; padding: .2rem .7rem; text-align: right; }
@@ -117,6 +128,10 @@
     table.cards td.lead-cell::before { content: none; }
     table.cards td.lead-cell .cv { display: flex; width: 100%; justify-content: space-between; align-items: center; }
     table.cards td.m-hide { display: none; }
+    table.cards tr.run-row { padding: .1rem .2rem .3rem; border-bottom: 0; }
+    table.cards tr.run-row td { display: none; }
+    table.cards tr.run-row td.run-summary { display: block; text-align: left; padding: .15rem .7rem .15rem 1.4rem; background: transparent; }
+    table.cards tr.run-row td.run-summary::before { content: none; }
     .m-only { display: inline-block !important; }
     .drops .progress { width: 4rem; }
   }
@@ -152,7 +167,7 @@
       <div class="panel">
         <div class="panel-head"><h2>Fleet today</h2><span class="note" id="today-note"></span></div>
         <div class="table-wrap"><table class="cards" id="fleet">
-          <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col">Run</th><th scope="col">Drops</th>
+          <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
             <th scope="col" class="n">Left</th><th scope="col">Schedule</th><th scope="col">Next stop or last job</th>
             <th scope="col">Back at Plus</th><th scope="col">Status</th></tr></thead>
           <tbody></tbody>
@@ -167,7 +182,7 @@
 
   <section id="view-period" hidden>
     <div class="panel period-bar" id="period-bar"></div>
-    <div class="banner" id="missing" hidden></div>
+    <div class="info" id="missing" hidden></div>
     <div class="panel kpis" id="period-kpis"></div>
     <div class="panel">
       <div class="panel-head"><h2>Completed drops per full-time van per day</h2><span class="note" id="chart-note"></span></div>
@@ -203,7 +218,8 @@
 (() => {
   const API = '/api/transport';
   const POLL_MS = 60 * 1000;
-  const STATUS = { out: 'Out', returning: 'Returning', back: 'Back', back_estimated: 'Back (estimated)',
+  const ACTIVE_STATUS = ['out', 'returning', 'late', 'no_data'];
+  const STATUS = { out: 'Out', returning: 'Returning', back: 'Back', back_estimated: 'Back (est.)',
                    not_departed: 'Not departed', late: 'Late', no_data: 'No data' };
   const TYPE = { full_time_van: 'Full-time van', truck: 'Truck', support: 'Support', temporary: 'Temporary or hire',
                  excluded: 'Excluded', unclassified: 'Not classified yet' };
@@ -261,6 +277,20 @@
     return run.planned_return ? `<span class="small">Plan ${esc(run.planned_return)}</span>` : '–';
   }
 
+  function dropsCell(x) {
+    const pct = x.planned_drops ? Math.round((x.completed_drops / x.planned_drops) * 100) : 0;
+    const notes = [];
+    if (x.failed_drops) notes.push(`<span class="fail">${x.failed_drops} failed</span>`);
+    if (x.closed_no_items) notes.push(`${x.closed_no_items} closed, no items recorded`);
+    return `<span class="num">${x.completed_drops} / ${x.planned_drops}</span><span class="progress" aria-hidden="true"><span style="width:${pct}%"></span></span>${notes.length ? `<span class="drop-note">${notes.join(', ')}</span>` : ''}`;
+  }
+  function runSummary(run) {
+    const back = run.status === 'back' && run.actual_return ? `back ${run.actual_return}`
+      : ['returning', 'back_estimated'].includes(run.status) && run.estimated_return ? `back about ${run.estimated_return}`
+      : run.status === 'out' ? `out, ${run.open_drops} left` : (STATUS[run.status] || run.status).toLowerCase();
+    return `<b>Run ${run.run_number}</b>: ${run.completed_drops} of ${run.planned_drops} drops, ${esc(back)}${run.driver ? `, ${esc(run.driver)}` : ''}`;
+  }
+
   function renderToday(d) {
     const h = d.headline;
     const pctDone = h.planned_drops ? Math.round((h.completed_drops / h.planned_drops) * 100) : 0;
@@ -275,7 +305,8 @@
         <div class="sub">${d.target !== null ? `Target ${fmt1(d.target)} for the day` : 'No target set'}</div></div>
       <div class="kpi"><div class="label">Vehicles out</div><div class="value">${fmtInt(h.vehicles_out)}</div>
         <div class="sub">${fmtInt(h.vehicles_returning)} returning</div></div>
-      <div class="kpi"><div class="label">Second runs</div><div class="value">${fmtInt(h.second_runs)}</div></div>
+      <div class="kpi"><div class="label">Runs today</div><div class="value">${fmtInt(h.runs)}</div>
+        <div class="sub">${fmtInt(h.second_runs)} second run${h.second_runs === 1 ? '' : 's'}</div></div>
       <div class="kpi"><div class="label">Failed deliveries</div><div class="value${h.failed_drops ? ' bad' : ''}">${fmtInt(h.failed_drops)}</div></div>`;
 
     const groups = [
@@ -290,17 +321,30 @@
       rows += `<tr class="group"><th colspan="9" scope="rowgroup">${label}</th></tr>`;
       for (const v of list) {
         const r = v.current;
-        const pct = v.planned_drops ? Math.round((v.completed_drops / v.planned_drops) * 100) : 0;
+        const multi = v.runs.length > 1;
         rows += `<tr>
-          <td class="lead-cell" data-label="Vehicle"><span class="cv"><span class="veh">${esc(v.vehicle)}</span><span class="pill ${r.status} m-only">${STATUS[r.status] || r.status}</span></span></td>
+          <td class="lead-cell" data-label="Vehicle"><span class="cv"><span class="veh">${esc(v.vehicle)}</span><span class="pill ${r.status} m-only">${STATUS[r.status] || r.status}${multi && ACTIVE_STATUS.includes(r.status) ? ` run ${r.run_number}` : ''}</span></span></td>
           <td data-label="Driver"><span class="cv">${esc(v.driver || '–')}</span></td>
-          <td data-label="Run" class="m-hide"><span class="cv">${r.run_number}${v.runs.length > 1 ? ` of ${v.runs.length}` : ''}</span></td>
-          <td data-label="Drops" class="drops"><span class="cv"><span class="num">${v.completed_drops} / ${v.planned_drops}</span><span class="progress" aria-hidden="true"><span style="width:${pct}%"></span></span>${v.failed_drops ? ` <span class="fail">${v.failed_drops} failed</span>` : ''}<span class="m-only small">&nbsp;${v.open_drops} left</span></span></td>
+          <td data-label="Runs" class="n"><span class="cv">${v.runs.length}</span></td>
+          <td data-label="Drops completed" class="drops"><span class="cv">${dropsCell(v)}<span class="m-only small">&nbsp;${v.open_drops} left</span></span></td>
           <td data-label="Left" class="n m-hide"><span class="cv">${v.open_drops}</span></td>
           <td data-label="Schedule"><span class="cv">${schedule(r)}</span></td>
           <td data-label="Next stop or last job"><span class="cv">${nextOrLast(r)}</span></td>
           <td data-label="Back at Plus"><span class="cv">${backAtPlus(r)}</span></td>
-          <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${r.status}">${STATUS[r.status] || r.status}</span></span></td></tr>`;
+          <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${r.status}">${STATUS[r.status] || r.status}</span>${multi && ACTIVE_STATUS.includes(r.status) ? `<span class="pill-run">run ${r.run_number}</span>` : ''}</span></td></tr>`;
+        if (multi) for (const run of v.runs) {
+          rows += `<tr class="run-row">
+            <td class="run-label">Run ${run.run_number}</td>
+            <td>${esc(run.driver || '–')}</td>
+            <td></td>
+            <td class="drops">${dropsCell(run)}</td>
+            <td class="n">${run.open_drops}</td>
+            <td>${schedule(run)}</td>
+            <td>${nextOrLast(run)}</td>
+            <td>${backAtPlus(run)}</td>
+            <td><span class="pill ${run.status}">${STATUS[run.status] || run.status}</span></td>
+            <td class="run-summary">${runSummary(run)}</td></tr>`;
+        }
       }
     }
     $('fleet').querySelector('tbody').innerHTML = rows || '<tr><td colspan="9" class="muted">No runs in MaxOptra for today yet.</td></tr>';
@@ -375,6 +419,21 @@
     return { from, to, label: 'Date range', note: to >= ukToday() ? 'today is still in progress' : '' };
   }
 
+  // 1 Jun, 2 Jun ... 28 Aug, 1 Oct ... 9 Oct  ->  "1 Jun to 28 Aug, 1 Oct to 9 Oct" (weekends don't break a run of days)
+  function dateRanges(dates) {
+    const fmt = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const out = [];
+    let start = dates[0], prev = dates[0];
+    for (const d of dates.slice(1).concat([null])) {
+      let next = addDays(prev, 1);
+      while (d && next < d && [0, 6].includes(new Date(next + 'T12:00:00Z').getUTCDay())) next = addDays(next, 1);
+      if (d && d === next) { prev = d; continue; }
+      out.push(start === prev ? fmt(start) : `${fmt(start)} to ${fmt(prev)}`);
+      start = d; prev = d;
+    }
+    return out.join(', ');
+  }
+
   function weightedTarget(daily) {
     let t = 0, n = 0;
     for (const d of daily) if (d.target !== null && d.van_days) { t += d.target * d.van_days; n += d.van_days; }
@@ -419,7 +478,7 @@
 
     $('missing').hidden = !r.missing_weekdays.length;
     $('missing').innerHTML = r.missing_weekdays.length
-      ? `<b>No MaxOptra data for ${r.missing_weekdays.length} weekday${r.missing_weekdays.length > 1 ? 's' : ''} in this period</b>: ${r.missing_weekdays.map(shortDate).join(', ')}. Bank holidays aside, import those days from the setup page so the averages are complete.` : '';
+      ? `<b>History still loading:</b> no data yet for ${r.missing_weekdays.length} weekday${r.missing_weekdays.length > 1 ? 's' : ''} (${dateRanges(r.missing_weekdays)}). The sync fills these in overnight, so averages for this period are partial until then.` : '';
 
     $('period-kpis').innerHTML = `
       <div class="kpi lead"><div class="label">Completed drops per full-time van per day</div>
@@ -440,29 +499,29 @@
     const vsT = (v) => (tgt && v !== null ? `<span class="${v - tgt.value < 0 ? 'behind' : 'ahead'}">${signed(v - tgt.value)}</span>` : '–');
     // Actual miles only exist on tracked days, so compare them with the plan for those same days (brief s.22)
     const miles = (v) => v.days_miles_tracked ? `${fmtInt(v.actual_miles)} <span class="small">vs ${fmtInt(v.planned_miles_tracked)} planned on the ${v.days_miles_tracked} tracked day${v.days_miles_tracked === 1 ? '' : 's'}</span>` : '<span class="small">Not tracked</span>';
-    $('vans').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Utilisation</th></tr></thead><tbody>` +
+    $('vans').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Utilisation</th></tr></thead><tbody>` +
       vans.map((v) => { const pd = per(v.completed_drops, v.days); return `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td>
-        <td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td>
+        <td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td><td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td>
         <td class="n" data-label="Per day"><b>${fmt1(pd)}</b></td><td class="n" data-label="Against target">${vsT(pd)}</td>
         <td class="n" data-label="Failed">${v.failed_drops ? `<span class="fail">${v.failed_drops}</span>` : 0}</td><td class="n" data-label="Second runs">${v.second_runs}</td>
         <td class="n" data-label="Planned miles">${fmtInt(v.planned_miles)}</td><td data-label="Actual miles">${miles(v)}</td>
         <td class="n" data-label="Average back">${hhmm(v.avg_return_minute)}</td><td class="n" data-label="Utilisation">${v.utilisation === null ? '–' : v.utilisation + '%'}</td></tr>`; }).join('') +
-      `<tr class="total"><td data-label="">All full-time vans</td><td class="n" data-label="Days">${vanDays}</td><td class="n" data-label="Completed drops">${fmtInt(vanDrops)}</td><td class="n" data-label="Per day">${fmt1(avg)}</td><td class="n" data-label="Against target">${vsT(avg)}</td><td colspan="6"></td></tr></tbody>`;
+      `<tr class="total"><td data-label="">All full-time vans</td><td class="n" data-label="Days">${vanDays}</td><td class="n" data-label="Runs">${fmtInt(sum(vans, 'runs'))}</td><td class="n" data-label="Completed drops">${fmtInt(vanDrops)}</td><td class="n" data-label="Per day">${fmt1(avg)}</td><td class="n" data-label="Against target">${vsT(avg)}</td><td colspan="6"></td></tr></tbody>`;
 
     const drivers = r.drivers.map((d) => ({ ...d, pd: per(d.completed_drops, d.days) })).sort((a, b) => b.pd - a.pd || b.days - a.days);
-    $('drivers').innerHTML = `<thead><tr><th class="n" scope="col">#</th><th scope="col">Driver</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th scope="col">Vans</th></tr></thead><tbody>` +
+    $('drivers').innerHTML = `<thead><tr><th class="n" scope="col">#</th><th scope="col">Driver</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th scope="col">Vans</th></tr></thead><tbody>` +
       (drivers.length ? drivers.map((d, i) => `<tr><td class="n" data-label="Rank">${i + 1}</td><td class="lead-cell" data-label="Driver"><b>${esc(d.driver)}</b></td>
-        <td class="n" data-label="Days">${d.days}</td><td class="n" data-label="Completed drops">${fmtInt(d.completed_drops)}</td><td class="n" data-label="Per day"><b>${fmt1(d.pd)}</b></td>
+        <td class="n" data-label="Days">${d.days}</td><td class="n" data-label="Runs">${fmtInt(d.runs)}</td><td class="n" data-label="Completed drops">${fmtInt(d.completed_drops)}</td><td class="n" data-label="Per day"><b>${fmt1(d.pd)}</b></td>
         <td class="n" data-label="Against target">${vsT(d.pd)}</td><td class="n" data-label="Failed">${d.failed_drops || 0}</td><td class="n" data-label="Second runs">${d.second_runs || 0}</td>
-        <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="9" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
+        <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
 
-    $('trucks').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Average day</th><th class="n" scope="col">Utilisation</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th></tr></thead><tbody>` +
-      (trucks.length ? trucks.map((v) => `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td><td class="n" data-label="Days">${v.days}</td>
+    $('trucks').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Average day</th><th class="n" scope="col">Utilisation</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th></tr></thead><tbody>` +
+      (trucks.length ? trucks.map((v) => `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td><td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td>
         <td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td><td class="n" data-label="Per day">${fmt1(per(v.completed_drops, v.days))}</td>
         <td class="n" data-label="Average day"><b>${hours(v.avg_day_minutes)}</b></td><td class="n" data-label="Utilisation"><b>${v.utilisation === null ? '–' : v.utilisation + '%'}</b></td>
         <td class="n" data-label="Average back">${hhmm(v.avg_return_minute)}</td><td class="n" data-label="Second runs">${v.second_runs}</td>
         <td class="n" data-label="Planned miles">${fmtInt(v.planned_miles)}</td><td data-label="Actual miles">${miles(v)}</td></tr>`).join('')
-        : '<tr><td colspan="10" class="muted">No truck runs in this period.</td></tr>') + '</tbody>';
+        : '<tr><td colspan="11" class="muted">No truck runs in this period.</td></tr>') + '</tbody>';
 
     $('others').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th scope="col">Type</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Failed</th></tr></thead><tbody>` +
       (others.length ? others.map((v) => `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td><td data-label="Type">${esc(TYPE[v.vehicle_type] || v.vehicle_type)}</td>

@@ -200,6 +200,7 @@ const LIVE_RUNS = `
     (count(s.stop_key) filter (where s.is_drop and s.completed))::int as completed_drops,
     (count(s.stop_key) filter (where s.is_drop and s.failed))::int as failed_drops,
     (count(s.stop_key) filter (where s.is_drop and not s.done))::int as open_drops,
+    (count(s.stop_key) filter (where s.is_drop and s.done and not s.completed and not s.failed))::int as closed_no_items,
     min(s.act_arr)::text as first_arrival,
     (max(s.act_dep) filter (where s.done))::text as last_departure,
     ((array_agg(s.planned_arrival order by s.seq desc nulls last) filter (where s.done and s.act_arr is not null))[1])::text as last_done_planned,
@@ -223,13 +224,15 @@ const NO_DATA_AFTER = 60;       // ...and after this long: No data (the driver a
 const BACK_AFTER_ESTIMATE = 30; // returning, and this long past the estimated return: treated as back
 
 export function runState(run, now) {
+  // MaxOptra sometimes records a return earlier than the run's last job (seen on second runs): ignore it.
+  const actualEnd = run.actual_end && (!run.last_departure || run.actual_end >= run.last_departure) ? run.actual_end : null;
   const leg = minutesBetween(run.last_stop_planned_departure, run.planned_end);
   const estimatedReturn = run.stops > 0 && run.stops_open === 0 && run.last_departure && leg !== null && leg >= 0 && leg <= 300
     ? addMinutes(run.last_departure, leg) : null;
   const started = Boolean(run.actual_departure || run.first_arrival || run.stops_open < run.stops);
   let status;
   let variance = null;                           // minutes: positive = ahead of plan
-  if (run.actual_end) status = 'back';
+  if (actualEnd) status = 'back';
   else if (run.stops > 0 && run.stops_open === 0) {
     status = estimatedReturn && minutesBetween(estimatedReturn, now) > BACK_AFTER_ESTIMATE ? 'back_estimated' : 'returning';
   } else if (!started) {
@@ -238,42 +241,52 @@ export function runState(run, now) {
     else if (late < NO_DATA_AFTER) { status = 'late'; variance = -late; }
     else status = 'no_data';
   } else status = 'out';
+  // Left but nothing reported since, and well past the planned return: the driver app isn't being used
+  if (status === 'out' && run.stops_open === run.stops && run.planned_end && minutesBetween(run.planned_end, now) > NO_DATA_AFTER) status = 'no_data';
   if (status === 'out') {
+    // still out: the next stop's ETA against its planned arrival, else the last stop reached
     if (run.next_eta && run.next_planned) variance = minutesBetween(run.next_eta, run.next_planned);
     else if (run.last_done_actual && run.last_done_planned) variance = minutesBetween(run.last_done_actual, run.last_done_planned);
-  } else if (['returning', 'back', 'back_estimated'].includes(status) && run.last_done_actual && run.last_done_planned) {
-    variance = minutesBetween(run.last_done_actual, run.last_done_planned);
+  } else if (['returning', 'back', 'back_estimated'].includes(status) && run.planned_end) {
+    // finished: back at Plus (actual, else estimated) against the planned return
+    const back = actualEnd || estimatedReturn;
+    if (back) variance = minutesBetween(back, run.planned_end);
   }
-  return { status, variance, estimated_return: estimatedReturn };
+  return { status, variance, estimated_return: estimatedReturn, actual_end: actualEnd };
 }
 
-const STATUS_ORDER = ['out', 'returning', 'late', 'no_data', 'not_departed', 'back_estimated', 'back'];
+const ACTIVE = ['out', 'returning', 'late', 'no_data'];
 
 export function buildLive(runs, now) {
   const vehicles = new Map();
   for (const r of runs) {
     const state = runState(r, now);
-    const run = { run_number: r.run_number, driver: r.driver, ...state,
-      planned_drops: r.planned_drops, completed_drops: r.completed_drops, failed_drops: r.failed_drops, open_drops: r.open_drops,
+    const run = { run_number: r.run_number, driver: r.driver, status: state.status, variance: state.variance,
+      planned_drops: r.planned_drops, completed_drops: r.completed_drops, failed_drops: r.failed_drops,
+      open_drops: r.open_drops, closed_no_items: r.closed_no_items,
       planned_departure: clock(r.planned_departure), actual_departure: clock(r.actual_departure),
-      planned_return: clock(r.planned_end), actual_return: clock(r.actual_end),
+      planned_return: clock(r.planned_end), actual_return: clock(state.actual_end),
       estimated_return: clock(state.estimated_return), last_job: clock(r.last_departure),
       next_client: r.next_client, next_due: clock(r.next_eta || r.next_planned) };
     if (!vehicles.has(r.vehicle_id)) vehicles.set(r.vehicle_id, { vehicle: r.vehicle, vehicle_type: r.vehicle_type, in_kpi: r.in_kpi, runs: [] });
     vehicles.get(r.vehicle_id).runs.push(run);
   }
   const list = [...vehicles.values()].map((v) => {
-    const current = [...v.runs].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || a.run_number - b.run_number)[0];
+    v.runs.sort((a, b) => a.run_number - b.run_number);
+    const current = v.runs.filter((r) => ACTIVE.includes(r.status)).sort((a, b) => ACTIVE.indexOf(a.status) - ACTIVE.indexOf(b.status) || a.run_number - b.run_number)[0]
+      || v.runs.find((r) => r.status === 'not_departed')
+      || v.runs[v.runs.length - 1];
     const sum = (k) => v.runs.reduce((t, r) => t + (r[k] || 0), 0);
-    const first = v.runs[0];
     return { ...v, current, driver: current.driver,
-      planned_drops: sum('planned_drops'), completed_drops: sum('completed_drops'), failed_drops: sum('failed_drops'), open_drops: sum('open_drops'),
-      first_departure: first.actual_departure, first_departure_planned: first.planned_departure,
+      drivers: [...new Set(v.runs.map((r) => r.driver).filter(Boolean))],
+      run_count: v.runs.length,
+      runs_finished: v.runs.filter((r) => ['back', 'back_estimated', 'returning'].includes(r.status)).length,
+      planned_drops: sum('planned_drops'), completed_drops: sum('completed_drops'), failed_drops: sum('failed_drops'),
+      open_drops: sum('open_drops'), closed_no_items: sum('closed_no_items'),
       last_job: v.runs.map((r) => r.last_job).filter(Boolean).sort().pop() || null,
       second_runs: v.runs.filter((r) => r.run_number >= 2).length };
   });
   const vans = list.filter((v) => v.vehicle_type === 'full_time_van' && v.in_kpi && v.planned_drops > 0);
-  const out = list.filter((v) => ['out', 'returning', 'late', 'no_data'].includes(v.current.status));
   const sum = (arr, k) => arr.reduce((t, x) => t + (x[k] || 0), 0);
   return {
     vehicles: list,
@@ -283,8 +296,9 @@ export function buildLive(runs, now) {
       van_count: vans.length, van_completed: sum(vans, 'completed_drops'),
       vans_active: list.filter((v) => ['full_time_van', 'support'].includes(v.vehicle_type)).length,
       trucks_active: list.filter((v) => v.vehicle_type === 'truck').length,
-      vehicles_out: out.length, vehicles_returning: list.filter((v) => v.current.status === 'returning').length,
-      second_runs: sum(list, 'second_runs'),
+      vehicles_out: list.filter((v) => ['out', 'returning', 'late', 'no_data'].includes(v.current.status)).length,
+      vehicles_returning: list.filter((v) => v.current.status === 'returning').length,
+      runs: sum(list, 'run_count'), second_runs: sum(list, 'second_runs'),
     },
   };
 }
@@ -317,10 +331,12 @@ async function live(sql) {
     },
     target: target[0] && target[0].target !== null ? Number(target[0].target) : null,
     ...buildLive(runs, now.stamp),
-    events: events.map((e) => ({ id: Number(e.id), ...e.detail,
-      last_job_at: clock(e.detail.last_job_at && e.detail.last_job_at.replace('T', ' ')),
-      estimated_return: clock(e.detail.estimated_return && e.detail.estimated_return.replace('T', ' ')),
-      actual_return: clock(e.detail.actual_return && e.detail.actual_return.replace('T', ' ')) })),
+    events: events.map((e) => {
+      const t = (k) => (e.detail[k] ? String(e.detail[k]).replace('T', ' ') : null);
+      const actual = t('actual_return') && t('last_job_at') && t('actual_return') < t('last_job_at') ? null : t('actual_return');
+      return { id: Number(e.id), ...e.detail, last_job_at: clock(t('last_job_at')),
+               estimated_return: clock(t('estimated_return')), actual_return: clock(actual) };
+    }),
   });
 }
 
@@ -339,7 +355,7 @@ async function report(url, sql) {
       select vehicle, maxoptra_name, vehicle_type, hours_profile, bool_or(in_kpi) as in_kpi,
         (count(*) filter (where operated))::int as days,
         sum(planned_drops)::int as planned_drops, sum(completed_drops)::int as completed_drops,
-        sum(failed_drops)::int as failed_drops, sum(second_runs)::int as second_runs,
+        sum(failed_drops)::int as failed_drops, sum(runs)::int as runs, sum(second_runs)::int as second_runs,
         sum(second_run_completed_drops)::int as second_run_drops,
         round(sum(planned_miles), 1)::float8 as planned_miles,
         round(sum(actual_miles), 1)::float8 as actual_miles,
@@ -355,12 +371,15 @@ async function report(url, sql) {
       group by vehicle, maxoptra_name, vehicle_type, hours_profile
       order by vehicle`, [from, to]),
     sql.query(`
-      select driver_id, driver, (count(distinct run_date))::int as days, sum(completed_drops)::int as completed_drops,
-        sum(failed_drops)::int as failed_drops, sum(second_runs)::int as second_runs,
-        string_agg(distinct vehicle, ', ') as vehicles
-      from transport.v_driver_day
-      where run_date between $1 and $2 and vehicle_type = 'full_time_van' and driver_in_kpi
-      group by driver_id, driver`, [from, to]),
+      select s.driver_id, d.name as driver, (count(distinct s.run_date))::int as days, (count(distinct s.run_key))::int as runs,
+        (count(*) filter (where s.completed))::int as completed_drops, (count(*) filter (where s.failed))::int as failed_drops,
+        (count(distinct s.run_key) filter (where s.run_number >= 2))::int as second_runs,
+        string_agg(distinct coalesce(v.display_name, v.maxoptra_name), ', ') as vehicles
+      from transport.v_drop_stops s
+      join transport.drivers d on d.id = s.driver_id
+      join transport.vehicles v on v.id = s.vehicle_id
+      where s.run_date between $1 and $2 and v.vehicle_type = 'full_time_van' and d.kpi_included
+      group by s.driver_id, d.name`, [from, to]),
     sql.query(`
       select s.run_date::text as date, coalesce(v.display_name, v.maxoptra_name) as vehicle, d.name as driver,
              s.client_name, s.fail_reasons
