@@ -127,8 +127,12 @@
       animation: fadeUp 0.45s ease both;
     }
 
-    .card:nth-child(2) { animation-delay: 0.1s; }
-    .card:nth-child(3) { animation-delay: 0.2s; }
+    .card:nth-child(2) { animation-delay: 0.05s; }
+    .card:nth-child(3) { animation-delay: 0.1s; }
+    .card:nth-child(4) { animation-delay: 0.15s; }
+    .card:nth-child(5) { animation-delay: 0.2s; }
+    .card:nth-child(6) { animation-delay: 0.25s; }
+    .card:nth-child(7) { animation-delay: 0.3s; }
 
     .card:hover {
       transform: translateY(-5px);
@@ -142,6 +146,10 @@
     .card--pipeline .card-top { background: #1f1208; }
     .card--management:hover { border-color: #a78bfa; }
     .card--management .card-top { background: #1a0d38; }
+    .card--transport:hover  { border-color: #003da5; }
+    .card--transport .card-top { background: #003da5; }
+    .card--calls:hover      { border-color: #9ea2a2; }
+    .card--calls .card-top  { background: #33393f; }
 
     .card-top {
       background: var(--navy);
@@ -266,21 +274,36 @@
     }
 
     @media (max-width: 680px) {
-      .header { padding: 12px 16px; }
-      .logo { height: 38px; }
+      .header { padding: 10px 16px; }
+      .logo { height: 34px; }
       .header-label { font-size: 10px; }
-      .hero { padding: 32px 16px 72px; }
-      .hero h1 { font-size: 22px; }
+      .hero { padding: 22px 16px 44px; }
+      .hero h1 { font-size: 20px; margin-bottom: 4px; }
       .hero p { font-size: 13px; }
-      .amber-bar { height: 36px; }
-      .cards-section { padding: 24px 16px 40px; }
-      .cards { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin: 0 auto; }
-      .card { width: 100%; }
-      .card-top { padding: 16px 18px 14px; }
-      .card-body { padding: 16px 18px; gap: 12px; }
-      .card-desc { font-size: 13px; }
-      .card-cta { padding: 11px 18px; font-size: 13px; }
+      .hero::after { height: 26px; }
+      .amber-bar { height: 18px; }
+      .cards-section { padding: 16px 12px 28px; }
+      .cards { flex-direction: column; align-items: stretch; width: 100%; max-width: 480px; margin: 0 auto; gap: 10px; }
+      .card { width: 100%; border-width: 1px; animation: none; }
+      .card-top { padding: 12px 14px; gap: 12px; }
+      .card-top::after {                       /* a chevron shows the whole row opens the dashboard */
+        content: ''; margin-left: auto; flex-shrink: 0;
+        width: 9px; height: 9px; border-top: 2.5px solid var(--amber); border-right: 2.5px solid var(--amber);
+        transform: rotate(45deg);
+      }
+      .card-icon { width: 36px; height: 36px; }
+      .card-icon svg { width: 18px; height: 18px; }
+      .card-num { font-size: 9px; margin-bottom: 1px; }
+      .card-title { font-size: 17px; }
+      .card-body { padding: 10px 14px 12px; gap: 0; }
+      .card-desc { font-size: 13px; line-height: 1.45; }
+      .card-tags, .card-cta { display: none; }
       .footer { font-size: 10px; padding: 14px; }
+    }
+
+    /* Touch screens have no hover: don't leave a card lifted after a tap */
+    @media (hover: none) {
+      .card:hover { transform: none; box-shadow: none; }
     }
 
     @media (max-width: 380px) {
@@ -436,6 +459,58 @@
             <span class="tag">Win Rate</span>
             <span class="tag">NPS</span>
             <span class="tag">Inventory</span>
+          </div>
+        </div>
+        <div class="card-cta">
+          Open Dashboard
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+      <a class="card card--transport" href="./transport/">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 000-7h-11a3.5 3.5 0 010-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+          </div>
+          <div>
+            <div class="card-num">Dashboard 06</div>
+            <div class="card-title">Transport</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="card-desc">Live vans and trucks from MaxOptra: drops completed and left, ahead or behind schedule, returns to Plus, mileage and estimated cost.</p>
+          <div class="card-tags">
+            <span class="tag">Live Fleet</span>
+            <span class="tag">Drops per Van</span>
+            <span class="tag">Runs</span>
+            <span class="tag">Mileage</span>
+            <span class="tag">Est. Cost</span>
+            <span class="tag">Failed Deliveries</span>
+          </div>
+        </div>
+        <div class="card-cta">
+          Open Dashboard
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+      <a class="card card--calls" href="./calls/">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><polyline points="23 7 23 1 17 1"/><line x1="16" y1="8" x2="23" y2="1"/><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z"/></svg>
+          </div>
+          <div>
+            <div class="card-num">Dashboard 07</div>
+            <div class="card-title">Calls</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="card-desc">Outbound calls from RingCentral that connected for longer than the threshold, by salesperson.</p>
+          <div class="card-tags">
+            <span class="tag">RingCentral</span>
+            <span class="tag">Outbound Calls</span>
+            <span class="tag">Connected Calls</span>
+            <span class="tag">By Salesperson</span>
           </div>
         </div>
         <div class="card-cta">

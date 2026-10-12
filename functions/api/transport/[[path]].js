@@ -194,6 +194,7 @@ const LIVE_RUNS = `
     (v.kpi_included and (v.kpi_from is null or r.run_date >= v.kpi_from) and (v.kpi_to is null or r.run_date <= v.kpi_to)) as in_kpi,
     d.name as driver,
     r.planned_departure::text, r.actual_departure::text, r.planned_end::text, r.actual_end::text,
+    r.planned_distance::float8 as planned_miles, r.actual_distance::float8 as actual_miles, r.run_cost::float8 as est_cost,
     count(s.stop_key)::int as stops,
     (count(s.stop_key) filter (where not s.done))::int as stops_open,
     (count(s.stop_key) filter (where s.is_drop))::int as planned_drops,
@@ -215,7 +216,8 @@ const LIVE_RUNS = `
   left join s on s.run_key = r.run_key
   where r.run_date = $1 and r.removed_at is null
   group by r.run_key, r.run_number, r.vehicle_id, v.display_name, v.maxoptra_name, v.vehicle_type, v.kpi_included,
-           v.kpi_from, v.kpi_to, r.run_date, d.name, r.planned_departure, r.actual_departure, r.planned_end, r.actual_end
+           v.kpi_from, v.kpi_to, r.run_date, d.name, r.planned_departure, r.actual_departure, r.planned_end, r.actual_end,
+           r.planned_distance, r.actual_distance, r.run_cost
   order by 4, r.run_number`;
 
 // Every stop (customer visit) on a day, for the drill-downs. Several orders at one stop are one row.
@@ -321,7 +323,8 @@ export function buildLive(runs, now) {
       planned_departure: clock(r.planned_departure), actual_departure: clock(r.actual_departure),
       planned_return: clock(r.planned_end), actual_return: clock(state.actual_end),
       estimated_return: clock(state.estimated_return), last_job: clock(r.last_departure),
-      next_client: r.next_client, next_due: clock(r.next_eta || r.next_planned) };
+      next_client: r.next_client, next_due: clock(r.next_eta || r.next_planned),
+      planned_miles: r.planned_miles, actual_miles: r.actual_miles, est_cost: r.est_cost };
     if (!vehicles.has(r.vehicle_id)) vehicles.set(r.vehicle_id, { vehicle: r.vehicle, vehicle_type: r.vehicle_type, in_kpi: r.in_kpi, runs: [] });
     vehicles.get(r.vehicle_id).runs.push(run);
   }
@@ -337,6 +340,9 @@ export function buildLive(runs, now) {
       runs_finished: v.runs.filter((r) => ['back', 'back_estimated', 'returning'].includes(r.status)).length,
       planned_drops: sum('planned_drops'), completed_drops: sum('completed_drops'), failed_drops: sum('failed_drops'),
       open_drops: sum('open_drops'), closed_no_items: sum('closed_no_items'),
+      planned_miles: sum('planned_miles'), est_cost: sum('est_cost'),
+      actual_miles: v.runs.some((r) => r.actual_miles !== null) ? sum('actual_miles') : null,
+      runs_with_actual_miles: v.runs.filter((r) => r.actual_miles !== null).length,
       last_job: v.runs.map((r) => r.last_job).filter(Boolean).sort().pop() || null,
       second_runs: v.runs.filter((r) => r.run_number >= 2).length };
   });
@@ -353,6 +359,8 @@ export function buildLive(runs, now) {
       vehicles_out: list.filter((v) => ['out', 'returning', 'late', 'no_data'].includes(v.current.status)).length,
       vehicles_returning: list.filter((v) => v.current.status === 'returning').length,
       runs: sum(list, 'run_count'), second_runs: sum(list, 'second_runs'),
+      planned_miles: sum(list, 'planned_miles'), est_cost: sum(list, 'est_cost'),
+      actual_miles: sum(list, 'actual_miles'), runs_with_actual_miles: sum(list, 'runs_with_actual_miles'),
     },
   };
 }
@@ -474,7 +482,7 @@ async function report(url, sql) {
   if (!isDate(from) || !isDate(to) || from > to) return fail(400, 'Give from and to as YYYY-MM-DD, from before to');
   if ((Date.parse(to) - Date.parse(from)) / 86400000 > 400) return fail(400, 'Choose a range of 400 days or less');
 
-  const [vehicles, drivers, failures, daily, missing, hours, vehicleDaily] = await Promise.all([
+  const [vehicles, drivers, failures, daily, missing, hours, vehicleDaily, costs] = await Promise.all([
     sql.query(`
       select vehicle, maxoptra_name, vehicle_type, hours_profile, bool_or(in_kpi) as in_kpi,
         (count(*) filter (where operated))::int as days,
@@ -541,7 +549,19 @@ async function report(url, sql) {
       from transport.v_vehicle_day
       where run_date between $1 and $2 and operated
       order by run_date, vehicle`, [from, to]),
+    // MaxOptra's run cost: its time and mileage rates applied to each planned run
+    sql.query(`
+      select coalesce(v.display_name, v.maxoptra_name) as vehicle, sum(r.run_cost)::float8 as est_cost,
+             (count(*) filter (where r.run_cost is not null))::int as runs_costed
+      from transport.runs r join transport.vehicles v on v.id = r.vehicle_id
+      where r.run_date between $1 and $2 and r.removed_at is null
+      group by 1`, [from, to]),
   ]);
+  const costBy = Object.fromEntries(costs.map((c) => [c.vehicle, c]));
+  for (const v of vehicles) {
+    v.est_cost = costBy[v.vehicle] ? costBy[v.vehicle].est_cost : null;
+    v.runs_costed = costBy[v.vehicle] ? costBy[v.vehicle].runs_costed : 0;
+  }
   // Utilisation (brief s.24): estimated working time (loading allowance + first departure to return, less the
   // break) against the scheduled net day for vans or trucks.
   const hoursBy = Object.fromEntries(hours.map((h) => [h.applies_to, h]));
