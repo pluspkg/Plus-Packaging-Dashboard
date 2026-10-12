@@ -218,6 +218,60 @@ const LIVE_RUNS = `
            v.kpi_from, v.kpi_to, r.run_date, d.name, r.planned_departure, r.actual_departure, r.planned_end, r.actual_end
   order by 4, r.run_number`;
 
+// Every stop (customer visit) on a day, for the drill-downs. Several orders at one stop are one row.
+const STOPS = `
+  select o.run_key, o.stop_key,
+    min(o.sequence) as seq,
+    max(o.client_name) as client, max(o.location_name) as location, max(o.location_postcode) as postcode,
+    bool_or(o.task = 'DROP') as is_drop,
+    count(*)::int as orders, string_agg(o.order_ref, ', ' order by o.order_ref) as order_refs,
+    min(o.planned_arrival)::text as planned_arrival,
+    min(o.eta)::text as eta,
+    min(coalesce(o.gps_arrival, o.reported_arrival))::text as arrived,
+    max(coalesce(o.gps_departure, o.reported_departure))::text as departed,
+    min(o.window_start)::text as window_start, max(o.window_end)::text as window_end,
+    coalesce(bool_or(o.completion_status in ('FULLY_DELIVERED', 'PARTIALLY_DELIVERED')), false) as completed,
+    coalesce(bool_or(o.order_status = 'FAILED' or o.fail_reason is not null), false) as any_failed,
+    bool_and(coalesce(o.order_status in ('CLOSED', 'FAILED') or o.completion_status in ('FULLY_DELIVERED', 'PARTIALLY_DELIVERED'), false)) as done,
+    string_agg(distinct o.fail_reason, '; ') as fail_reason,
+    string_agg(distinct o.fail_comment, '; ') as fail_comment
+  from transport.orders o
+  where o.run_date = $1 and o.removed_at is null
+  group by o.run_key, o.stop_key
+  order by o.run_key, 3`;
+
+// One stop, ready to show: times as HH:MM, minutes on site, arrival against plan and the customer's window.
+export function mapStop(s, now) {
+  const onSite = s.arrived && s.departed ? minutesBetween(s.arrived, s.departed) : null;
+  const windowStart = s.window_start ? s.window_start.slice(11, 16) : null;
+  const windowEnd = s.window_end ? s.window_end.slice(11, 16) : null;
+  const anyTime = windowStart === '00:00' && (windowEnd === '23:59' || windowEnd === '00:00');
+  const arrivedClock = clock(s.arrived);
+  // Arriving before the customer's window opens and arriving after it closes are different problems.
+  const windowFlag = !arrivedClock || anyTime ? null
+    : windowStart && arrivedClock < windowStart ? 'before'
+    : windowEnd && windowEnd !== '00:00' && arrivedClock > windowEnd ? 'after' : null;
+  let status;
+  if (s.completed) status = s.is_drop ? 'delivered' : 'collected';
+  else if (s.any_failed) status = 'failed';
+  else if (s.done) status = 'closed_no_items';
+  else status = 'open';
+  const attr = (s.attributes || '').match(/Sell To Customer No:\s*([A-Za-z0-9]+)/);
+  return {
+    seq: s.seq, client: s.client, location: s.location, postcode: s.postcode,
+    type: s.is_drop ? 'drop' : 'collection', orders: s.orders, order_refs: s.order_refs,
+    window: windowStart && windowEnd && !anyTime ? `${windowStart}–${windowEnd}` : null,
+    planned: clock(s.planned_arrival), eta: status === 'open' ? clock(s.eta) : null,
+    arrived: arrivedClock, departed: clock(s.departed),
+    on_site: onSite !== null && onSite >= 0 && onSite < 600 ? onSite : null,
+    vs_plan: s.arrived && s.planned_arrival ? minutesBetween(s.arrived, s.planned_arrival) : null,
+    window_flag: windowFlag,
+    status, fail_reason: s.fail_reason || null, fail_comment: s.fail_comment || null,
+    customer_no: attr ? attr[1] : null,
+    ...(s.date ? { date: s.date, vehicle: s.vehicle, driver: s.driver, run_number: s.run_number } : {}),
+  };
+}
+
 // Thresholds for live status, in minutes.
 const LATE_AFTER = 10;          // nothing reported this long after the planned departure: Late
 const NO_DATA_AFTER = 60;       // ...and after this long: No data (the driver app probably isn't in use)
@@ -261,7 +315,7 @@ export function buildLive(runs, now) {
   const vehicles = new Map();
   for (const r of runs) {
     const state = runState(r, now);
-    const run = { run_number: r.run_number, driver: r.driver, status: state.status, variance: state.variance,
+    const run = { run_key: r.run_key, run_number: r.run_number, driver: r.driver, status: state.status, variance: state.variance,
       planned_drops: r.planned_drops, completed_drops: r.completed_drops, failed_drops: r.failed_drops,
       open_drops: r.open_drops, closed_no_items: r.closed_no_items,
       planned_departure: clock(r.planned_departure), actual_departure: clock(r.actual_departure),
@@ -303,10 +357,70 @@ export function buildLive(runs, now) {
   };
 }
 
+// A whole day: vehicles, their runs (with live status as at `stamp`) and every stop on each run.
+async function dayData(sql, date, stamp) {
+  const [runs, stops] = await Promise.all([sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date])]);
+  const built = buildLive(runs, stamp);
+  const byRun = new Map();
+  for (const st of stops) {
+    if (!byRun.has(st.run_key)) byRun.set(st.run_key, []);
+    byRun.get(st.run_key).push(mapStop(st, stamp));
+  }
+  for (const v of built.vehicles) for (const r of v.runs) r.stops = byRun.get(r.run_key) || [];
+  return built;
+}
+
+async function day(url, sql) {
+  const date = url.searchParams.get('date');
+  if (!isDate(date)) return fail(400, 'Give date as YYYY-MM-DD');
+  const now = londonNow();
+  const stamp = date === now.date ? now.stamp : `${date} 23:59:59`;
+  const [built, target] = await Promise.all([
+    dayData(sql, date, stamp),
+    sql.query(`select transport.target_on('van_drops_per_day', $1::date) as target`, [date]),
+  ]);
+  return json({ date, live: date === now.date, target: target[0] && target[0].target !== null ? Number(target[0].target) : null, ...built });
+}
+
+// One customer's visits over a date range (the drill-down from any customer name).
+async function customer(url, sql) {
+  const name = url.searchParams.get('name');
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+  if (!name || !isDate(from) || !isDate(to)) return fail(400, 'Give name, from and to');
+  const rows = await sql.query(`
+    select o.run_date::text as date, r.run_number, coalesce(v.display_name, v.maxoptra_name) as vehicle, d.name as driver,
+      o.run_key, o.stop_key, min(o.sequence) as seq,
+      max(o.client_name) as client, max(o.location_name) as location, max(o.location_postcode) as postcode,
+      bool_or(o.task = 'DROP') as is_drop, count(*)::int as orders, string_agg(o.order_ref, ', ' order by o.order_ref) as order_refs,
+      min(o.planned_arrival)::text as planned_arrival, min(o.eta)::text as eta,
+      min(coalesce(o.gps_arrival, o.reported_arrival))::text as arrived,
+      max(coalesce(o.gps_departure, o.reported_departure))::text as departed,
+      min(o.window_start)::text as window_start, max(o.window_end)::text as window_end,
+      coalesce(bool_or(o.completion_status in ('FULLY_DELIVERED', 'PARTIALLY_DELIVERED')), false) as completed,
+      coalesce(bool_or(o.order_status = 'FAILED' or o.fail_reason is not null), false) as any_failed,
+      bool_and(coalesce(o.order_status in ('CLOSED', 'FAILED') or o.completion_status in ('FULLY_DELIVERED', 'PARTIALLY_DELIVERED'), false)) as done,
+      string_agg(distinct o.fail_reason, '; ') as fail_reason, string_agg(distinct o.fail_comment, '; ') as fail_comment,
+      max(o.attributes) as attributes, max(o.instructions) as instructions
+    from transport.orders o
+    join transport.runs r using (run_key)
+    join transport.vehicles v on v.id = r.vehicle_id
+    left join transport.drivers d on d.id = r.driver_id
+    where o.client_name = $1 and o.run_date between $2 and $3 and o.removed_at is null and r.removed_at is null
+    group by o.run_date, r.run_number, v.display_name, v.maxoptra_name, d.name, o.run_key, o.stop_key
+    order by o.run_date desc, min(o.sequence)
+    limit 500`, [name, from, to]);
+  const now = londonNow().stamp;
+  const visits = rows.map((r) => mapStop(r, now));
+  const instructions = rows.map((r) => r.instructions).find((t) => t && t.trim()) || null;
+  return json({ name, from, to, visits, instructions: instructions ? instructions.replace(/\s+/g, ' ').trim().slice(0, 600) : null,
+                customer_no: visits.map((v) => v.customer_no).find(Boolean) || null });
+}
+
 async function live(sql) {
   const now = londonNow();
-  const [runs, sync, events, target] = await Promise.all([
-    sql.query(LIVE_RUNS, [now.date]),
+  const [built, sync, events, target] = await Promise.all([
+    dayData(sql, now.date, now.stamp),
     // Today's freshness only: history being pulled in the background logs past dates and must not count.
     sql.query(`select
         (select started_at from transport.sync_log where source = 'report_api' and status = 'ok'
@@ -340,7 +454,7 @@ async function live(sql) {
       last_error: s.last_error || null, last_error_at: lastErr ? lastErr.stamp.slice(11, 16) : null,
     },
     target: target[0] && target[0].target !== null ? Number(target[0].target) : null,
-    ...buildLive(runs, now.stamp),
+    ...built,
     events: events.map((e) => {
       const t = (k) => (e.detail[k] ? String(e.detail[k]).replace('T', ' ') : null);
       const actual = t('actual_return') && t('last_job_at') && t('actual_return') < t('last_job_at') ? null : t('actual_return');
@@ -360,7 +474,7 @@ async function report(url, sql) {
   if (!isDate(from) || !isDate(to) || from > to) return fail(400, 'Give from and to as YYYY-MM-DD, from before to');
   if ((Date.parse(to) - Date.parse(from)) / 86400000 > 400) return fail(400, 'Choose a range of 400 days or less');
 
-  const [vehicles, drivers, failures, daily, missing, hours] = await Promise.all([
+  const [vehicles, drivers, failures, daily, missing, hours, vehicleDaily] = await Promise.all([
     sql.query(`
       select vehicle, maxoptra_name, vehicle_type, hours_profile, bool_or(in_kpi) as in_kpi,
         (count(*) filter (where operated))::int as days,
@@ -421,6 +535,12 @@ async function report(url, sql) {
         (extract(epoch from (shift_end - shift_start)) / 60 - break_minutes)::int as net_minutes,
         (select (value #>> '{}')::int from transport.settings where key = 'prep_minutes') as prep_minutes
       from transport.working_hours where effective_from <= $1 order by applies_to, effective_from desc`, [to]),
+    sql.query(`
+      select run_date::text as date, vehicle, vehicle_type, in_kpi, runs::int, planned_drops::int, completed_drops::int,
+             failed_drops::int, transport.target_on('van_drops_per_day', run_date)::float8 as target
+      from transport.v_vehicle_day
+      where run_date between $1 and $2 and operated
+      order by run_date, vehicle`, [from, to]),
   ]);
   // Utilisation (brief s.24): estimated working time (loading allowance + first departure to return, less the
   // break) against the scheduled net day for vans or trucks.
@@ -431,7 +551,7 @@ async function report(url, sql) {
     v.utilisation = v.avg_day_minutes && h
       ? Math.round(((v.avg_day_minutes + (h.prep_minutes ?? 25) - h.break_minutes) / h.net_minutes) * 100) : null;
   }
-  return json({ from, to, vehicles, drivers, failures, daily, missing_weekdays: missing.map((m) => m.date) });
+  return json({ from, to, vehicles, drivers, failures, daily, vehicle_daily: vehicleDaily, missing_weekdays: missing.map((m) => m.date) });
 }
 
 async function importBatch(request, sql) {
@@ -481,6 +601,8 @@ export async function onRequest(context) {
     if (method === 'GET' && route === 'status') return status(sql);
     if (method === 'GET' && route === 'validation') return validation(url, sql);
     if (method === 'GET' && route === 'live') return live(sql);
+    if (method === 'GET' && route === 'day') return day(url, sql);
+    if (method === 'GET' && route === 'customer') return customer(url, sql);
     if (method === 'GET' && route === 'report') return report(url, sql);
     if (method === 'POST' && route === 'import') return admin ? importBatch(request, sql) : fail(403, 'Admins only');
     if (method === 'POST' && route === 'import/log') return admin ? importLog(request, sql, user) : fail(403, 'Admins only');

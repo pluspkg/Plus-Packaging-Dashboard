@@ -57,6 +57,8 @@
   .progress span { display: block; height: 100%; background: var(--blue); }
 
   .live-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem); gap: 1rem; align-items: start; }
+  .fleet > tbody > tr > td:nth-child(2), .fleet > tbody > tr > td:nth-child(3), .fleet > tbody > tr > td:nth-child(6),
+  .fleet > tbody > tr > td:nth-child(8), .fleet > tbody > tr > td:nth-child(9) { white-space: nowrap; }
 
   .table-wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: .95rem; }
@@ -66,7 +68,6 @@
   tr.group th { background: var(--white); color: var(--navy); font-weight: 900; padding-top: .9rem; font-size: .9rem; border-bottom: 2px solid var(--navy); }
   tr.total td { font-weight: 900; border-top: 2px solid var(--navy); }
   .veh { font-weight: 900; color: var(--navy); white-space: nowrap; }
-  #fleet td:nth-child(2), #fleet td:nth-child(3), #fleet td:nth-child(6), #fleet td:nth-child(8), #fleet td:nth-child(9) { white-space: nowrap; }
   .drops { white-space: nowrap; }
   .drops .progress { width: 6rem; display: inline-block; vertical-align: middle; margin: 0 0 0 .5rem; }
   .drop-note { display: block; font-size: .8rem; color: var(--muted); white-space: normal; }
@@ -75,11 +76,47 @@
   .behind { color: var(--bad); font-weight: 700; }
   .fail { color: var(--bad); font-weight: 700; }
 
-  tr.run-row td { font-size: .86rem; color: var(--muted); padding-top: .25rem; padding-bottom: .25rem; background: #fbfcfe; }
-  tr.run-row td.run-label { padding-left: 1.6rem; color: var(--navy); font-weight: 700; white-space: nowrap; }
+  /* Drill-downs: registration opens its runs, a run opens its stops */
+  button.exp { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; color: var(--navy); font-weight: 900; white-space: nowrap; display: inline-flex; align-items: center; gap: .4rem; }
+  button.exp::before { content: ""; width: .45rem; height: .45rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; flex: none; }
+  button.exp[aria-expanded="true"]::before { transform: rotate(45deg); }
+  button.exp:hover { color: var(--blue); }
+  button.link { font: inherit; background: none; border: 0; padding: 0; color: var(--blue); cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: rgba(0,61,165,.35); text-underline-offset: 2px; }
+  button.link:hover { text-decoration-color: var(--blue); }
+  tr.run-row td { font-size: .88rem; background: #fbfcfe; padding-top: .35rem; padding-bottom: .35rem; }
+  tr.run-row td.run-label { padding-left: 1.6rem; }
+  tr.run-row button.exp { font-weight: 700; }
   tr.run-row .pill { font-size: .75rem; }
-  .run-summary { display: none; }
+  tr.stops-row > td { padding: .2rem .7rem .9rem 1.6rem; background: #fbfcfe; }
+  tr.vehicle-open > td { border-bottom-color: transparent; }
+  tr.selected > td { background: var(--light); }
   .pill-run { font-size: .78rem; color: var(--muted); margin-left: .35rem; white-space: nowrap; }
+  table.stops { font-size: .86rem; background: var(--white); border: 1px solid var(--line); }
+  table.stops th { background: var(--bg); font-size: .78rem; }
+  table.stops td, table.stops th { padding: .35rem .55rem; }
+  table.stops .client { font-weight: 700; }
+  .stop-meta { display: block; font-size: .78rem; color: var(--muted); }
+  .st-delivered, .st-collected { color: var(--blue); font-weight: 700; }
+  .st-failed { color: var(--bad); font-weight: 700; }
+  .st-closed_no_items, .st-open-past { color: var(--muted); }
+  .st-open { color: var(--ink); }
+  .close { font: inherit; background: none; border: 1px solid var(--grey); border-radius: 3px; padding: .15rem .6rem; cursor: pointer; color: var(--ink); margin-left: auto; }
+  .close:hover { border-color: var(--blue); color: var(--blue); }
+  .chart rect.bar { cursor: pointer; }
+  .chart rect.bar:focus { outline: none; stroke: #002b75; stroke-width: 3; }
+  .chart-tools { display: flex; gap: .6rem; align-items: center; margin-left: auto; }
+  .day-summary { padding: .3rem 1.1rem .6rem; color: var(--muted); font-size: .9rem; }
+
+  /* Customer drill-down */
+  .overlay { position: fixed; inset: 0; background: rgba(0,43,117,.35); z-index: 20; display: flex; justify-content: flex-end; }
+  .sheet { background: var(--white); width: min(64rem, 100%); height: 100%; overflow-y: auto; box-shadow: -6px 0 20px rgba(0,43,117,.2); }
+  .sheet-head { position: sticky; top: 0; background: var(--navy); color: var(--white); display: flex; align-items: center; gap: 1rem; padding: .8rem 1.1rem; }
+  .sheet-head h2 { color: var(--white); }
+  .sheet-head .close { color: var(--white); border-color: rgba(255,255,255,.6); }
+  .sheet-sub { padding: .7rem 1.1rem 0; color: var(--muted); font-size: .9rem; }
+  .sheet .kpis { margin: .8rem 1.1rem; border: 1px solid var(--line); border-radius: 4px; }
+  .sheet .kpi .value { font-size: 1.7rem; }
+  .instructions { margin: 0 1.1rem .8rem; padding: .6rem .8rem; background: var(--bg); border-left: 3px solid var(--grey); font-size: .9rem; }
   .info { background: var(--light); color: var(--navy); border-left: 4px solid var(--blue); padding: .6rem 1rem; margin-bottom: 1rem; border-radius: 0 4px 4px 0; }
   .info b { font-weight: 900; }
   .pill { display: inline-block; padding: .1rem .55rem; border-radius: 3px; font-size: .82rem; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
@@ -111,6 +148,7 @@
   @media (max-width: 1280px) { .live-grid { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 1100px) { .two { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 720px) {
+    header { position: static; }                       /* a wrapped header shouldn't take a third of a phone screen */
     .bar { gap: .6rem 1rem; }
     .tools { margin-left: 0; }
     .kpi { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -128,10 +166,13 @@
     table.cards td.lead-cell::before { content: none; }
     table.cards td.lead-cell .cv { display: flex; width: 100%; justify-content: space-between; align-items: center; }
     table.cards td.m-hide { display: none; }
-    table.cards tr.run-row { padding: .1rem .2rem .3rem; border-bottom: 0; }
-    table.cards tr.run-row td { display: none; }
-    table.cards tr.run-row td.run-summary { display: block; text-align: left; padding: .15rem .7rem .15rem 1.4rem; background: transparent; }
-    table.cards tr.run-row td.run-summary::before { content: none; }
+    table.cards tr.run-row { padding: .3rem .2rem .3rem 1rem; background: #fbfcfe; }
+    table.cards tr.stops-row { padding: 0 0 .6rem; border-bottom: 1px solid var(--line); }
+    table.cards tr.stops-row > td { display: block; padding: 0 .4rem; }
+    table.cards tr.stops-row > td::before { content: none; }
+    table.stops.cards tr { border: 1px solid var(--line); border-radius: 4px; margin: .4rem 0; padding: .3rem 0; background: var(--white); }
+    .fleet > tbody > tr > td { white-space: normal !important; }
+    .overlay { justify-content: stretch; }
     .m-only { display: inline-block !important; }
     .drops .progress { width: 4rem; }
   }
@@ -166,7 +207,7 @@
     <div class="live-grid">
       <div class="panel">
         <div class="panel-head"><h2>Fleet today</h2><span class="note" id="today-note"></span></div>
-        <div class="table-wrap"><table class="cards" id="fleet">
+        <div class="table-wrap"><table class="cards fleet" id="fleet">
           <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
             <th scope="col" class="n">Left</th><th scope="col">Schedule</th><th scope="col">Next stop or last job</th>
             <th scope="col">Back at Plus</th><th scope="col">Status</th></tr></thead>
@@ -185,8 +226,19 @@
     <div class="info" id="missing" hidden></div>
     <div class="panel kpis" id="period-kpis"></div>
     <div class="panel">
-      <div class="panel-head"><h2>Completed drops per full-time van per day</h2><span class="note" id="chart-note"></span></div>
+      <div class="panel-head"><h2 id="chart-title">Completed drops per full-time van per day</h2><span class="note" id="chart-note"></span>
+        <div class="chart-tools"><button class="close" id="chart-all" hidden>Show all full-time vans</button></div></div>
       <div class="chart" id="chart"></div>
+    </div>
+    <div class="panel" id="day-panel" hidden>
+      <div class="panel-head"><h2 id="day-title"></h2><button class="close" id="day-close">Close</button></div>
+      <div class="day-summary" id="day-summary"></div>
+      <div class="table-wrap"><table class="cards fleet" id="day-fleet">
+        <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
+          <th scope="col" class="n">Left</th><th scope="col">Against plan</th><th scope="col">Last job</th>
+          <th scope="col">Back at Plus</th><th scope="col">Status</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
     </div>
     <div class="panel">
       <div class="panel-head"><h2>Full-time vans</h2></div>
@@ -213,6 +265,15 @@
   </section>
 </main>
 <div id="toasts" aria-live="polite"></div>
+<div class="overlay" id="customer" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cust-name">
+    <div class="sheet-head"><h2 id="cust-name"></h2><button class="close" id="cust-close">Close</button></div>
+    <div class="sheet-sub" id="cust-sub"></div>
+    <div class="panel kpis" id="cust-kpis"></div>
+    <div class="instructions" id="cust-ins" hidden></div>
+    <div class="table-wrap" style="padding: 0 1.1rem 1.5rem"><table class="cards stops" id="cust-visits"></table></div>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -255,6 +316,13 @@
   // ---------------------------------------------------------------- Today
   let pollTimer = null;
   let seenEvents = null;
+  let lastLive = null;
+  const todayOpen = { vehicles: new Set(), runs: new Set(), highlight: null };
+  function drawToday() {
+    if (!lastLive) return;
+    $('fleet').querySelector('tbody').innerHTML = fleetRows(lastLive.vehicles, todayOpen, true)
+      || '<tr><td colspan="9" class="muted">No runs in MaxOptra for today yet.</td></tr>';
+  }
 
   function schedule(run) {
     const v = run.variance;
@@ -284,11 +352,101 @@
     if (x.closed_no_items) notes.push(`${x.closed_no_items} closed, no items recorded`);
     return `<span class="num">${x.completed_drops} / ${x.planned_drops}</span><span class="progress" aria-hidden="true"><span style="width:${pct}%"></span></span>${notes.length ? `<span class="drop-note">${notes.join(', ')}</span>` : ''}`;
   }
-  function runSummary(run) {
-    const back = run.status === 'back' && run.actual_return ? `back ${run.actual_return}`
-      : ['returning', 'back_estimated'].includes(run.status) && run.estimated_return ? `back about ${run.estimated_return}`
-      : run.status === 'out' ? `out, ${run.open_drops} left` : (STATUS[run.status] || run.status).toLowerCase();
-    return `<b>Run ${run.run_number}</b>: ${run.completed_drops} of ${run.planned_drops} drops, ${esc(back)}${run.driver ? `, ${esc(run.driver)}` : ''}`;
+  // ---------------------------------------------------------------- Drill-downs (Today and the day panel)
+  const STOP_STATUS = { delivered: 'Delivered', collected: 'Collected', failed: 'Failed', closed_no_items: 'Closed, no items recorded' };
+  function stopStatus(st, live) {
+    if (st.status === 'open') return live ? `<span class="st-open">Due ${esc(st.eta || st.planned || '–')}</span>` : '<span class="st-open-past">Not reported</span>';
+    const reason = st.status === 'failed' && st.fail_reason ? `<span class="stop-meta">${esc(st.fail_reason)}</span>` : '';
+    return `<span class="st-${st.status}">${STOP_STATUS[st.status] || esc(st.status)}</span>${reason}`;
+  }
+  function arrivedCell(st) {
+    if (!st.arrived) return '–';
+    const bits = [];
+    if (st.vs_plan !== null && st.vs_plan >= 5) bits.push(`${st.vs_plan} min early`);
+    if (st.vs_plan !== null && st.vs_plan <= -5) bits.push(`<span class="behind">${-st.vs_plan} min late</span>`);
+    if (st.window_flag === 'after') bits.push('<span class="behind">after window</span>');
+    if (st.window_flag === 'before') bits.push('before window');
+    return `<b>${esc(st.arrived)}</b>${bits.length ? `<span class="stop-meta">${bits.join(', ')}</span>` : ''}`;
+  }
+  function stopsTable(stops, live) {
+    if (!stops || !stops.length) return '<p class="muted">No stops on this run.</p>';
+    return `<table class="cards stops"><thead><tr><th class="n" scope="col">Stop</th><th scope="col">Customer</th><th scope="col">Postcode</th>
+      <th scope="col">Window</th><th scope="col">Planned</th><th scope="col">Arrived</th><th scope="col">Left</th><th class="n" scope="col">On site</th>
+      <th scope="col">Status</th></tr></thead><tbody>` +
+      stops.map((st) => `<tr>
+        <td class="n" data-label="Stop">${st.seq ?? ''}</td>
+        <td class="lead-cell" data-label="Customer"><span class="cv"><span><button class="link client" data-customer="${esc(st.client || '')}">${esc(st.client || 'Unknown customer')}</button>${st.type === 'collection' ? '<span class="stop-meta">Collection</span>' : ''}${st.orders > 1 ? `<span class="stop-meta">${st.orders} orders</span>` : ''}</span></span></td>
+        <td data-label="Postcode">${esc(st.postcode || '–')}</td>
+        <td data-label="Window">${esc(st.window || 'Any time')}</td>
+        <td data-label="Planned">${esc(st.planned || '–')}</td>
+        <td data-label="Arrived"><span class="cv"><span>${arrivedCell(st)}</span></span></td>
+        <td data-label="Left">${esc(st.departed || '–')}</td>
+        <td class="n" data-label="On site">${st.on_site !== null ? `${st.on_site} min` : '–'}</td>
+        <td data-label="Status"><span class="cv"><span>${stopStatus(st, live)}</span></span></td></tr>`).join('') + '</tbody></table>';
+  }
+
+  // A day's fleet: one row per vehicle; opening a registration shows its runs (or, with one run, its stops),
+  // and opening a run shows its stops.
+  function fleetRows(vehicles, open, live) {
+    const groups = [
+      ['Full-time vans', (v) => v.vehicle_type === 'full_time_van' && v.in_kpi],
+      ['Trucks', (v) => v.vehicle_type === 'truck'],
+      ['Other vehicles', (v) => !(v.vehicle_type === 'full_time_van' && v.in_kpi) && v.vehicle_type !== 'truck'],
+    ];
+    let rows = '';
+    for (const [label, test] of groups) {
+      const list = vehicles.filter(test);
+      if (!list.length) continue;
+      rows += `<tr class="group"><th colspan="9" scope="rowgroup">${label}</th></tr>`;
+      for (const v of list) {
+        const r = v.current;
+        const multi = v.runs.length > 1;
+        const isOpen = open.vehicles.has(v.vehicle);
+        const runTag = multi && ACTIVE_STATUS.includes(r.status) ? ` run ${r.run_number}` : '';
+        rows += `<tr class="${isOpen ? 'vehicle-open' : ''}${open.highlight === v.vehicle ? ' selected' : ''}">
+          <td class="lead-cell" data-label="Vehicle"><span class="cv"><button class="exp" data-veh="${esc(v.vehicle)}" aria-expanded="${isOpen}" title="${multi ? 'Show runs' : 'Show stops'}">${esc(v.vehicle)}</button><span class="pill ${r.status} m-only">${STATUS[r.status] || r.status}${runTag}</span></span></td>
+          <td data-label="Driver"><span class="cv">${esc(v.driver || '–')}</span></td>
+          <td data-label="Runs" class="n"><span class="cv">${v.runs.length}</span></td>
+          <td data-label="Drops completed" class="drops"><span class="cv">${dropsCell(v)}<span class="m-only small">&nbsp;${v.open_drops} left</span></span></td>
+          <td data-label="Left" class="n m-hide"><span class="cv">${v.open_drops}</span></td>
+          <td data-label="Schedule"><span class="cv">${schedule(r)}</span></td>
+          <td data-label="Next stop or last job"><span class="cv">${nextOrLast(r)}</span></td>
+          <td data-label="Back at Plus"><span class="cv">${backAtPlus(r)}</span></td>
+          <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${r.status}">${STATUS[r.status] || r.status}</span>${runTag ? `<span class="pill-run">${runTag.trim()}</span>` : ''}</span></td></tr>`;
+        if (!isOpen) continue;
+        if (!multi) { rows += `<tr class="stops-row"><td colspan="9">${stopsTable(v.runs[0].stops, live)}</td></tr>`; continue; }
+        for (const run of v.runs) {
+          const runOpen = open.runs.has(run.run_key);
+          rows += `<tr class="run-row">
+            <td class="run-label lead-cell" data-label="Run"><span class="cv"><button class="exp" data-run="${esc(run.run_key)}" aria-expanded="${runOpen}" title="Show stops">Run ${run.run_number}</button><span class="pill ${run.status} m-only">${STATUS[run.status] || run.status}</span></span></td>
+            <td data-label="Driver"><span class="cv">${esc(run.driver || '–')}</span></td>
+            <td data-label="Runs" class="n m-hide"><span class="cv"></span></td>
+            <td data-label="Drops completed" class="drops"><span class="cv">${dropsCell(run)}</span></td>
+            <td data-label="Left" class="n"><span class="cv">${run.open_drops}</span></td>
+            <td data-label="Schedule"><span class="cv">${schedule(run)}</span></td>
+            <td data-label="Next stop or last job"><span class="cv">${nextOrLast(run)}</span></td>
+            <td data-label="Back at Plus"><span class="cv">${backAtPlus(run)}</span></td>
+            <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${run.status}">${STATUS[run.status] || run.status}</span></span></td></tr>`;
+          if (runOpen) rows += `<tr class="stops-row"><td colspan="9">${stopsTable(run.stops, live)}</td></tr>`;
+        }
+      }
+    }
+    return rows;
+  }
+
+  // Clicks inside a fleet table: open or close a registration or run, or open a customer.
+  function bindFleet(tableId, open, redraw) {
+    $(tableId).addEventListener('click', (e) => {
+      const cust = e.target.closest('[data-customer]');
+      if (cust) { openCustomer(cust.dataset.customer, cust); return; }
+      const btn = e.target.closest('[data-veh], [data-run]');
+      if (!btn) return;
+      const [set, key, attr] = btn.dataset.veh !== undefined ? [open.vehicles, btn.dataset.veh, 'veh'] : [open.runs, btn.dataset.run, 'run'];
+      if (set.has(key)) set.delete(key); else set.add(key);
+      redraw();
+      const again = [...$(tableId).querySelectorAll(`[data-${attr}]`)].find((b) => b.dataset[attr] === key);
+      if (again) again.focus();
+    });
   }
 
   function renderToday(d) {
@@ -309,46 +467,9 @@
         <div class="sub">${fmtInt(h.second_runs)} second run${h.second_runs === 1 ? '' : 's'}</div></div>
       <div class="kpi"><div class="label">Failed deliveries</div><div class="value${h.failed_drops ? ' bad' : ''}">${fmtInt(h.failed_drops)}</div></div>`;
 
-    const groups = [
-      ['Full-time vans', (v) => v.vehicle_type === 'full_time_van' && v.in_kpi],
-      ['Trucks', (v) => v.vehicle_type === 'truck'],
-      ['Other vehicles', (v) => !(v.vehicle_type === 'full_time_van' && v.in_kpi) && v.vehicle_type !== 'truck'],
-    ];
-    let rows = '';
-    for (const [label, test] of groups) {
-      const list = d.vehicles.filter(test);
-      if (!list.length) continue;
-      rows += `<tr class="group"><th colspan="9" scope="rowgroup">${label}</th></tr>`;
-      for (const v of list) {
-        const r = v.current;
-        const multi = v.runs.length > 1;
-        rows += `<tr>
-          <td class="lead-cell" data-label="Vehicle"><span class="cv"><span class="veh">${esc(v.vehicle)}</span><span class="pill ${r.status} m-only">${STATUS[r.status] || r.status}${multi && ACTIVE_STATUS.includes(r.status) ? ` run ${r.run_number}` : ''}</span></span></td>
-          <td data-label="Driver"><span class="cv">${esc(v.driver || '–')}</span></td>
-          <td data-label="Runs" class="n"><span class="cv">${v.runs.length}</span></td>
-          <td data-label="Drops completed" class="drops"><span class="cv">${dropsCell(v)}<span class="m-only small">&nbsp;${v.open_drops} left</span></span></td>
-          <td data-label="Left" class="n m-hide"><span class="cv">${v.open_drops}</span></td>
-          <td data-label="Schedule"><span class="cv">${schedule(r)}</span></td>
-          <td data-label="Next stop or last job"><span class="cv">${nextOrLast(r)}</span></td>
-          <td data-label="Back at Plus"><span class="cv">${backAtPlus(r)}</span></td>
-          <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${r.status}">${STATUS[r.status] || r.status}</span>${multi && ACTIVE_STATUS.includes(r.status) ? `<span class="pill-run">run ${r.run_number}</span>` : ''}</span></td></tr>`;
-        if (multi) for (const run of v.runs) {
-          rows += `<tr class="run-row">
-            <td class="run-label">Run ${run.run_number}</td>
-            <td>${esc(run.driver || '–')}</td>
-            <td></td>
-            <td class="drops">${dropsCell(run)}</td>
-            <td class="n">${run.open_drops}</td>
-            <td>${schedule(run)}</td>
-            <td>${nextOrLast(run)}</td>
-            <td>${backAtPlus(run)}</td>
-            <td><span class="pill ${run.status}">${STATUS[run.status] || run.status}</span></td>
-            <td class="run-summary">${runSummary(run)}</td></tr>`;
-        }
-      }
-    }
-    $('fleet').querySelector('tbody').innerHTML = rows || '<tr><td colspan="9" class="muted">No runs in MaxOptra for today yet.</td></tr>';
-    $('today-note').textContent = d.vehicles.length ? 'Schedule is the next stop’s ETA against the plan' : '';
+    lastLive = d;
+    drawToday();
+    $('today-note').textContent = d.vehicles.length ? 'Click a registration for its runs and stops' : '';
 
     $('events').innerHTML = d.events.length ? d.events.map((e) => `<li>
         <div><span class="veh">${esc(e.vehicle)}</span> run ${e.run_number} <span class="small">${esc(e.driver || '')}</span></div>
@@ -408,6 +529,68 @@
     catch (e) { banner(`<b>${esc(e.message)}</b>${e.detail ? ` ${esc(e.detail)}` : ''}`); }
   }
 
+  // ---------------------------------------------------------------- Customer drill-down
+  let customerOpener = null;
+  function customerRange() {
+    const inPeriod = !$('view-period').hidden && periodState.p;
+    return inPeriod ? { from: periodState.p.from, to: periodState.p.to, label: periodState.p.label }
+                    : { from: addDays(ukToday(), -90), to: ukToday(), label: 'Last 90 days' };
+  }
+  async function openCustomer(name, opener) {
+    if (!name) return;
+    customerOpener = opener || null;
+    const range = customerRange();
+    $('cust-name').textContent = name;
+    $('cust-sub').textContent = 'Loading';
+    $('cust-kpis').innerHTML = ''; $('cust-ins').hidden = true; $('cust-visits').innerHTML = '';
+    $('customer').hidden = false;
+    $('cust-close').focus();
+    try {
+      const c = await api(`/customer?name=${encodeURIComponent(name)}&from=${range.from}&to=${range.to}`);
+      renderCustomer(c, range);
+    } catch (e) { $('cust-sub').textContent = e.message; }
+  }
+  function closeCustomer() {
+    $('customer').hidden = true;
+    if (customerOpener && document.body.contains(customerOpener)) customerOpener.focus();
+  }
+  function renderCustomer(c, range) {
+    const v = c.visits;
+    const postcodes = [...new Set(v.map((x) => x.postcode).filter(Boolean))];
+    $('cust-sub').textContent = [c.customer_no ? `Customer ${c.customer_no}` : null, postcodes.length ? postcodes.join(', ') : null,
+      `${range.label}: ${longDate(range.from)} to ${longDate(range.to)}`].filter(Boolean).join('. ');
+    const done = v.filter((x) => ['delivered', 'collected', 'failed', 'closed_no_items'].includes(x.status));
+    const onSite = v.map((x) => x.on_site).filter((x) => x !== null);
+    const arrivals = v.map((x) => x.arrived).filter(Boolean).sort();
+    const windowed = v.filter((x) => x.arrived && x.window);
+    const afterWindow = windowed.filter((x) => x.window_flag === 'after').length;
+    $('cust-kpis').innerHTML = `
+      <div class="kpi"><div class="label">Visits</div><div class="value">${fmtInt(v.length)}</div><div class="sub">${fmtInt(done.length)} completed or closed</div></div>
+      <div class="kpi"><div class="label">Failed</div><div class="value${v.some((x) => x.status === 'failed') ? ' bad' : ''}">${fmtInt(v.filter((x) => x.status === 'failed').length)}</div></div>
+      <div class="kpi"><div class="label">Average time on site</div><div class="value">${onSite.length ? Math.round(onSite.reduce((a, b) => a + b, 0) / onSite.length) : '–'} <small>min</small></div></div>
+      <div class="kpi"><div class="label">Usual arrival</div><div class="value">${arrivals.length ? arrivals[Math.floor(arrivals.length / 2)] : '–'}</div><div class="sub">middle of all arrivals</div></div>
+      <div class="kpi"><div class="label">Arrived after their window</div><div class="value${afterWindow ? ' bad' : ''}">${windowed.length ? fmtInt(afterWindow) : '–'}</div><div class="sub">${windowed.length ? `of ${windowed.length} visits with a delivery window` : 'No delivery window set'}</div></div>`;
+    $('cust-ins').hidden = !c.instructions;
+    $('cust-ins').innerHTML = c.instructions ? `<b>Delivery instructions:</b> ${esc(c.instructions)}` : '';
+    const today = ukToday();
+    $('cust-visits').innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col">Window</th>
+      <th scope="col">Planned</th><th scope="col">Arrived</th><th scope="col">Left</th><th class="n" scope="col">On site</th><th scope="col">Status</th></tr></thead><tbody>` +
+      (v.length ? v.map((x) => `<tr>
+        <td class="lead-cell" data-label="Date"><span class="cv"><b>${shortDate(x.date)}</b></span></td>
+        <td data-label="Vehicle">${esc(x.vehicle)} <span class="small">run ${x.run_number}</span></td>
+        <td data-label="Driver">${esc(x.driver || '–')}</td>
+        <td data-label="Window">${esc(x.window || 'Any time')}</td>
+        <td data-label="Planned">${esc(x.planned || '–')}</td>
+        <td data-label="Arrived"><span class="cv"><span>${arrivedCell(x)}</span></span></td>
+        <td data-label="Left">${esc(x.departed || '–')}</td>
+        <td class="n" data-label="On site">${x.on_site !== null ? `${x.on_site} min` : '–'}</td>
+        <td data-label="Status"><span class="cv"><span>${stopStatus(x, x.date === today)}</span></span></td></tr>`).join('')
+        : '<tr><td colspan="9" class="muted">No visits in this period.</td></tr>') + '</tbody>';
+  }
+  $('cust-close').addEventListener('click', closeCustomer);
+  $('customer').addEventListener('click', (e) => { if (e.target === $('customer')) closeCustomer(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('customer').hidden) closeCustomer(); });
+
   // ---------------------------------------------------------------- Periods
   function periodFor(view) {
     const yesterday = addDays(ukToday(), -1);
@@ -440,32 +623,104 @@
     return n ? { value: t / n, coverage: n } : null;
   }
 
-  function chart(daily, target) {
-    const days = daily.filter((d) => d.van_days > 0);
-    if (!days.length) return '<p class="muted">No full-time van days in this period.</p>';
-    const vals = days.map((d) => d.van_completed / d.van_days);
-    const max = Math.max(...vals, ...(days.map((d) => d.target || 0))) * 1.15 || 1;
+  // Bars for a series of days; each bar opens that day below the chart.
+  function chart(series, selectedDay, label) {
+    if (!series.length) return '<p class="muted">No days with data for this in the period.</p>';
+    const max = Math.max(...series.map((d) => d.value), ...series.map((d) => d.target || 0)) * 1.15 || 1;
     const W = 1000, H = 220, padL = 34, padB = 26, padT = 8;
-    const bw = (W - padL) / days.length;
+    const bw = (W - padL) / series.length;
     const y = (v) => padT + (H - padT - padB) * (1 - v / max);
+    const step = max > 40 ? 10 : max > 20 ? 5 : 2;
     let svg = '';
-    for (let g = 0; g <= max; g += max > 20 ? 5 : 2) svg += `<line x1="${padL}" x2="${W}" y1="${y(g)}" y2="${y(g)}" stroke="#d9dee3" stroke-width="1"/><text x="${padL - 6}" y="${y(g) + 4}" font-size="12" text-anchor="end" fill="#5d6566">${g}</text>`;
-    days.forEach((d, i) => {
-      const v = vals[i];
+    for (let g = 0; g <= max; g += step) svg += `<line x1="${padL}" x2="${W}" y1="${y(g)}" y2="${y(g)}" stroke="#d9dee3" stroke-width="1"/><text x="${padL - 6}" y="${y(g) + 4}" font-size="12" text-anchor="end" fill="#5d6566">${g}</text>`;
+    series.forEach((d, i) => {
       const x = padL + i * bw + bw * 0.15;
-      const below = d.target !== null && v < d.target;
-      svg += `<rect x="${x}" y="${y(v)}" width="${bw * 0.7}" height="${y(0) - y(v)}" fill="${below ? '#9ea2a2' : '#003da5'}"><title>${shortDate(d.date)}: ${v.toFixed(1)} per van (${d.van_completed} drops, ${d.van_days} vans)${d.target !== null ? `, target ${d.target}` : ''}</title></rect>`;
-      if (i === 0 || i === days.length - 1 || new Date(d.date + 'T12:00:00Z').getUTCDay() === 1)
+      const below = d.target !== null && d.target !== undefined && d.value < d.target;
+      const fill = d.date === selectedDay ? '#002b75' : below ? '#9ea2a2' : '#003da5';
+      const text = `${shortDate(d.date)}: ${d.value.toFixed(1)}${d.tip ? ` (${d.tip})` : ''}${d.target !== null && d.target !== undefined ? `, target ${d.target}` : ''}`;
+      svg += `<rect class="bar" data-date="${d.date}" role="button" tabindex="0" aria-label="${esc(text)}. Show this day." x="${x}" y="${y(d.value)}" width="${bw * 0.7}" height="${Math.max(y(0) - y(d.value), 1)}" fill="${fill}"><title>${esc(text)}</title></rect>`;
+      if (i === 0 || i === series.length - 1 || new Date(d.date + 'T12:00:00Z').getUTCDay() === 1)
         svg += `<text x="${x + bw * 0.35}" y="${H - 8}" font-size="12" text-anchor="middle" fill="#5d6566">${new Date(d.date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}</text>`;
     });
-    // target line, drawn only across the days a target applied
     let path = '';
-    days.forEach((d, i) => { if (d.target !== null) { const x1 = padL + i * bw, x2 = x1 + bw; path += `M${x1},${y(d.target)}H${x2}`; } });
-    if (path) svg += `<path d="${path}" stroke="#002b75" stroke-width="2.5" stroke-dasharray="6 4" fill="none"/>`;
-    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Completed drops per full-time van, by day${target ? ', with the target' : ''}" preserveAspectRatio="none">${svg}</svg>`;
+    series.forEach((d, i) => { if (d.target !== null && d.target !== undefined) { const x1 = padL + i * bw, x2 = x1 + bw; path += `M${x1},${y(d.target)}H${x2}`; } });
+    if (path) svg += `<path d="${path}" stroke="#002b75" stroke-width="2.5" stroke-dasharray="6 4" fill="none" pointer-events="none"/>`;
+    return `<svg viewBox="0 0 ${W} ${H}" aria-label="${esc(label)}" preserveAspectRatio="none">${svg}</svg>`;
   }
 
+  // What the period view is showing: the report, a chosen vehicle (or all full-time vans) and a chosen day.
+  const periodState = { view: null, p: null, r: null, vehicle: null, day: null, dayData: null };
+  const dayOpen = { vehicles: new Set(), runs: new Set(), highlight: null };
+
+  function renderChart() {
+    const r = periodState.r;
+    if (!r) return;
+    let series, title;
+    if (!periodState.vehicle) {
+      series = r.daily.filter((d) => d.van_days > 0).map((d) => ({ date: d.date, value: d.van_completed / d.van_days, target: d.target,
+        tip: `${d.van_completed} drops by ${d.van_days} van${d.van_days === 1 ? '' : 's'}` }));
+      title = 'Completed drops per full-time van per day';
+    } else {
+      const rows = r.vehicle_daily.filter((x) => x.vehicle === periodState.vehicle);
+      const kpiVan = rows.some((x) => x.vehicle_type === 'full_time_van' && x.in_kpi);
+      series = rows.map((x) => ({ date: x.date, value: x.completed_drops, target: kpiVan ? x.target : null,
+        tip: `${x.completed_drops} of ${x.planned_drops} drops, ${x.runs} run${x.runs === 1 ? '' : 's'}` }));
+      title = `Completed drops per day: ${periodState.vehicle}`;
+    }
+    $('chart-title').textContent = title;
+    $('chart-all').hidden = !periodState.vehicle;
+    $('chart').innerHTML = chart(series, periodState.day, title);
+    const hasTarget = series.some((d) => d.target !== null && d.target !== undefined);
+    $('chart-note').textContent = `Click a bar to see that day${periodState.vehicle ? '' : ', or a registration below to chart it'}.${hasTarget ? ' Grey bars are below target.' : ''}`;
+  }
+
+  async function selectDay(date) {
+    periodState.day = date;
+    renderChart();
+    dayOpen.vehicles = new Set(periodState.vehicle ? [periodState.vehicle] : []);
+    dayOpen.runs = new Set();
+    dayOpen.highlight = periodState.vehicle;
+    $('day-panel').hidden = false;
+    $('day-title').textContent = new Date(date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+    $('day-summary').textContent = 'Loading';
+    $('day-fleet').querySelector('tbody').innerHTML = '';
+    if ($('day-panel').scrollIntoView) $('day-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try {
+      const d = await api(`/day?date=${date}`);
+      if (periodState.day !== date) return;                       // another bar was clicked meanwhile
+      periodState.dayData = d;
+      const h = d.headline;
+      $('day-summary').textContent = d.vehicles.length
+        ? `${fmtInt(h.completed_drops)} of ${fmtInt(h.planned_drops)} drops completed over ${fmtInt(h.runs)} run${h.runs === 1 ? '' : 's'}` +
+          `${h.failed_drops ? `, ${h.failed_drops} failed` : ''}. Full-time vans averaged ${fmt1(per(h.van_completed, h.van_count))}${d.target !== null ? ` against a target of ${fmt1(d.target)}` : ''}. Click a registration for its runs and stops.`
+        : 'No runs in MaxOptra for this day.';
+      drawDay();
+    } catch (e) { $('day-summary').textContent = e.message; }
+  }
+  function drawDay() {
+    const d = periodState.dayData;
+    if (!d) return;
+    $('day-fleet').querySelector('tbody').innerHTML = fleetRows(d.vehicles, dayOpen, d.live);
+  }
+  function closeDay() {
+    periodState.day = null; periodState.dayData = null;
+    $('day-panel').hidden = true;
+    renderChart();
+  }
+  function selectVehicle(name) {
+    periodState.vehicle = periodState.vehicle === name ? null : name;
+    document.querySelectorAll('#view-period tr[data-row-vehicle]').forEach((tr) => tr.classList.toggle('selected', tr.dataset.rowVehicle === periodState.vehicle));
+    renderChart();
+    if (periodState.dayData) {
+      dayOpen.highlight = periodState.vehicle;
+      if (periodState.vehicle) dayOpen.vehicles.add(periodState.vehicle);
+      drawDay();
+    }
+  }
+  const regButton = (name) => `<button class="link veh" data-select-vehicle="${esc(name)}" title="Chart this vehicle">${esc(name)}</button>`;
+
   function renderPeriod(view, p, r) {
+    periodState.r = r;
     const vans = r.vehicles.filter((v) => v.vehicle_type === 'full_time_van' && v.in_kpi);
     const trucks = r.vehicles.filter((v) => v.vehicle_type === 'truck');
     const others = r.vehicles.filter((v) => !(v.vehicle_type === 'full_time_van' && v.in_kpi) && v.vehicle_type !== 'truck');
@@ -493,14 +748,13 @@
       <div class="kpi"><div class="label">Second runs</div><div class="value">${fmtInt(sum(r.vehicles, 'second_runs'))}</div>
         <div class="sub">${fmtInt(sum(r.vehicles, 'second_run_drops'))} drops on them</div></div>`;
 
-    $('chart').innerHTML = chart(r.daily, tgt);
-    $('chart-note').textContent = tgt ? 'Grey bars are days below target; the dashed line is the target.' : '';
+    renderChart();
 
     const vsT = (v) => (tgt && v !== null ? `<span class="${v - tgt.value < 0 ? 'behind' : 'ahead'}">${signed(v - tgt.value)}</span>` : '–');
     // Actual miles only exist on tracked days, so compare them with the plan for those same days (brief s.22)
     const miles = (v) => v.days_miles_tracked ? `${fmtInt(v.actual_miles)} <span class="small">vs ${fmtInt(v.planned_miles_tracked)} planned on the ${v.days_miles_tracked} tracked day${v.days_miles_tracked === 1 ? '' : 's'}</span>` : '<span class="small">Not tracked</span>';
     $('vans').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Utilisation</th></tr></thead><tbody>` +
-      vans.map((v) => { const pd = per(v.completed_drops, v.days); return `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td>
+      vans.map((v) => { const pd = per(v.completed_drops, v.days); return `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td>
         <td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td><td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td>
         <td class="n" data-label="Per day"><b>${fmt1(pd)}</b></td><td class="n" data-label="Against target">${vsT(pd)}</td>
         <td class="n" data-label="Failed">${v.failed_drops ? `<span class="fail">${v.failed_drops}</span>` : 0}</td><td class="n" data-label="Second runs">${v.second_runs}</td>
@@ -516,7 +770,7 @@
         <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
 
     $('trucks').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Average day</th><th class="n" scope="col">Utilisation</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th></tr></thead><tbody>` +
-      (trucks.length ? trucks.map((v) => `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td><td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td>
+      (trucks.length ? trucks.map((v) => `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td><td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td>
         <td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td><td class="n" data-label="Per day">${fmt1(per(v.completed_drops, v.days))}</td>
         <td class="n" data-label="Average day"><b>${hours(v.avg_day_minutes)}</b></td><td class="n" data-label="Utilisation"><b>${v.utilisation === null ? '–' : v.utilisation + '%'}</b></td>
         <td class="n" data-label="Average back">${hhmm(v.avg_return_minute)}</td><td class="n" data-label="Second runs">${v.second_runs}</td>
@@ -524,14 +778,14 @@
         : '<tr><td colspan="11" class="muted">No truck runs in this period.</td></tr>') + '</tbody>';
 
     $('others').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th scope="col">Type</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Failed</th></tr></thead><tbody>` +
-      (others.length ? others.map((v) => `<tr><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(v.vehicle)}</span></td><td data-label="Type">${esc(TYPE[v.vehicle_type] || v.vehicle_type)}</td>
+      (others.length ? others.map((v) => `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td><td data-label="Type">${esc(TYPE[v.vehicle_type] || v.vehicle_type)}</td>
         <td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td><td class="n" data-label="Per day">${fmt1(per(v.completed_drops, v.days))}</td>
         <td class="n" data-label="Failed">${v.failed_drops || 0}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">None.</td></tr>') + '</tbody>';
 
     $('fail-note').textContent = r.failures.length >= 200 ? 'Latest 200 shown' : '';
     $('failures').innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col">Customer</th><th scope="col">Reason</th></tr></thead><tbody>` +
-      (r.failures.length ? r.failures.map((f) => `<tr><td data-label="Date">${shortDate(f.date)}</td><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(f.vehicle)}</span></td>
-        <td data-label="Driver">${esc(f.driver || '–')}</td><td data-label="Customer">${esc(f.client_name || '–')}</td><td data-label="Reason">${esc(f.fail_reasons || 'No reason given')}</td></tr>`).join('')
+      (r.failures.length ? r.failures.map((f) => `<tr><td data-label="Date">${shortDate(f.date)}</td><td class="lead-cell" data-label="Vehicle">${regButton(f.vehicle)}</td>
+        <td data-label="Driver">${esc(f.driver || '–')}</td><td data-label="Customer">${f.client_name ? `<button class="link" data-customer="${esc(f.client_name)}">${esc(f.client_name)}</button>` : '–'}</td><td data-label="Reason">${esc(f.fail_reasons || 'No reason given')}</td></tr>`).join('')
         : '<tr><td colspan="5" class="muted">No failed deliveries.</td></tr>') + '</tbody>';
   }
 
@@ -547,6 +801,8 @@
 
   async function loadPeriod(view) {
     const p = periodFor(view);
+    Object.assign(periodState, { view, p, r: null, vehicle: null, day: null, dayData: null });
+    $('day-panel').hidden = true;
     const bar = $('period-bar');
     if (view === 'range') {
       bar.innerHTML = `<h2>Date range</h2>
@@ -564,9 +820,27 @@
     catch (e) { banner(`<b>${esc(e.message)}</b>${e.detail ? ` ${esc(e.detail)}` : ''}`); }
   }
 
+  bindFleet('fleet', todayOpen, drawToday);
+  bindFleet('day-fleet', dayOpen, drawDay);
+  $('view-period').addEventListener('click', (e) => {
+    const reg = e.target.closest('[data-select-vehicle]');
+    if (reg) { selectVehicle(reg.dataset.selectVehicle); return; }
+    const cust = e.target.closest('#failures [data-customer]');
+    if (cust) { openCustomer(cust.dataset.customer, cust); return; }
+    const bar = e.target.closest('rect.bar');
+    if (bar) selectDay(bar.dataset.date);
+  });
+  $('chart').addEventListener('keydown', (e) => {
+    const bar = e.target.closest('rect.bar');
+    if (bar && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectDay(bar.dataset.date); }
+  });
+  $('chart-all').addEventListener('click', () => selectVehicle(periodState.vehicle));
+  $('day-close').addEventListener('click', closeDay);
+
   // ---------------------------------------------------------------- Router
   function show() {
     const view = (location.hash.slice(1).split('?')[0]) || 'today';
+    if (!$('customer').hidden) closeCustomer();          // e.g. the browser's back button while a customer is open
     document.querySelectorAll('nav a').forEach((a) => { if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     $('view-today').hidden = view !== 'today';
     $('view-period').hidden = view === 'today';
