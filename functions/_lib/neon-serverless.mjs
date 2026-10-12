@@ -1,5 +1,5 @@
-// @neondatabase/serverless 1.1.0, vendored unchanged so Pages can bundle it without npm.
-/*
+// @neondatabase/serverless 1.1.0, vendored unchanged so it can be bundled without npm.
+/*! @neondatabase/serverless 1.1.0 licence:
 MIT License
 
 Copyright (c) 2022 - 2025 Neon Inc.

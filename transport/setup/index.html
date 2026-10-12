@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transport setup | Plus Packaging</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #003da5;
+    --navy: #002b75;
+    --grey: #9ea2a2;
+    --light: #eaf2ff;
+    --bg: #f4f7fb;
+    --white: #ffffff;
+    --ink: #1c2733;
+    --muted: #5d6566;
+    --line: #d9dee3;
+    --bad: #b42318;
+    --bad-bg: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Lato, "Segoe UI", Arial, sans-serif; }
+  a { color: var(--blue); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  header { background: var(--navy); color: var(--white); }
+  .bar { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .brand { font-weight: 900; font-size: 18px; letter-spacing: .2px; }
+  .brand span { font-weight: 400; opacity: .85; margin-left: 10px; }
+  .who { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .role { border: 1px solid rgba(255,255,255,.55); border-radius: 3px; padding: 1px 7px; font-size: 12px; font-weight: 700; }
+  header a { color: var(--white); font-size: 14px; }
+
+  main { max-width: 1120px; margin: 0 auto; padding: 18px 20px 48px; }
+  section { background: var(--white); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 0; }
+  h1, h2 { margin: 0; color: var(--navy); }
+  h2 { font-size: 17px; font-weight: 900; }
+  .pad { padding: 12px 18px 16px; }
+  .muted { color: var(--muted); }
+
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 12px 18px; font-size: 14px; }
+  .check b { font-weight: 700; }
+  .ok::before, .err::before, .wait::before { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; content: ""; vertical-align: 1px; }
+  .ok::before { background: var(--blue); }
+  .err::before { background: var(--bad); }
+  .wait::before { background: var(--grey); }
+
+  .kpi { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 6px 18px 2px; }
+  .kpi .big { font-size: 46px; line-height: 1.05; font-weight: 900; color: var(--blue); }
+  .kpi .label { font-size: 15px; color: var(--muted); max-width: 32ch; }
+  .kpi .ref { font-size: 14px; color: var(--muted); }
+
+  select, button, input[type=file] { font: inherit; }
+  select { border: 1px solid var(--grey); border-radius: 3px; padding: 4px 8px; background: var(--white); color: var(--ink); }
+  button { background: var(--blue); color: var(--white); border: 0; border-radius: 3px; padding: 7px 14px; font-weight: 700; cursor: pointer; }
+  button:disabled { background: var(--grey); cursor: default; }
+
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { background: var(--light); color: var(--navy); font-weight: 700; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 900; border-top: 2px solid var(--navy); border-bottom: 0; }
+  td.diff { color: var(--muted); }
+  caption { caption-side: top; text-align: left; padding: 14px 18px 8px; font-weight: 700; color: var(--navy); }
+
+  ul.flags { margin: 0; padding: 0; list-style: none; }
+  ul.flags li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  ul.flags li:last-child { border-bottom: 0; }
+  ul.flags .count { min-width: 3.5em; text-align: right; font-weight: 900; color: var(--navy); font-variant-numeric: tabular-nums; }
+  ul.flags .eg { color: var(--muted); font-size: 13px; }
+
+  .import-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .progress { margin-top: 10px; font-size: 14px; }
+  .note { font-size: 13px; color: var(--muted); margin: 10px 0 0; max-width: 75ch; }
+  .error { background: var(--bad-bg); color: var(--bad); border-left: 4px solid var(--bad); padding: 10px 14px; margin: 12px 18px; font-size: 14px; }
+  .error code { color: var(--ink); }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 640px) {
+    .kpi .big { font-size: 38px; }
+    .who { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Plus Transport<span>Setup and validation</span></div>
+    <div class="who"><span id="who-email">Checking sign-in</span><span class="role" id="who-role" hidden></span></div>
+    <a href="/transport/">Transport</a>
+    <a href="/">Dashboards</a>
+  </div>
+</header>
+
+<main>
+  <section aria-labelledby="conn-title">
+    <div class="section-head"><h2 id="conn-title">Connection</h2></div>
+    <div class="checks">
+      <div class="check wait" id="check-access"><b>Cloudflare Access</b> <span>checking</span></div>
+      <div class="check wait" id="check-db"><b>Neon database</b> <span>checking</span></div>
+      <div class="check wait" id="check-data"><b>Data loaded</b> <span>checking</span></div>
+    </div>
+    <div class="error" id="conn-error" hidden></div>
+  </section>
+
+  <section aria-labelledby="val-title">
+    <div class="section-head">
+      <h2 id="val-title">Completed drops per full-time van per day</h2>
+      <label class="muted">Month <select id="month"></select></label>
+    </div>
+    <div class="kpi">
+      <div class="big num" id="kpi-value">–</div>
+      <div class="label" id="kpi-label">Completed drops ÷ days each full-time van ran. Several orders at one stop count as one drop.</div>
+    </div>
+    <div class="kpi"><div class="ref" id="kpi-ref"></div></div>
+    <div class="table-wrap">
+      <table id="vans">
+        <caption>Full-time vans</caption>
+        <thead><tr>
+          <th>Vehicle</th><th class="n">Days</th><th class="n">Completed drops</th>
+          <th class="n">Completed drops a day</th><th class="n">Order lines a day</th>
+          <th class="n" data-sept>Brief (September)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="table-wrap">
+      <table id="others">
+        <caption>Other vehicles, not in the van KPI</caption>
+        <thead><tr>
+          <th>Vehicle</th><th>Type</th><th class="n">Days</th><th class="n">Completed drops a day</th>
+          <th class="n">Order lines a day</th><th class="n">Failed drops</th><th class="n">Second runs</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="error" id="val-error" hidden></div>
+  </section>
+
+  <section aria-labelledby="flags-title">
+    <div class="section-head"><h2 id="flags-title">Data checks for the month</h2></div>
+    <div class="pad"><ul class="flags" id="flags"><li class="muted">Waiting for data</li></ul></div>
+  </section>
+
+  <section aria-labelledby="import-title" id="import" hidden>
+    <div class="section-head"><h2 id="import-title">Import an Aggregated Routes Report</h2></div>
+    <div class="pad">
+      <div class="import-row">
+        <input type="file" id="file" accept=".xlsm,.xlsx" aria-label="Aggregated Routes Report file">
+        <button id="import-btn" disabled>Import report</button>
+      </div>
+      <div class="progress" id="progress" aria-live="polite"></div>
+      <p class="note">Only the All routes and All planned orders tabs are read. Nothing else in the file, including its Config tab, leaves this browser. Importing the same report again changes nothing, so a month can be re-imported safely.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+// Maps MaxOptra's Aggregated Routes Report (the "All routes" and "All planned orders" tabs)
+// to clean records for transport.import_batch. Runs in the browser with SheetJS; only those two
+// tabs are parsed, so nothing else in the workbook (including its Config tab) is ever read.
+const PlusReportImport = (() => {
+  const RUN_COLUMNS = {
+    'run id': 'run_key', 'aoc id': 'aoc_id', 'distribution center': 'aoc_name', 'date': 'run_date',
+    'driver name': 'driver_name', 'vehicle name': 'vehicle_name',
+    'vehicle capacity 1': 'capacity_1', 'vehicle capacity 2': 'capacity_2', 'run number': 'run_number',
+    'planned distance': 'planned_distance', 'actual distance': 'actual_distance',
+    'cost per mile': 'cost_per_mile', 'run cost': 'run_cost', 'fact cost per mile': 'actual_cost_per_mile',
+    'planned route duration': 'planned_duration_min', 'actual route duration': 'actual_duration_min',
+    'planned run start time': 'planned_start', 'planned run departure time': 'planned_departure',
+    'actual run departure time': 'actual_departure', 'planned run end time': 'planned_end',
+    'actual run end time': 'actual_end', 'driver availability start time': 'driver_avail_start',
+    'driver availability end time': 'driver_avail_end', 'planned driving time': 'planned_driving_min',
+    'actual driving time': 'actual_driving_min', 'load, capacity 1': 'load_1', 'load, capacity 2': 'load_2',
+    'total actual items': 'actual_items', 'total planned items': 'planned_items',
+  };
+  // Contact names and phone numbers are deliberately not imported: the dashboard doesn't need them.
+  const ORDER_COLUMNS = {
+    'run id': 'run_key', 'order reference': 'order_ref', 'priority': 'priority', 'order status': 'order_status',
+    'fail reason': 'fail_reason', 'comment': 'fail_comment', 'order task': 'task', 'location name': 'location_name',
+    'location address': 'location_postcode', 'client name': 'client_name', 'sequence': 'sequence',
+    'location latitude': 'latitude', 'location longitude': 'longitude',
+    'operation time window, start time': 'window_start', 'operation time window, end time': 'window_end',
+    'planned arrival time': 'planned_arrival', 'planned departure time': 'planned_departure',
+    'actual arrival time (gps)': 'gps_arrival', 'actual departure time (gps)': 'gps_departure',
+    'reported arrival time': 'reported_arrival', 'reported departure time': 'reported_departure',
+    'planned distance': 'planned_distance', 'actual distance': 'actual_distance',
+    'planned driving time': 'planned_driving_min', 'actual driving time': 'actual_driving_min',
+    'planned stop duration': 'planned_stop_min', 'report stop duration': 'reported_stop_min',
+    'driver name': 'driver_name', 'territory': 'territory', 'vehicle name': 'vehicle_name',
+    'vehicle requirements': 'vehicle_requirements', 'order size, capacity 1': 'size_1',
+    'order size, capacity 2': 'size_2', 'cost': 'cost', 'actual cost': 'actual_cost',
+    'additional attributes': 'attributes', 'additional instructions': 'instructions',
+    'actual items': 'actual_items', 'planned items': 'planned_items', 'completion status': 'completion_status',
+  };
+  const TIME = new Set(['planned_start', 'planned_departure', 'planned_end', 'actual_departure', 'actual_end',
+    'driver_avail_start', 'driver_avail_end', 'window_start', 'window_end', 'planned_arrival',
+    'gps_arrival', 'gps_departure', 'reported_arrival', 'reported_departure']);
+  const DATE = new Set(['run_date']);
+  const NUMBER = new Set(['capacity_1', 'capacity_2', 'planned_distance', 'actual_distance', 'cost_per_mile',
+    'run_cost', 'actual_cost_per_mile', 'planned_duration_min', 'actual_duration_min', 'planned_driving_min',
+    'actual_driving_min', 'load_1', 'load_2', 'latitude', 'longitude', 'planned_stop_min', 'reported_stop_min',
+    'size_1', 'size_2', 'cost', 'actual_cost']);
+  const INTEGER = new Set(['run_number', 'actual_items', 'planned_items', 'sequence']);
+  const REQUIRED_RUN = ['run_key', 'run_date', 'vehicle_name', 'driver_name'];
+  const REQUIRED_ORDER = ['run_key', 'order_ref', 'task', 'order_status', 'vehicle_name', 'driver_name'];
+  const RUN_KEY = /^(\d{4}-\d{2}-\d{2})-(.+)-(\d+)$/;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  // Excel serial number (days since 1899-12-30) to wall-clock time, without any time-zone shift.
+  function serialToIso(v) {
+    const d = new Date(Math.round((v - 25569) * 86400) * 1000);
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T` +
+           `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  }
+
+  function parseTime(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number') return Number.isFinite(v) && v > 1 ? serialToIso(v) : undefined;
+    const s = String(v).trim();
+    if (!s) return null;
+    let m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);   // 01.09.2026 08:00
+    if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}T${pad(m[4])}:${m[5]}:${m[6] || '00'}`;
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);                  // 2026-09-01 08:00
+    if (m) return `${m[1]}-${m[2]}-${m[3]}T${pad(m[4])}:${m[5]}:${m[6] || '00'}`;
+    return undefined;
+  }
+
+  function parseDate(v) {
+    const t = parseTime(v);
+    if (t) return t.slice(0, 10);
+    if (t === null) return null;
+    const s = String(v).trim();
+    let m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+    if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return s;
+    return undefined;
+  }
+
+  function parseNumber(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+    const s = String(v).replace(/,/g, '').trim();
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  function parseText(v) {
+    if (v === null || v === undefined) return null;
+    const s = String(v).trim();
+    return s ? s : null;
+  }
+
+  function convert(field, value) {
+    if (TIME.has(field)) return parseTime(value);
+    if (DATE.has(field)) return parseDate(value);
+    if (INTEGER.has(field)) { const n = parseNumber(value); return n === undefined || n === null ? n : Math.round(n); }
+    if (NUMBER.has(field)) return parseNumber(value);
+    return parseText(value);
+  }
+
+  function mapSheet(XLSX, ws, columns, required, label) {
+    const raw = XLSX.utils.sheet_to_json(ws, { raw: true, defval: null });
+    const headerMap = {};
+    if (raw.length) {
+      for (const h of Object.keys(raw[0])) {
+        const key = columns[String(h).trim().toLowerCase().replace(/\s+/g, ' ')];
+        if (key) headerMap[h] = key;
+      }
+    }
+    const present = new Set(Object.values(headerMap));
+    const missing = required.filter((f) => !present.has(f));
+    if (raw.length && missing.length) {
+      throw new Error(`The "${label}" tab is missing columns for: ${missing.join(', ')}. Export the report again from MaxOptra without changing its layout.`);
+    }
+    const rows = [];
+    const problems = [];
+    raw.forEach((r, i) => {
+      const out = {};
+      const unparsed = {};
+      for (const [header, field] of Object.entries(headerMap)) {
+        const v = convert(field, r[header]);
+        if (v === undefined) { out[field] = null; unparsed[field] = r[header]; problems.push({ tab: label, row: i + 2, field, value: r[header] }); }
+        else out[field] = v;
+      }
+      if (Object.keys(unparsed).length) out._unparsed = unparsed;
+      if (out.run_key) rows.push(out);
+    });
+    return { rows, problems };
+  }
+
+  function mapWorkbook(XLSX, wb) {
+    const routesWs = wb.Sheets['All routes'];
+    const ordersWs = wb.Sheets['All planned orders'];
+    if (!routesWs || !ordersWs) {
+      throw new Error('This file has no "All routes" and "All planned orders" tabs. Choose the Aggregated Routes Report exported from MaxOptra.');
+    }
+    const runs = mapSheet(XLSX, routesWs, RUN_COLUMNS, REQUIRED_RUN, 'All routes');
+    const orders = mapSheet(XLSX, ordersWs, ORDER_COLUMNS, REQUIRED_ORDER, 'All planned orders');
+    const problems = runs.problems.concat(orders.problems);
+    for (const set of [runs.rows, orders.rows]) {
+      for (const r of set) {
+        if (!RUN_KEY.test(r.run_key)) problems.push({ tab: 'run IDs', row: null, field: 'run_key', value: r.run_key });
+      }
+    }
+    const dates = runs.rows.map((r) => r.run_date).concat(orders.rows.map((o) => o.run_key.slice(0, 10))).filter(Boolean).sort();
+    return { runs: runs.rows, orders: orders.rows, from: dates[0] || null, to: dates[dates.length - 1] || null, problems };
+  }
+
+  return { mapWorkbook, parseTime, parseDate, serialToIso };
+})();
+</script>
+<script>
+(() => {
+  const API = '/api/transport';
+  const SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  // Figures the brief expects for September 2026 (s.17), shown only to check the import against.
+  const BRIEF_SEPT = { 'CJ26 OGM': 12.8, 'CJ26 OHS': 12.5, 'OV20 LPZ': 8.9, total: 11.7 };
+  const TYPE_LABEL = { truck: 'Truck', support: 'Support', temporary: 'Temporary or hire', excluded: 'Excluded', unclassified: 'Not classified yet', full_time_van: 'Full-time van' };
+  const FLAG_LABEL = {
+    runs_rebuilt: 'Runs missing from MaxOptra\'s routes feed, rebuilt from their orders',
+    closed_without_items: 'Orders closed by the driver with no items recorded, not counted as completed',
+    implausibly_early_departure: 'Departures before 05:00, left out of averages',
+    impossible_duration: 'Impossible route times, left out of averages',
+    timestamp_on_wrong_day: 'Times dated outside the run date, left out of averages',
+    outside_operating_hours: 'Returns after 21:00, left out of averages',
+    overlaps_previous_run: 'Runs leaving before the previous run returned',
+    departure_matches_plan: 'Departures exactly at the planned time, so possibly not recorded',
+    return_not_recorded: 'Runs with no recorded return time',
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const fmt1 = (n) => (n === null || n === undefined || !isFinite(n)) ? '–' : Number(n).toFixed(1);
+  const fmtInt = (n) => (n === null || n === undefined) ? '–' : Number(n).toLocaleString('en-GB');
+  const perDay = (total, days) => days ? total / days : null;
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const longDate = (iso) => iso ? new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '–';
+
+  async function api(path, options = {}) {
+    const res = await fetch(API + path, { credentials: 'same-origin', ...options });
+    let body = null;
+    try { body = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) {
+      const err = new Error((body && body.error) || `The transport API returned ${res.status}`);
+      err.detail = body && body.detail;
+      err.status = res.status;
+      throw err;
+    }
+    return body;
+  }
+
+  function setCheck(id, state, text) {
+    const el = $(id);
+    el.className = 'check ' + state;
+    el.querySelector('span').textContent = text;
+  }
+
+  function showError(id, err) {
+    const el = $(id);
+    el.innerHTML = `<b>${esc(err.message)}</b>${err.detail ? `<br><code>${esc(err.detail)}</code>` : ''}`;
+    el.hidden = false;
+  }
+
+  // ---- months -----------------------------------------------------------
+  function monthRange(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return { from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, '0')}` };
+  }
+  function fillMonths(firstDate, lastDate) {
+    const sel = $('month');
+    const months = [];
+    if (firstDate && lastDate) {
+      let [y, m] = firstDate.slice(0, 7).split('-').map(Number);
+      const [ly, lm] = lastDate.slice(0, 7).split('-').map(Number);
+      while (y < ly || (y === ly && m <= lm)) { months.push(`${y}-${String(m).padStart(2, '0')}`); m++; if (m > 12) { m = 1; y++; } }
+    }
+    const keep = sel.value;
+    sel.innerHTML = months.reverse().map((ym) => {
+      const label = new Date(ym + '-15T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      return `<option value="${ym}">${label}</option>`;
+    }).join('');
+    if (months.includes(keep)) sel.value = keep;
+  }
+
+  // ---- validation ---------------------------------------------------------
+  async function loadValidation() {
+    const ym = $('month').value;
+    if (!ym) return;
+    $('val-error').hidden = true;
+    const { from, to } = monthRange(ym);
+    let v;
+    try { v = await api(`/validation?from=${from}&to=${to}`); }
+    catch (e) { showError('val-error', e); return; }
+
+    const sept = ym === '2026-09';
+    document.querySelectorAll('[data-sept]').forEach((el) => { el.hidden = !sept; });
+
+    const t = v.full_time_vans || {};
+    $('kpi-value').textContent = fmt1(perDay(t.completed_drops, t.van_days));
+    $('kpi-ref').textContent = t.van_days
+      ? `${fmtInt(t.completed_drops)} completed drops over ${fmtInt(t.van_days)} van-days. Counting every order line instead gives ${fmt1(perDay(t.drop_order_lines, t.van_days))}.` +
+        (sept ? ` The brief's September baseline is about ${BRIEF_SEPT.total}.` : '')
+      : 'No full-time van days in this month yet.';
+
+    const vans = v.vehicles.filter((x) => x.vehicle_type === 'full_time_van' && x.in_kpi);
+    const others = v.vehicles.filter((x) => !(x.vehicle_type === 'full_time_van' && x.in_kpi));
+
+    $('vans').querySelector('tbody').innerHTML = vans.map((x) => `
+      <tr><td>${esc(x.vehicle)}</td><td class="n">${fmtInt(x.days)}</td><td class="n">${fmtInt(x.completed_drops)}</td>
+      <td class="n">${fmt1(perDay(x.completed_drops, x.days))}</td><td class="n">${fmt1(perDay(x.drop_order_lines, x.days))}</td>
+      <td class="n diff" data-sept ${sept ? '' : 'hidden'}>${BRIEF_SEPT[x.maxoptra_name] ?? '–'}</td></tr>`).join('') +
+      `<tr class="total"><td>Full-time vans</td><td class="n">${fmtInt(t.van_days)}</td><td class="n">${fmtInt(t.completed_drops)}</td>
+      <td class="n">${fmt1(perDay(t.completed_drops, t.van_days))}</td><td class="n">${fmt1(perDay(t.drop_order_lines, t.van_days))}</td>
+      <td class="n" data-sept ${sept ? '' : 'hidden'}>about ${BRIEF_SEPT.total}</td></tr>`;
+
+    $('others').querySelector('tbody').innerHTML = others.length ? others.map((x) => `
+      <tr><td>${esc(x.vehicle)}</td><td>${esc(TYPE_LABEL[x.vehicle_type] || x.vehicle_type)}</td><td class="n">${fmtInt(x.days)}</td>
+      <td class="n">${fmt1(perDay(x.completed_drops, x.days))}</td><td class="n">${fmt1(perDay(x.drop_order_lines, x.days))}</td>
+      <td class="n">${fmtInt(x.failed_drops)}</td><td class="n">${fmtInt(x.second_runs)}</td></tr>`).join('')
+      : '<tr><td colspan="7" class="muted">No other vehicles ran this month.</td></tr>';
+
+    const rebuilt = v.vehicles.reduce((s, x) => s + (x.runs_rebuilt || 0), 0);
+    const items = [];
+    if (v.coverage) items.push({ count: v.coverage.days_with_data, label: 'Days with MaxOptra data', eg: v.coverage.weekdays_without_data ? `${v.coverage.weekdays_without_data} weekdays have no runs` : 'Every weekday has runs' });
+    if (rebuilt) items.push({ count: rebuilt, label: FLAG_LABEL.runs_rebuilt });
+    for (const f of v.flags) items.push({ count: f.count, label: FLAG_LABEL[f.rule] || f.rule, eg: /\d/.test(f.example || '') ? `For example: ${f.example}` : '' });
+    $('flags').innerHTML = items.map((i) => `<li><span class="count">${fmtInt(i.count)}</span><span>${esc(i.label)}${i.eg ? `<br><span class="eg">${esc(i.eg)}</span>` : ''}</span></li>`).join('')
+      || '<li class="muted">No data for this month.</li>';
+  }
+
+  // ---- status -------------------------------------------------------------
+  async function loadStatus() {
+    const s = await api('/status');
+    const d = s.data || {};
+    if (d.runs) {
+      setCheck('check-data', 'ok', `${longDate(d.first_date)} to ${longDate(d.last_date)}, ${fmtInt(d.runs)} runs and ${fmtInt(d.orders)} orders`);
+    } else {
+      setCheck('check-data', 'wait', 'nothing imported yet');
+    }
+    fillMonths(d.first_date, d.last_date);
+  }
+
+  // ---- import -------------------------------------------------------------
+  function loadSheetJs() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = SHEETJS;
+      s.onload = () => resolve(window.XLSX);
+      s.onerror = () => reject(new Error('Could not load the spreadsheet reader from cdnjs'));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function postJson(path, body) {
+    return api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  }
+
+  async function runImport() {
+    const file = $('file').files[0];
+    if (!file) return;
+    const btn = $('import-btn');
+    const progress = $('progress');
+    btn.disabled = true;
+    const say = (t) => { progress.textContent = t; };
+    let mapped = null;
+    const totals = { runs: 0, runs_rebuilt_from_orders: 0, orders: 0, new_vehicles: 0, new_drivers: 0 };
+    try {
+      say('Reading the report');
+      const XLSX = await loadSheetJs();
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', sheets: ['All routes', 'All planned orders'] });
+      mapped = PlusReportImport.mapWorkbook(XLSX, wb);
+      if (!mapped.runs.length && !mapped.orders.length) throw new Error('The report has no runs or orders in it.');
+      if (mapped.problems.length) console.warn('Values that could not be read', mapped.problems);
+
+      const add = (r) => { for (const k of Object.keys(totals)) totals[k] += r[k] || 0; };
+      const CHUNK = 200;
+      for (let i = 0; i < mapped.runs.length; i += CHUNK) {
+        say(`Uploading runs ${fmtInt(Math.min(i + CHUNK, mapped.runs.length))} of ${fmtInt(mapped.runs.length)}`);
+        add(await postJson('/import', { runs: mapped.runs.slice(i, i + CHUNK), orders: [] }));
+      }
+      for (let i = 0; i < mapped.orders.length; i += CHUNK) {
+        say(`Uploading orders ${fmtInt(Math.min(i + CHUNK, mapped.orders.length))} of ${fmtInt(mapped.orders.length)}`);
+        add(await postJson('/import', { runs: [], orders: mapped.orders.slice(i, i + CHUNK) }));
+      }
+      const message = `${file.name}: ${totals.runs} runs and ${totals.orders} orders new or changed, ${totals.runs_rebuilt_from_orders} runs rebuilt from orders, ${totals.new_vehicles} new vehicles, ${totals.new_drivers} new drivers` +
+        (mapped.problems.length ? `, ${mapped.problems.length} values unreadable` : '');
+      await postJson('/import/log', { status: 'ok', from: mapped.from, to: mapped.to, runs: totals.runs, orders: totals.orders, message });
+      say(`Imported ${longDate(mapped.from)} to ${longDate(mapped.to)}. ${message.split(': ')[1]}.`);
+      await loadStatus();
+      if (mapped.to) $('month').value = mapped.to.slice(0, 7);
+      await loadValidation();
+    } catch (e) {
+      say('');
+      showError('conn-error', e);
+      postJson('/import/log', { status: 'error', from: mapped && mapped.from, to: mapped && mapped.to, message: `${file.name}: ${e.message}` }).catch(() => {});
+    } finally {
+      btn.disabled = !$('file').files.length;
+    }
+  }
+
+  // ---- start --------------------------------------------------------------
+  async function start() {
+    let me;
+    try {
+      me = await api('/me');
+    } catch (e) {
+      const accessFault = e.status === 401 || e.status === 403;
+      setCheck('check-access', accessFault ? 'err' : 'ok', accessFault ? 'not verified' : 'verified');
+      setCheck('check-db', 'err', accessFault ? 'not checked' : 'failed');
+      setCheck('check-data', 'wait', 'not checked');
+      $('who-email').textContent = 'Not signed in';
+      showError('conn-error', e);
+      return;
+    }
+    $('who-email').textContent = me.email;
+    $('who-role').textContent = me.role === 'admin' ? 'Admin' : 'Standard';
+    $('who-role').hidden = false;
+    setCheck('check-access', 'ok', 'verified');
+    setCheck('check-db', 'ok', 'connected');
+    $('import').hidden = me.role !== 'admin';
+    try {
+      await loadStatus();
+      await loadValidation();
+    } catch (e) {
+      showError('conn-error', e);
+    }
+  }
+
+  $('month').addEventListener('change', loadValidation);
+  $('file').addEventListener('change', () => { $('import-btn').disabled = !$('file').files.length; $('progress').textContent = ''; $('conn-error').hidden = true; });
+  $('import-btn').addEventListener('click', runImport);
+  start();
+})();
+</script>
+</body>
+</html>
