@@ -307,10 +307,14 @@ async function live(sql) {
   const now = londonNow();
   const [runs, sync, events, target] = await Promise.all([
     sql.query(LIVE_RUNS, [now.date]),
+    // Today's freshness only: history being pulled in the background logs past dates and must not count.
     sql.query(`select
-        (select started_at from transport.sync_log where source = 'report_api' and status = 'ok' order by id desc limit 1) as last_ok,
-        (select started_at from transport.sync_log where source = 'report_api' and status = 'error' order by id desc limit 1) as last_error_at,
-        (select message from transport.sync_log where source = 'report_api' and status = 'error' order by id desc limit 1) as last_error`),
+        (select started_at from transport.sync_log where source = 'report_api' and status = 'ok'
+           and date_from = $1::date order by id desc limit 1) as last_ok,
+        (select started_at from transport.sync_log where source = 'report_api' and status = 'error'
+           and date_from <= $1::date and date_to >= $1::date order by id desc limit 1) as last_error_at,
+        (select message from transport.sync_log where source = 'report_api' and status = 'error'
+           and date_from <= $1::date and date_to >= $1::date order by id desc limit 1) as last_error`, [now.date]),
     sql.query(`select id, detail from transport.events where event_date = $1 and event_type = 'last_job_done'
                order by created_at desc, id desc limit 30`, [now.date]),
     sql.query(`select transport.target_on('van_drops_per_day', $1::date) as target`, [now.date]),
@@ -318,14 +322,20 @@ async function live(sql) {
   const s = sync[0] || {};
   const lastOk = s.last_ok ? londonNow(new Date(s.last_ok)) : null;
   const lastErr = s.last_error_at ? londonNow(new Date(s.last_error_at)) : null;
-  const inHours = !['Sat', 'Sun'].includes(now.weekday) && now.minutes >= 6 * 60 && now.minutes < 19 * 60 + 30;
+  // The sync runs every 5 minutes 06:00-17:00 and every 15 minutes 05:30-06:00 and 17:00-19:30 on weekdays,
+  // so allow three missed runs before warning.
+  const weekday = !['Sat', 'Sun'].includes(now.weekday);
+  const m = now.minutes;
+  const staleAfter = !weekday ? null
+    : (m >= 6 * 60 && m < 17 * 60) ? 15
+    : ((m >= 6 * 60 - 15 && m < 6 * 60) || (m >= 17 * 60 && m < 19 * 60 + 30)) ? 45 : null;
   const ageMin = s.last_ok ? Math.round((Date.now() - new Date(s.last_ok).getTime()) / 60000) : null;
   return json({
     date: now.date, now: now.stamp.slice(11, 16),
     sync: {
       last_ok: lastOk ? (lastOk.date === now.date ? lastOk.stamp.slice(11, 16) : lastOk.stamp.slice(0, 16)) : null,
       age_minutes: ageMin,
-      stale: inHours && (ageMin === null || ageMin > 15),
+      stale: staleAfter !== null && (ageMin === null || ageMin > staleAfter),
       failing: Boolean(s.last_error_at && (!s.last_ok || new Date(s.last_error_at) > new Date(s.last_ok))),
       last_error: s.last_error || null, last_error_at: lastErr ? lastErr.stamp.slice(11, 16) : null,
     },
@@ -401,7 +411,10 @@ async function report(url, sql) {
     sql.query(`
       select d::date::text as date from generate_series($1::date, $2::date, interval '1 day') d
       where extract(isodow from d) < 6
+        and d::date < (now() at time zone 'Europe/London')::date
         and not exists (select 1 from transport.runs r where r.run_date = d::date and r.removed_at is null)
+        -- a day MaxOptra was asked for and had nothing (a bank holiday) is not missing
+        and not exists (select 1 from transport.sync_log l where l.status = 'ok' and l.date_from <= d::date and l.date_to >= d::date)
       order by 1`, [from, to]),
     sql.query(`
       select distinct on (applies_to) applies_to, break_minutes,

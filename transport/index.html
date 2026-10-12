@@ -478,7 +478,7 @@
 
     $('missing').hidden = !r.missing_weekdays.length;
     $('missing').innerHTML = r.missing_weekdays.length
-      ? `<b>History still loading:</b> no data yet for ${r.missing_weekdays.length} weekday${r.missing_weekdays.length > 1 ? 's' : ''} (${dateRanges(r.missing_weekdays)}). The sync fills these in overnight, so averages for this period are partial until then.` : '';
+      ? `<b>History is still being pulled from MaxOptra:</b> no data yet for ${r.missing_weekdays.length} weekday${r.missing_weekdays.length > 1 ? 's' : ''} (${dateRanges(r.missing_weekdays)}). Averages for this period are partial until it's in.` : '';
 
     $('period-kpis').innerHTML = `
       <div class="kpi lead"><div class="label">Completed drops per full-time van per day</div>

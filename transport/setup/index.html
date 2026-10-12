@@ -151,14 +151,14 @@
   </section>
 
   <section aria-labelledby="import-title" id="import" hidden>
-    <div class="section-head"><h2 id="import-title">Import an Aggregated Routes Report</h2></div>
+    <div class="section-head"><h2 id="import-title">Import a spreadsheet (optional)</h2></div>
     <div class="pad">
       <div class="import-row">
         <input type="file" id="file" accept=".xlsm,.xlsx" aria-label="Aggregated Routes Report file">
         <button id="import-btn" disabled>Import report</button>
       </div>
       <div class="progress" id="progress" aria-live="polite"></div>
-      <p class="note">Only the All routes and All planned orders tabs are read. Nothing else in the file, including its Config tab, leaves this browser. Importing the same report again changes nothing, so a month can be re-imported safely.</p>
+      <p class="note">History comes from MaxOptra automatically, so this isn't needed. It's here to load an Aggregated Routes Report by hand if you ever want to. Only its All routes and All planned orders tabs are read, and nothing else in the file leaves this browser.</p>
     </div>
   </section>
 </main>
