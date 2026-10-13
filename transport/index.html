@@ -58,7 +58,8 @@
 
   .live-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem); gap: 1rem; align-items: start; }
   .fleet > tbody > tr > td:nth-child(2), .fleet > tbody > tr > td:nth-child(3), .fleet > tbody > tr > td:nth-child(5),
-  .fleet > tbody > tr > td:nth-child(7), .fleet > tbody > tr > td:nth-child(9), .fleet > tbody > tr > td:nth-child(10) { white-space: nowrap; }
+  .fleet > tbody > tr > td:nth-child(7), .fleet > tbody > tr > td:nth-child(8), .fleet > tbody > tr > td:nth-child(10),
+  .fleet > tbody > tr > td:nth-child(11) { white-space: nowrap; }
 
   .table-wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: .95rem; }
@@ -91,6 +92,7 @@
   tr.vehicle-open > td { border-bottom-color: transparent; }
   tr.selected > td { background: var(--light); }
   .pad-note { padding: .5rem 1.1rem 1rem; margin: 0; }
+  .fleet > thead th, .fleet > tbody > tr > td { padding-left: .5rem; padding-right: .5rem; }   /* eleven columns: a little tighter */
   .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 0 1.2rem; }
   @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
   .expected { display: block; font-weight: 700; white-space: nowrap; }
@@ -222,7 +224,7 @@
         <div class="table-wrap"><table class="cards fleet" id="fleet">
           <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
             <th scope="col" title="Ahead or behind the plan, from the stops reached so far in whatever order the driver takes them">Schedule</th><th scope="col">Next stop or last job</th>
-            <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" id="cost-head">Cost</th><th scope="col">Status</th></tr></thead>
+            <th scope="col" title="When the vehicle left Plus for its first run (each run's time when you open a registration)">Left Plus</th><th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" id="cost-head">Cost</th><th scope="col">Status</th></tr></thead>
           <tbody></tbody>
         </table></div>
       </div>
@@ -248,7 +250,7 @@
       <div class="table-wrap"><table class="cards fleet" id="day-fleet">
         <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
           <th scope="col">Against plan</th><th scope="col">Last job</th>
-          <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" id="cost-head-day">Cost</th><th scope="col">Status</th></tr></thead>
+          <th scope="col" title="When the vehicle left Plus for its first run (each run's time when you open a registration)">Left Plus</th><th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" id="cost-head-day">Cost</th><th scope="col">Status</th></tr></thead>
         <tbody></tbody>
       </table></div>
     </div>
@@ -337,7 +339,7 @@
     const flag = c.missing && c.missing.length ? '<span class="cost-flag" aria-label="incomplete">*</span>' : '';
     return `<span title="${esc(costTitle(c, maxoptra))}">${money(c.total)}${flag}</span>`;
   }
-  const costCols = () => (canSeeCosts ? 10 : 9);
+  const costCols = () => (canSeeCosts ? 11 : 10);
   const signed = (n, dp = 1) => (n === null || !isFinite(n)) ? '–' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(dp);
 
   async function api(path) {
@@ -384,6 +386,19 @@
     if (['not_departed', 'late'].includes(run.status)) return run.planned_departure ? `Due to leave ${esc(run.planned_departure)}` : '–';
     if (run.status === 'no_data') return '<span class="small">No updates from the driver app</span>';
     return '–';
+  }
+  // When it left Plus: MaxOptra's recorded departure, with the plan underneath. A time identical to the plan is
+  // shown greyed, because MaxOptra fills in the planned time when a driver doesn't record leaving.
+  function leftPlus(run) {
+    if (!run) return '–';
+    const plan = run.planned_departure ? `<span class="drop-note">plan ${esc(run.planned_departure)}</span>` : '';
+    if (run.actual_departure) {
+      if (run.actual_departure === run.planned_departure)
+        return `<span class="muted" title="Same as the plan, so the driver may not have recorded leaving">${esc(run.actual_departure)}</span><span class="drop-note">same as plan</span>`;
+      return `<b>${esc(run.actual_departure)}</b>${plan}`;
+    }
+    if (['not_departed', 'late'].includes(run.status)) return `<span class="muted">Not yet</span>${plan}`;
+    return `<span class="muted">Not recorded</span>${plan}`;
   }
   function backAtPlus(run) {
     if (run.status === 'back' && run.actual_return) return `<b>${esc(run.actual_return)}</b>`;
@@ -474,6 +489,7 @@
           <td data-label="Drops completed" class="drops"><span class="cv">${dropsCell(v)}</span></td>
           <td data-label="Schedule"><span class="cv">${schedule(r)}</span></td>
           <td data-label="Next stop or last job"><span class="cv">${nextOrLast(r)}</span></td>
+          <td data-label="Left Plus (first run)"><span class="cv">${leftPlus(v.runs[0])}</span></td>
           <td data-label="Back at Plus"><span class="cv">${backAtPlus(r)}</span></td>
           <td data-label="Miles" class="n"><span class="cv">${milesCell(v)}</span></td>
           <td data-label="Cost" class="n cost-col"><span class="cv">${costCell(v.cost, v.est_cost)}</span></td>
@@ -489,6 +505,7 @@
             <td data-label="Drops completed" class="drops"><span class="cv">${dropsCell(run)}</span></td>
             <td data-label="Schedule"><span class="cv">${schedule(run)}</span></td>
             <td data-label="Next stop or last job"><span class="cv">${nextOrLast(run)}</span></td>
+            <td data-label="Left Plus"><span class="cv">${leftPlus(run)}</span></td>
             <td data-label="Back at Plus"><span class="cv">${backAtPlus(run)}</span></td>
             <td data-label="Miles" class="n"><span class="cv">${milesCell(run)}</span></td>
             <td data-label="Cost" class="n cost-col"><span class="cv">${costCell(run.cost, run.est_cost)}</span></td>
