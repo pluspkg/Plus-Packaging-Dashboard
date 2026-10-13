@@ -93,7 +93,7 @@
           <label><input type="checkbox" id="jobs-todo"> Only orders still needing a reason or cost</label>
           <button class="ghost" id="jobs-show">Show</button><span class="note" id="jobs-total"></span></div>
         <div class="table-wrap"><table id="jobs-table"></table></div>
-        <p class="note">Unallocated orders come in from MaxOptra every 30 minutes, and drop off if they're later put on a run. A cost left empty uses the default price for the order's type, if one is set. People with courier access can also add an order by hand below.</p>
+        <p class="note">Orders are listed on the day MaxOptra had them down for delivery, with the date they were ordered underneath. They come in from MaxOptra every 30 minutes and drop off if they're later put on a run. A cost left empty uses the default price for the order's type, if one is set. People with courier access can also add an order by hand below.</p>
       </div>
     </section>
 
@@ -193,12 +193,13 @@
       const waiting = r.jobs.filter((j) => j.needs.length).length;
       $('jobs-total').textContent = r.jobs.length ? `${r.jobs.length} order${r.jobs.length > 1 ? 's' : ''}, ${gbp(total)}${waiting ? `; ${waiting} still need a reason or cost` : ''}` : '';
       const NEED = { reason: 'Needs reason', cost: 'Needs cost' };
-      $('jobs-table').innerHTML = `<thead><tr><th>Date</th><th>Order and customer</th><th>Postcode</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody>` +
+      $('jobs-table').innerHTML = `<thead><tr><th title="The day MaxOptra had the order down for delivery">Delivery date</th><th>Order and customer</th><th>Postcode</th><th>Vehicle requirements</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody>` +
         (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}" class="${j.needs.length ? 'needs' : ''}">
-          <td>${longDate(j.job_date)}</td>
+          <td>${longDate(j.job_date)}${j.order_date && j.order_date !== j.job_date ? `<span class="current">Ordered ${longDate(j.order_date)}</span>` : ''}</td>
           <td><b>${esc(j.order_ref)}</b><span class="current">${esc(j.client_name || (j.customer_no ? `Customer ${j.customer_no}` : '–'))}${j.client_name && j.customer_no ? ` (${esc(j.customer_no)})` : ''}</span>
             <span class="current">${j.source === 'manual' ? 'Added by hand' : `From MaxOptra${j.depot ? `, ${esc(j.depot)}` : ''}`}</span></td>
           <td>${esc(j.location_postcode || '–')}</td>
+          <td>${j.vehicle_requirements === '' ? '<span class="muted">None</span>' : esc(j.vehicle_requirements || '–')}</td>
           <td><select data-f="job_type" aria-label="Type for ${esc(j.order_ref)}">${typeOptions(j.job_type)}</select></td>
           <td><select data-f="reason_code" aria-label="Reason for ${esc(j.order_ref)}">${reasonOptions(j.reason_code)}</select></td>
           <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" aria-label="Cost for ${esc(j.order_ref)}">
@@ -206,7 +207,7 @@
           <td><input type="text" data-f="notes" value="${esc(j.notes || '')}" size="18" aria-label="Notes for ${esc(j.order_ref)}"></td>
           <td>${j.needs.length ? j.needs.map((n) => `<span class="chip todo">${NEED[n]}</span>`).join(' ') : '<span class="chip done">Complete</span>'}</td>
           <td class="edit-only" style="white-space:nowrap"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost" data-remove-job>Remove</button>' : ''}</td></tr>`).join('')
-          : `<tr><td colspan="9" class="muted">${$('jobs-todo').checked ? 'Nothing waiting for a reason or cost in these dates.' : 'No orders in these dates.'}</td></tr>`) + '</tbody>';
+          : `<tr><td colspan="10" class="muted">${$('jobs-todo').checked ? 'Nothing waiting for a reason or cost in these dates.' : 'No orders in these dates.'}</td></tr>`) + '</tbody>';
     } catch (e) { $('jobs-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
   }
   $('jobs-show').addEventListener('click', loadJobs);

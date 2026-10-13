@@ -990,7 +990,7 @@ async function courierJobs(url, sql) {
   const todo = url.searchParams.get('todo') === '1';
   if (!isDate(from) || !isDate(to)) return fail(400, 'Give from and to as YYYY-MM-DD');
   const jobs = await sql.query(`
-    select order_ref, job_date::text, client_name, customer_no, depot, location_name, location_postcode, vehicle_requirements,
+    select order_ref, job_date::text, order_date::text, client_name, customer_no, depot, location_name, location_postcode, vehicle_requirements,
            size_1::float8, size_2::float8, order_status, job_type, reason_code, cost::float8, job_cost::float8,
            cost_is_default, notes, source, created_by, updated_by,
            array_remove(array[case when reason_code is null then 'reason' end, case when job_cost is null then 'cost' end], null) as needs
