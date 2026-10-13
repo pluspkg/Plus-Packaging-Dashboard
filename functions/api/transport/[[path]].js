@@ -964,7 +964,7 @@ async function courierJobs(url, sql) {
   const from = url.searchParams.get('from'), to = url.searchParams.get('to');
   if (!isDate(from) || !isDate(to)) return fail(400, 'Give from and to as YYYY-MM-DD');
   const jobs = await sql.query(`
-    select order_ref, job_date::text, client_name, location_name, location_postcode, vehicle_requirements,
+    select order_ref, job_date::text, client_name, customer_no, depot, location_name, location_postcode, vehicle_requirements,
            size_1::float8, size_2::float8, order_status, job_type, reason_code, cost::float8, job_cost::float8,
            cost_is_default, notes, source, created_by, updated_by
     from transport.v_external_jobs where job_date between $1 and $2 order by job_date desc, client_name limit 1000`, [from, to]);

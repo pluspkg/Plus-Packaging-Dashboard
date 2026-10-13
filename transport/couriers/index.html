@@ -176,7 +176,8 @@
       $('jobs-table').innerHTML = `<thead><tr><th>Date</th><th>Order and customer</th><th>Postcode</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th></th></tr></thead><tbody>` +
         (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}">
           <td>${longDate(j.job_date)}</td>
-          <td><b>${esc(j.order_ref)}</b><span class="current">${esc(j.client_name || '–')}${j.source === 'manual' ? ', added by hand' : ', from MaxOptra'}</span></td>
+          <td><b>${esc(j.order_ref)}</b><span class="current">${esc(j.client_name || (j.customer_no ? `Customer ${j.customer_no}` : '–'))}${j.client_name && j.customer_no ? ` (${esc(j.customer_no)})` : ''}</span>
+            <span class="current">${j.source === 'manual' ? 'Added by hand' : `From MaxOptra${j.depot ? `, ${esc(j.depot)}` : ''}`}</span></td>
           <td>${esc(j.location_postcode || '–')}</td>
           <td><select data-f="job_type" aria-label="Type for ${esc(j.order_ref)}">${typeOptions(j.job_type)}</select></td>
           <td><select data-f="reason_code" aria-label="Reason for ${esc(j.order_ref)}">${reasonOptions(j.reason_code)}</select></td>
