@@ -67,7 +67,7 @@
   <div class="bar">
     <div class="brand">Plus Transport<span>Admin</span></div>
     <div class="tools"><span id="who"></span><span class="role" id="role" hidden></span>
-      <a href="/transport/">Transport</a><a href="/transport/pay/" id="pay-link" hidden>Pay</a><a href="/transport/couriers/" id="couriers-link" hidden>Couriers</a><a href="/transport/setup/">Setup</a><a href="/">Dashboards</a></div>
+      <a href="/transport/">Transport</a><a href="/transport/fuel/">Fuel price</a><a href="/transport/couriers/">Couriers</a><a href="/transport/pay/" id="pay-link" hidden>Pay</a><a href="/transport/setup/">Setup</a><a href="/">Dashboards</a></div>
   </div>
 </header>
 
@@ -75,7 +75,7 @@
 
 <div id="app" hidden>
   <nav class="jump" aria-label="Sections">
-    <a href="#fuel">Fuel price</a><a href="#drivers">Drivers</a><a href="#vehicles">Vehicles</a>
+    <a href="/transport/fuel/">Fuel price</a><a href="#drivers">Drivers</a><a href="#vehicles">Vehicles</a>
     <a href="#users">Users</a><a href="#changes">Recent changes</a>
   </nav>
   <main>
@@ -84,31 +84,6 @@
       <div class="head"><h2 id="gaps-title">Costs are incomplete</h2></div>
       <div class="pad"><ul class="gaps" id="gaps"></ul>
         <p class="note">Runs without a rate are costed without that part, and flagged on the dashboard.</p></div>
-    </section>
-
-    <section id="fuel" aria-labelledby="fuel-title">
-      <div class="head"><h2 id="fuel-title">Fuel price</h2><span class="note">Entered weekly from the fuel provider's price</span></div>
-      <div class="pad">
-        <div class="row"><span>This week, starting <b id="fuel-week"></b>:</span><span id="fuel-this"></span></div>
-        <div class="row">
-          <label>Week starting <input type="date" id="fuel-date"></label>
-          <label>Price per litre £ <input type="number" id="fuel-price" min="0" step="0.001" placeholder="1.429"></label>
-          <button id="fuel-save">Save price</button><span class="status" id="fuel-status" aria-live="polite"></span>
-        </div>
-        <div class="table-wrap"><table id="fuel-history"></table></div>
-
-        <h3>Weekly reminder email</h3>
-        <p class="note">From the chosen weekday, at the chosen time, everyone on the list gets an email each working day until that week's price is in.</p>
-        <div class="row"><label><input type="checkbox" id="rem-on"> Send the reminder</label></div>
-        <div class="row" style="align-items:flex-start"><label for="rem-to">Send to, one address per line</label></div>
-        <textarea id="rem-to" spellcheck="false" placeholder="name@pluspkg.com"></textarea>
-        <div class="row">
-          <label>Start on <select id="rem-day"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option></select></label>
-          <label>at <select id="rem-hour"></select></label>
-          <button id="rem-save">Save reminder</button><span class="status" id="rem-status" aria-live="polite"></span>
-        </div>
-        <p class="note" id="rem-last"></p>
-      </div>
     </section>
 
     <section id="drivers" aria-labelledby="drivers-title">
@@ -179,28 +154,9 @@
     if (noLease.length) gaps.push(`<a href="#vehicles">${noLease.length} vehicle${noLease.length > 1 ? 's have' : ' has'} no lease or hire cost</a>: ${esc(noLease.map((v) => v.vehicle).join(', '))}`);
     const noMpg = used.filter((v) => !v.mpg);
     if (noMpg.length) gaps.push(`<a href="#vehicles">${noMpg.length} vehicle${noMpg.length > 1 ? 's have' : ' has'} no MPG</a>: ${esc(noMpg.map((v) => v.vehicle).join(', '))}`);
-    if (!s.fuel.this_week) gaps.push(`<a href="#fuel">No fuel price for the week starting ${longDate(s.fuel.week_start)}</a>${s.fuel.prices.length ? `; the last one (${gbp(s.fuel.prices[0].price, 3)}) is used until then` : ''}`);
+    if (!s.fuel.this_week) gaps.push(`<a href="/transport/fuel/">No fuel price for the week starting ${longDate(s.fuel.week_start)}</a>${s.fuel.prices.length ? `; the last one (${gbp(s.fuel.prices[0].price, 3)}) is used until then` : ''}`);
     $('gaps-panel').hidden = !gaps.length;
     $('gaps').innerHTML = gaps.map((g) => `<li>${g}</li>`).join('');
-
-    // fuel
-    $('fuel-week').textContent = longDate(s.fuel.week_start);
-    $('fuel-this').innerHTML = s.fuel.this_week ? `<span class="big">${gbp(s.fuel.this_week.price, 3)}</span> per litre` : '<span class="bad">Not entered yet</span>';
-    if (!$('fuel-date').value) $('fuel-date').value = s.fuel.week_start;
-    $('fuel-history').innerHTML = s.fuel.prices.length
-      ? `<thead><tr><th>Week starting</th><th class="n">Price per litre</th><th>Entered by</th><th>When</th></tr></thead><tbody>` +
-        s.fuel.prices.map((f) => `<tr><td>${longDate(f.week_start)}</td><td class="n">${gbp(f.price, 3)}</td><td>${esc(f.created_by || '–')}</td><td>${f.created_at ? new Date(f.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' }) : '–'}</td></tr>`).join('') + '</tbody>'
-      : '<tbody><tr><td class="muted">No fuel prices yet.</td></tr></tbody>';
-    const r = s.reminder || {};
-    $('rem-on').checked = Boolean(r.enabled);
-    $('rem-to').value = (r.recipients || []).join('\n');
-    $('rem-day').value = String(r.start_day || 1);
-    $('rem-hour').innerHTML = Array.from({ length: 12 }, (_, i) => i + 6).map((h) => `<option value="${h}"${h === (r.hour || 10) ? ' selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
-    const last = (r.recent || [])[0];
-    $('rem-last').innerHTML = last
-      ? (last.ok ? `Last sent ${new Date(last.sent_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' })} to ${esc((last.recipients || []).join(', '))}.`
-                 : `<span class="bad">Last attempt ${new Date(last.sent_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' })} failed:</span> ${esc(last.message)}`)
-      : 'No reminder has been sent yet.';
 
     // drivers
     $('drivers-table').innerHTML = `<thead><tr><th>Driver</th><th>Type</th><th>In KPIs</th><th>Last drove</th><th>Same person as</th></tr></thead><tbody>` +
@@ -249,20 +205,6 @@
   }
 
   // ----- saving -----
-  $('fuel-save').addEventListener('click', async () => {
-    const price = Number($('fuel-price').value), week = $('fuel-date').value;
-    if (!week || !(price > 0)) { say('fuel-status', 'Enter the week and a price per litre', true); return; }
-    try { await api('/admin/rates', { effective_from: week, rates: [{ subject_type: 'fuel', rate_type: 'price_per_litre', value: price }] });
-          $('fuel-price').value = ''; await load(); say('fuel-status', `Saved ${gbp(price, 3)} from ${longDate(week)}`); }
-    catch (e) { say('fuel-status', e.message, true); }
-  });
-  $('rem-save').addEventListener('click', async () => {
-    const recipients = $('rem-to').value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
-    try { await api('/admin/reminder', { enabled: $('rem-on').checked, recipients, start_day: Number($('rem-day').value), hour: Number($('rem-hour').value) });
-          await load(); say('rem-status', 'Saved'); }
-    catch (e) { say('rem-status', e.message, true); }
-  });
-
   function changedRows(tableId) { return [...document.querySelectorAll(`#${tableId} tbody tr.changed`)]; }
   document.addEventListener('input', (e) => { const tr = e.target.closest('#drivers-table tr, #vehicles-table tr'); if (tr && e.target.dataset.f) markChanged(tr); });
   document.addEventListener('change', (e) => {
@@ -322,13 +264,14 @@
     catch (e) { say('users-status', e.message, true); }
   });
 
-  // ----- start: Admins only -----
+  // ----- start: Admins only (the fuel price has its own page now; old links to #fuel go there) -----
+  if (location.hash === '#fuel') { location.replace('/transport/fuel/'); return; }
   (async () => {
     let me;
     try { me = await api('/me'); } catch (e) { $('gate').hidden = false; $('gate-text').textContent = e.message; return; }
     $('who').textContent = me.email; $('role').textContent = me.role === 'admin' ? 'Admin' : 'Standard'; $('role').hidden = false;
     if (me.role !== 'admin') { $('gate').hidden = false; $('gate-text').textContent = 'This page is for Transport admins. Ask an Admin to add you if you need it.'; return; }
-    $('pay-link').hidden = !me.pay; $('couriers-link').hidden = !me.couriers;
+    $('pay-link').hidden = !me.pay;
     $('app').hidden = false;
     await load();
     if (location.hash) { const t = document.querySelector(location.hash); if (t && t.scrollIntoView) t.scrollIntoView(); }

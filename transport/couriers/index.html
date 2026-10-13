@@ -61,6 +61,8 @@
   .big { font-size: 26px; font-weight: 900; color: var(--blue); }
   .gate { max-width: 40em; margin: 40px auto; text-align: center; }
   #jobs-table td:first-child, #jobs-table td:nth-child(3) { white-space: nowrap; }
+  body.view-only .edit-only { display: none !important; }
+  body.view-only input, body.view-only select { pointer-events: none; border-color: transparent; background: transparent; color: var(--ink); appearance: none; }
   @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
 </style>
 </head>
@@ -68,12 +70,12 @@
 <header>
   <div class="bar">
     <div class="brand">Plus Transport<span>Couriers and pallets</span></div>
-    <div class="tools"><span id="who"></span><a href="/transport/">Transport</a><a href="/transport/admin/" id="admin-link" hidden>Admin</a><a href="/">Dashboards</a></div>
+    <div class="tools"><span id="who"></span><a href="/transport/">Transport</a><a href="/transport/fuel/">Fuel price</a><a href="/transport/admin/" id="admin-link" hidden>Admin</a><a href="/">Dashboards</a></div>
   </div>
 </header>
 <div class="gate" id="gate" hidden><h2>Couriers and pallets</h2><p id="gate-text"></p></div>
 <div id="app" hidden>
-  <nav class="jump" aria-label="Sections"><a href="#jobs">Jobs</a><a href="#add">Add a job</a><a href="#reasons">Reason codes</a><a href="#prices">Default prices</a></nav>
+  <nav class="jump" aria-label="Sections"><a href="#jobs">Jobs</a><a href="#add" class="edit-only">Add a job</a><a href="#reasons">Reason codes</a><a href="#prices">Default prices</a></nav>
   <main>
     <div class="banner" id="error" hidden></div>
 
@@ -83,11 +85,11 @@
         <div class="row"><label>From <input type="date" id="jobs-from"></label><label>To <input type="date" id="jobs-to"></label>
           <button class="ghost" id="jobs-show">Show jobs</button><span class="note" id="jobs-total"></span></div>
         <div class="table-wrap"><table id="jobs-table"></table></div>
-        <p class="note">A cost left empty uses the default price for that type. MaxOptra's unplanned jobs will appear here by themselves once we have its feed; until then, add them below.</p>
+        <p class="note">Unplanned jobs come in from MaxOptra every 30 minutes, and drop off if they're later planned onto a run. A cost left empty uses the default price for that type. People with courier access can also add a job by hand below.</p>
       </div>
     </section>
 
-    <section id="add" aria-labelledby="add-title">
+    <section id="add" aria-labelledby="add-title" class="edit-only">
       <div class="head"><h2 id="add-title">Add a job</h2></div>
       <div class="pad">
         <div class="row">
@@ -110,7 +112,7 @@
       <div class="head"><h2 id="reasons-title">Reason codes</h2><span class="note">Why a job had to go another way, mostly for same day deliveries</span></div>
       <div class="pad">
         <div class="table-wrap"><table id="reasons-table"></table></div>
-        <div class="row"><label>Code <input type="text" id="reason-code" size="8" placeholder="SD1"></label>
+        <div class="row edit-only"><label>Code <input type="text" id="reason-code" size="8" placeholder="SD1"></label>
           <label>Description <input type="text" id="reason-desc" size="36" placeholder="Customer ordered after the cut-off"></label>
           <button id="reason-add">Add reason</button><span class="status" id="reasons-status" aria-live="polite"></span></div>
       </div>
@@ -120,7 +122,7 @@
       <div class="head"><h2 id="prices-title">Default prices</h2><span class="note">Used for any job without its own cost</span></div>
       <div class="pad">
         <div class="row" id="prices-row"></div>
-        <div class="row"><label>Apply from <input type="date" id="prices-from"></label>
+        <div class="row edit-only"><label>Apply from <input type="date" id="prices-from"></label>
           <button id="prices-save">Save prices</button><span class="status" id="prices-status" aria-live="polite"></span></div>
       </div>
     </section>
@@ -157,9 +159,9 @@
           <td><input type="text" data-f="description" value="${esc(c.description)}" size="40" aria-label="Description for ${esc(c.code)}"></td>
           <td><input type="checkbox" data-f="active"${c.active ? ' checked' : ''} aria-label="${esc(c.code)} in use"></td>
           <td class="n"><input type="number" data-f="sort_order" value="${c.sort_order}" step="1" style="width:5em" aria-label="Order for ${esc(c.code)}"></td>
-          <td><button class="ghost" data-save-reason>Save</button></td></tr>`).join('') + '</tbody>'
+          <td class="edit-only"><button class="ghost" data-save-reason>Save</button></td></tr>`).join('') + '</tbody>'
       : '<tbody><tr><td class="muted">No reason codes yet. Add your same day reason codes below.</td></tr></tbody>';
-    $('prices-row').innerHTML = Object.entries(JOB).map(([k, l]) => `<label>${l} £ <input type="number" min="0" step="0.01" data-price="${k}" aria-label="Default price for ${l}">
+    $('prices-row').innerHTML = Object.entries(JOB).map(([k, l]) => `<label>${l} ${s.can_edit ? `£ <input type="number" min="0" step="0.01" data-price="${k}" aria-label="Default price for ${l}">` : ''}
       <span class="current">${s.defaults[k] ? `Now ${gbp(s.defaults[k].value)} from ${longDate(s.defaults[k].effective_from)}` : '<span class="bad">Not set</span>'}</span></label>`).join('');
     if (!$('prices-from').value) $('prices-from').value = Object.keys(s.defaults).length ? s.today : s.history_start;
     if (!$('jobs-from').value) { $('jobs-from').value = s.today.slice(0, 8) + '01'; $('jobs-to').value = s.today; }
@@ -181,7 +183,7 @@
           <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" aria-label="Cost for ${esc(j.order_ref)}">
             <span class="current">${j.cost_is_default ? (j.job_cost !== null ? 'Default price' : 'No default set') : 'Own cost'}</span></td>
           <td><input type="text" data-f="notes" value="${esc(j.notes || '')}" size="18" aria-label="Notes for ${esc(j.order_ref)}"></td>
-          <td style="white-space:nowrap"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost" data-remove-job>Remove</button>' : ''}</td></tr>`).join('')
+          <td class="edit-only" style="white-space:nowrap"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost" data-remove-job>Remove</button>' : ''}</td></tr>`).join('')
           : '<tr><td colspan="8" class="muted">No jobs in these dates.</td></tr>') + '</tbody>';
     } catch (e) { $('jobs-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
   }
@@ -233,7 +235,8 @@
     let me;
     try { me = await api('/me'); } catch (e) { $('gate').hidden = false; $('gate-text').textContent = e.message; return; }
     $('who').textContent = me.email;
-    if (!me.couriers) { $('gate').hidden = false; $('gate-text').textContent = 'This page is for the people who arrange couriers and pallets. Ask a Transport admin for access.'; return; }
+    // everyone at Plus can look; only courier access and Admins can change anything
+    document.body.classList.toggle('view-only', !me.couriers);
     $('admin-link').hidden = me.role !== 'admin';
     $('app').hidden = false;
     await load();

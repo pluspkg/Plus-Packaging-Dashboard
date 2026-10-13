@@ -383,44 +383,37 @@ export function buildLive(runs, now) {
   };
 }
 
-// Plus's own cost of each run (transport.run_costs): driver day rate, lease and fuel. Admins only, because a
-// vehicle's daily cost would otherwise reveal its driver's day rate.
+// Plus's own cost of each run (transport.run_costs): driver pay, lease and fuel. Everyone sees the running cost
+// (lease or hire, and fuel). Driver pay, and any total that includes it, goes only to people with pay access:
+// a van's daily cost would otherwise reveal its driver's pay.
 const RUN_COSTS = `
   select run_key, driver_cost::float8, lease_cost::float8, fuel_cost::float8, fuel_miles::float8, fuel_on_actual,
          driver_rate_missing, lease_missing, mpg_missing, fuel_price_missing
   from transport.run_costs($1::date, $2::date)`;
 
-function costOf(c) {
+function costOf(c, withPay) {
   if (!c) return null;
-  const parts = [c.driver_cost, c.lease_cost, c.fuel_cost];
-  const missing = [c.driver_rate_missing && 'driver rate', c.lease_missing && 'lease', c.mpg_missing && 'MPG', c.fuel_price_missing && 'fuel price'].filter(Boolean);
+  const parts = withPay ? [c.driver_cost, c.lease_cost, c.fuel_cost] : [c.lease_cost, c.fuel_cost];
+  const missing = [withPay && c.driver_rate_missing && 'driver pay', c.lease_missing && 'lease', c.mpg_missing && 'MPG', c.fuel_price_missing && 'fuel price'].filter(Boolean);
   return { total: parts.some((x) => x !== null) ? parts.reduce((t, x) => t + (x || 0), 0) : null,
-           driver: c.driver_cost, lease: c.lease_cost, fuel: c.fuel_cost, fuel_miles: c.fuel_miles,
-           fuel_on_actual: c.fuel_on_actual, missing };
+           ...(withPay ? { driver: c.driver_cost } : {}), lease: c.lease_cost, fuel: c.fuel_cost, fuel_miles: c.fuel_miles,
+           fuel_on_actual: c.fuel_on_actual, includes_pay: Boolean(withPay), missing };
 }
 function addCosts(a, b) {
   if (!b) return a;
   if (!a) return { ...b, missing: [...b.missing] };
   const add = (x, y) => (x === null && y === null ? null : (x || 0) + (y || 0));
-  return { total: add(a.total, b.total), driver: add(a.driver, b.driver), lease: add(a.lease, b.lease), fuel: add(a.fuel, b.fuel),
-           fuel_miles: add(a.fuel_miles, b.fuel_miles), fuel_on_actual: a.fuel_on_actual && b.fuel_on_actual,
-           missing: [...new Set([...a.missing, ...b.missing])] };
-}
-// MaxOptra's own run cost is a cost figure too, so it goes only to Admins (as a comparison).
-function stripCosts(built) {
-  for (const v of built.vehicles) {
-    delete v.est_cost;
-    for (const r of v.runs) delete r.est_cost;
-  }
-  delete built.headline.est_cost;
-  return built;
+  const out = { total: add(a.total, b.total), lease: add(a.lease, b.lease), fuel: add(a.fuel, b.fuel),
+                fuel_miles: add(a.fuel_miles, b.fuel_miles), fuel_on_actual: a.fuel_on_actual && b.fuel_on_actual,
+                includes_pay: a.includes_pay, missing: [...new Set([...a.missing, ...b.missing])] };
+  if ('driver' in a || 'driver' in b) out.driver = add(a.driver ?? null, b.driver ?? null);
+  return out;
 }
 
 // A whole day: vehicles, their runs (with live status as at `stamp`) and every stop on each run.
-async function dayData(sql, date, stamp, withCosts) {
+async function dayData(sql, date, stamp, withPay) {
   const [runs, stops, costs] = await Promise.all([
-    sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date]),
-    withCosts ? sql.query(RUN_COSTS, [date, date]) : Promise.resolve([]),
+    sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date]), sql.query(RUN_COSTS, [date, date]),
   ]);
   const built = buildLive(runs, stamp);
   const byRun = new Map();
@@ -428,15 +421,21 @@ async function dayData(sql, date, stamp, withCosts) {
     if (!byRun.has(st.run_key)) byRun.set(st.run_key, []);
     byRun.get(st.run_key).push(mapStop(st, stamp));
   }
-  const costBy = new Map(costs.map((c) => [c.run_key, costOf(c)]));
+  const costBy = new Map(costs.map((c) => [c.run_key, costOf(c, withPay)]));
   for (const v of built.vehicles) {
     for (const r of v.runs) {
       r.stops = byRun.get(r.run_key) || [];
-      if (withCosts) { r.cost = costBy.get(r.run_key) || null; v.cost = addCosts(v.cost || null, r.cost); }
+      r.cost = costBy.get(r.run_key) || null;
+      v.cost = addCosts(v.cost || null, r.cost);
     }
-    if (withCosts) built.headline.cost = addCosts(built.headline.cost || null, v.cost);
+    built.headline.cost = addCosts(built.headline.cost || null, v.cost);
   }
-  return withCosts ? built : stripCosts(built);
+  // MaxOptra's own run cost is built from an hourly rate per driver, so it's treated like pay
+  if (!withPay) {
+    for (const v of built.vehicles) { delete v.est_cost; for (const r of v.runs) delete r.est_cost; }
+    delete built.headline.est_cost;
+  }
+  return built;
 }
 
 async function day(url, sql, user) {
@@ -619,12 +618,10 @@ async function report(url, sql, user) {
       group by 1`, [from, to]),
   ]);
   const costBy = Object.fromEntries(costs.map((c) => [c.vehicle, c]));
-  const admin = user.pay;                         // costs include driver pay, so they need pay access
-  for (const v of vehicles) {
-    if (admin) v.est_cost = costBy[v.vehicle] ? costBy[v.vehicle].est_cost : null;
-  }
+  const withPay = user.pay;                       // driver pay, and totals that include it, need pay access
+  for (const v of vehicles) if (withPay) v.est_cost = costBy[v.vehicle] ? costBy[v.vehicle].est_cost : null;   // built from MaxOptra's per-driver hourly rates
   let external = null, salariesIdle = null;
-  if (user.couriers || user.pay) {
+  {
     const [byType, byReason] = await Promise.all([
       sql.query(`select coalesce(job_type, 'unclassified') as job_type, count(*)::int as jobs, sum(job_cost)::float8 as cost,
                         (count(*) filter (where job_cost is null))::int as no_cost
@@ -636,7 +633,7 @@ async function report(url, sql, user) {
     ]);
     external = { by_type: byType, by_reason: byReason };
   }
-  if (admin) {
+  {
     const [plus, lease, salaries] = await Promise.all([
       sql.query(`
         select coalesce(v.display_name, v.maxoptra_name) as vehicle,
@@ -655,9 +652,9 @@ async function report(url, sql, user) {
                       where driver_basis = 'salary_monthly' group by 1)
         select coalesce(sum(greatest(p.salary_cost - coalesce(u.allocated, 0), 0)), 0)::float8 as idle_cost,
                count(*)::int as salaried_drivers
-        from paid p left join used u using (driver_id)`, [from, to]),
+        from paid p left join used u using (driver_id)`, [from, to]).then((r) => (withPay ? r : [null])),
     ]);
-    salariesIdle = salaries[0];
+    salariesIdle = withPay ? salaries[0] : null;
     const plusBy = Object.fromEntries(plus.map((c) => [c.vehicle, c]));
     const leaseBy = Object.fromEntries(lease.map((c) => [c.vehicle, c]));
     for (const v of vehicles) {
@@ -665,14 +662,14 @@ async function report(url, sql, user) {
       const l = leaseBy[v.vehicle];
       if (!c && !l) { v.cost = null; continue; }
       const missing = [];
-      if (c && c.runs_no_driver_rate) missing.push(`driver rate on ${c.runs_no_driver_rate} run${c.runs_no_driver_rate === 1 ? '' : 's'}`);
+      if (withPay && c && c.runs_no_driver_rate) missing.push(`driver pay on ${c.runs_no_driver_rate} run${c.runs_no_driver_rate === 1 ? '' : 's'}`);
       if (!l) missing.push('lease');
       if (c && c.mpg_missing) missing.push('MPG');
       if (c && c.fuel_price_missing) missing.push('fuel price');
-      const parts = [c ? c.driver : null, l ? l.lease : null, c ? c.fuel : null];
+      const parts = [withPay && c ? c.driver : null, l ? l.lease : null, c ? c.fuel : null];
       v.cost = { total: parts.some((x) => x !== null) ? parts.reduce((t, x) => t + (x || 0), 0) : null,
-                 driver: c ? c.driver : null, lease: l ? l.lease : null, lease_weekdays: l ? l.weekdays : 0,
-                 fuel: c ? c.fuel : null, fuel_miles: c ? c.fuel_miles : null,
+                 ...(withPay ? { driver: c ? c.driver : null } : {}), lease: l ? l.lease : null, lease_weekdays: l ? l.weekdays : 0,
+                 fuel: c ? c.fuel : null, fuel_miles: c ? c.fuel_miles : null, includes_pay: Boolean(withPay),
                  runs_fuel_actual: c ? c.runs_fuel_actual : 0, runs: c ? c.runs : 0, missing };
     }
   }
@@ -686,7 +683,7 @@ async function report(url, sql, user) {
       ? Math.round(((v.avg_day_minutes + (h.prep_minutes ?? 25) - h.break_minutes) / h.net_minutes) * 100) : null;
   }
   return json({ from, to, vehicles, drivers, failures, daily, vehicle_daily: vehicleDaily, missing_weekdays: missing.map((m) => m.date),
-                ...(external ? { external } : {}), ...(admin ? { salaries_idle: salariesIdle } : {}) });
+                external, ...(withPay ? { salaries_idle: salariesIdle } : {}) });
 }
 
 // ---------------------------------------------------------------------------
@@ -786,6 +783,37 @@ async function saveReminder(request, sql) {
   await sql.query(`insert into transport.settings (key, value, description) values ('fuel_reminder', $1::jsonb, 'Weekly fuel price reminder')
                    on conflict (key) do update set value = excluded.value, updated_at = now()`, [JSON.stringify(value)]);
   return json({ saved: value });
+}
+
+async function fuelState(sql, user) {
+  const [prices, cfg, recent] = await Promise.all([
+    sql.query(`select effective_from::text as week_start, value::float8 as price, created_by, created_at
+               from transport.cost_rates where subject_type = 'fuel' and rate_type = 'price_per_litre'
+               order by effective_from desc limit 26`),
+    sql.query(`select value from transport.settings where key = 'fuel_reminder'`),
+    sql.query(`select sent_at, week_start::text, recipients, ok, message from transport.reminder_log
+               where kind = 'fuel' order by sent_at desc limit 5`),
+  ]);
+  const today = londonNow().date;
+  const d = new Date(`${today}T12:00:00Z`);
+  const weekStart = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+  return json({ prices, week_start: weekStart, this_week: prices.find((f) => f.week_start >= weekStart) || null, today,
+                can_edit: user.couriers,
+                ...(user.couriers ? { reminder: { ...(cfg[0] ? cfg[0].value : {}), recent } } : {}) });
+}
+
+async function saveFuelPrice(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  const price = Number(b.price);
+  if (!isDate(b.week_start)) return fail(400, 'Choose the week the price is for');
+  if (!(price > 0) || price > 10) return fail(400, 'Enter the price per litre in pounds, for example 1.429');
+  await sql.query(
+    `insert into transport.cost_rates (subject_type, subject_id, rate_type, value, effective_from, created_by)
+     values ('fuel', null, 'price_per_litre', $1, $2, $3)
+     on conflict (subject_type, coalesce(subject_id, 0), rate_type, effective_from)
+     do update set value = excluded.value, created_by = excluded.created_by, created_at = now()`,
+    [price, b.week_start, user.email]);
+  return json({ saved: price, week_start: b.week_start });
 }
 
 async function saveUser(request, sql) {
@@ -901,7 +929,7 @@ async function savePayAccess(request, sql, user) {
 // ---------------------------------------------------------------------------
 // Couriers and pallets: jobs that didn't go on a Plus vehicle, their reason codes and costs.
 // ---------------------------------------------------------------------------
-async function courierState(sql) {
+async function courierState(sql, user) {
   const [codes, rates, counts] = await Promise.all([
     sql.query(`select code, description, active, sort_order from transport.reason_codes order by sort_order, code`),
     sql.query(`select distinct on (rate_type) rate_type, value::float8, effective_from::text from transport.cost_rates
@@ -910,7 +938,7 @@ async function courierState(sql) {
                from transport.external_jobs where removed_at is null`),
   ]);
   const defaults = Object.fromEntries(rates.map((r) => [r.rate_type, r]));
-  return json({ codes, defaults, counts: counts[0], today: londonNow().date, history_start: '2026-06-01' });
+  return json({ codes, defaults, counts: counts[0], can_edit: user.couriers, today: londonNow().date, history_start: '2026-06-01' });
 }
 
 async function saveReason(request, sql) {
@@ -1036,12 +1064,20 @@ export async function onRequest(context) {
       if (method === 'POST' && route === 'pay/access') return savePayAccess(request, sql, user);
       return fail(404, `No pay route for ${method} /api/transport/${route}`);
     }
+    if (route.startsWith('fuel')) {
+      if (method === 'GET' && route === 'fuel/state') return fuelState(sql, user);
+      if (!user.couriers) return fail(403, 'Fuel prices are entered by Admins and people with courier access');
+      if (method === 'POST' && route === 'fuel/price') return saveFuelPrice(request, sql, user);
+      if (method === 'POST' && route === 'fuel/reminder') return saveReminder(request, sql);
+      return fail(404, `No fuel route for ${method} /api/transport/${route}`);
+    }
     if (route.startsWith('couriers')) {
-      if (!user.couriers) return fail(403, 'Couriers and pallets is restricted');
-      if (method === 'GET' && route === 'couriers/state') return courierState(sql);
+      // everyone can see courier jobs and their costs; changes need courier access or Admin
+      if (method === 'GET' && route === 'couriers/state') return courierState(sql, user);
+      if (method === 'GET' && route === 'couriers/jobs') return courierJobs(url, sql);
+      if (!user.couriers) return fail(403, 'Changes here need courier access');
       if (method === 'POST' && route === 'couriers/reason') return saveReason(request, sql);
       if (method === 'POST' && route === 'couriers/defaults') return saveRates(request, sql, user, ['external']);
-      if (method === 'GET' && route === 'couriers/jobs') return courierJobs(url, sql);
       if (method === 'POST' && route === 'couriers/job') return saveCourierJob(request, sql, user);
       if (method === 'POST' && route === 'couriers/job/remove') return removeCourierJob(request, sql, user);
       return fail(404, `No couriers route for ${method} /api/transport/${route}`);
@@ -1051,7 +1087,6 @@ export async function onRequest(context) {
       if (method === 'GET' && route === 'admin/state') return adminState(sql);
       if (method === 'POST' && route === 'admin/rates') return saveRates(request, sql, user, ['vehicle', 'fuel']);
       if (method === 'POST' && route === 'admin/user') return saveUser(request, sql);
-      if (method === 'POST' && route === 'admin/reminder') return saveReminder(request, sql);
       if (method === 'POST' && route === 'admin/vehicle') return saveVehicle(request, sql);
       if (method === 'POST' && route === 'admin/driver') return saveDriver(request, sql);
       if (method === 'POST' && route === 'admin/merge-drivers') return mergeDrivers(request, sql);

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fuel price | Plus Packaging</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #003da5; --navy: #002b75; --grey: #9ea2a2; --light: #eaf2ff; --bg: #f4f7fb; --white: #ffffff;
+    --ink: #1c2733; --muted: #5d6566; --line: #d9dee3; --bad: #b42318; --bad-bg: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Lato, "Segoe UI", Arial, sans-serif; }
+  a { color: var(--blue); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  header { background: var(--navy); color: var(--white); }
+  .bar { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .brand { font-weight: 900; font-size: 18px; }
+  .brand span { font-weight: 400; opacity: .85; margin-left: 10px; }
+  .tools { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 14px; flex-wrap: wrap; }
+  .tools a { color: var(--white); }
+  .role { border: 1px solid rgba(255,255,255,.55); border-radius: 3px; padding: 0 6px; font-size: 12px; font-weight: 700; }
+  nav.jump { max-width: 1280px; margin: 0 auto; padding: 12px 20px 0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 12px 20px 48px; }
+  section { background: var(--white); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; scroll-margin-top: 12px; }
+  .head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 4px; }
+  h2 { margin: 0; font-size: 17px; font-weight: 900; color: var(--navy); }
+  h3 { margin: 18px 0 6px; font-size: 15px; color: var(--navy); }
+  .pad { padding: 8px 18px 16px; }
+  .note { font-size: 13px; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .bad { color: var(--bad); font-weight: 700; }
+  .good { color: var(--blue); font-weight: 700; }
+  .banner { background: var(--bad-bg); color: var(--bad); border-left: 4px solid var(--bad); padding: 10px 14px; margin-bottom: 16px; }
+  ul.gaps { margin: 0; padding: 0 0 0 18px; }
+  ul.gaps li { margin: 3px 0; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 6px 9px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { background: var(--light); color: var(--navy); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.changed td { background: #fffbe6; }
+  input, select, textarea, button { font: inherit; }
+  input[type=number], input[type=text], input[type=email], input[type=date], select, textarea {
+    border: 1px solid var(--grey); border-radius: 3px; padding: 4px 7px; background: var(--white); color: var(--ink); }
+  input[type=number] { width: 7em; text-align: right; }
+  textarea { width: 100%; max-width: 30em; min-height: 5.5em; }
+  button { border: 1px solid var(--blue); background: var(--blue); color: var(--white); border-radius: 3px; padding: 6px 14px; font-weight: 700; cursor: pointer; }
+  button.ghost { background: var(--white); color: var(--blue); }
+  button:disabled { background: var(--grey); border-color: var(--grey); cursor: default; }
+  .row { display: flex; gap: 12px 18px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .row label { display: flex; gap: 6px; align-items: center; }
+  .current { display: block; font-size: 12px; color: var(--muted); }
+  .status { font-size: 14px; margin-left: 6px; }
+  .big { font-size: 26px; font-weight: 900; color: var(--blue); }
+  .gate { max-width: 40em; margin: 40px auto; text-align: center; }
+  #jobs-table td:first-child, #jobs-table td:nth-child(3) { white-space: nowrap; }
+  @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Plus Transport<span>Fuel price</span></div>
+    <div class="tools"><span id="who"></span><a href="/transport/">Transport</a><a href="/transport/couriers/">Couriers</a><a href="/transport/admin/" id="admin-link" hidden>Admin</a><a href="/">Dashboards</a></div>
+  </div>
+</header>
+<main>
+  <div class="banner" id="error" hidden></div>
+  <section id="fuel" aria-labelledby="fuel-title">
+    <div class="head"><h2 id="fuel-title">Fuel price</h2><span class="note">From the fuel provider, once a week. Transport costs use it for every run that week.</span></div>
+    <div class="pad">
+      <div class="row"><span>This week, starting <b id="fuel-week"></b>:</span><span id="fuel-this"></span></div>
+      <div class="row" id="fuel-entry" hidden>
+        <label>Week starting <input type="date" id="fuel-date"></label>
+        <label>Price per litre £ <input type="number" id="fuel-price" min="0" step="0.001" placeholder="1.429"></label>
+        <button id="fuel-save">Save price</button><span class="status" id="fuel-status" aria-live="polite"></span>
+      </div>
+      <div class="table-wrap"><table id="fuel-history"></table></div>
+    </div>
+  </section>
+
+  <section id="reminder" aria-labelledby="rem-title" hidden>
+    <div class="head"><h2 id="rem-title">Weekly reminder email</h2><span class="note">From the chosen weekday, at the chosen time, everyone on the list gets an email each working day until that week's price is in.</span></div>
+    <div class="pad">
+      <div class="row"><label><input type="checkbox" id="rem-on"> Send the reminder</label></div>
+      <div class="row" style="align-items:flex-start"><label for="rem-to">Send to, one address per line</label></div>
+      <textarea id="rem-to" spellcheck="false" placeholder="name@pluspkg.com"></textarea>
+      <div class="row">
+        <label>Start on <select id="rem-day"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option></select></label>
+        <label>at <select id="rem-hour"></select></label>
+        <button id="rem-save">Save reminder</button><span class="status" id="rem-status" aria-live="polite"></span>
+      </div>
+      <p class="note" id="rem-last"></p>
+    </div>
+  </section>
+</main>
+<script>
+(() => {
+  const API = '/api/transport';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const longDate = (iso) => iso ? new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '–';
+  const when = (ts) => ts ? new Date(ts).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' }) : '–';
+  const gbp = (n, dp = 2) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  async function api(path, body) {
+    const res = await fetch(API + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' } : { credentials: 'same-origin' });
+    let data = null; try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) throw new Error((data && (data.error + (data.detail ? `: ${data.detail}` : ''))) || `Error ${res.status}`);
+    return data;
+  }
+  function say(id, text, bad) { const el = $(id); el.textContent = text; el.className = 'status ' + (bad ? 'bad' : 'good'); if (!bad) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 5000); }
+
+  let state = null;
+  function render() {
+    const s = state;
+    $('fuel-week').textContent = longDate(s.week_start);
+    $('fuel-this').innerHTML = s.this_week ? `<span class="big">${gbp(s.this_week.price, 3)}</span> per litre` : `<span class="bad">Not entered yet</span>${s.prices.length ? ` <span class="note">Until it is, last week's ${gbp(s.prices[0].price, 3)} is used.</span>` : ''}`;
+    $('fuel-entry').hidden = !s.can_edit;
+    if (!$('fuel-date').value) $('fuel-date').value = s.week_start;
+    $('fuel-history').innerHTML = s.prices.length
+      ? `<thead><tr><th>Week starting</th><th class="n">Price per litre</th><th>Entered by</th><th>When</th></tr></thead><tbody>` +
+        s.prices.map((f) => `<tr><td>${longDate(f.week_start)}</td><td class="n">${gbp(f.price, 3)}</td><td>${esc(f.created_by || '–')}</td><td>${when(f.created_at)}</td></tr>`).join('') + '</tbody>'
+      : '<tbody><tr><td class="muted">No fuel prices yet.</td></tr></tbody>';
+    $('reminder').hidden = !s.reminder;
+    if (s.reminder) {
+      const r = s.reminder;
+      $('rem-on').checked = Boolean(r.enabled);
+      $('rem-to').value = (r.recipients || []).join('\n');
+      $('rem-day').value = String(r.start_day || 1);
+      $('rem-hour').innerHTML = Array.from({ length: 12 }, (_, i) => i + 6).map((h) => `<option value="${h}"${h === (r.hour || 10) ? ' selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
+      const last = (r.recent || [])[0];
+      $('rem-last').innerHTML = last
+        ? (last.ok ? `Last sent ${when(last.sent_at)} to ${esc((last.recipients || []).join(', '))}.` : `<span class="bad">Last attempt ${when(last.sent_at)} failed:</span> ${esc(last.message)}`)
+        : 'No reminder has been sent yet.';
+    }
+  }
+  async function load() { try { state = await api('/fuel/state'); render(); $('error').hidden = true; } catch (e) { $('error').textContent = e.message; $('error').hidden = false; } }
+  $('fuel-save').addEventListener('click', async () => {
+    const price = Number($('fuel-price').value), week = $('fuel-date').value;
+    if (!week || !(price > 0)) { say('fuel-status', 'Enter the week and a price per litre', true); return; }
+    try { await api('/fuel/price', { week_start: week, price }); $('fuel-price').value = ''; await load(); say('fuel-status', `Saved ${gbp(price, 3)} from ${longDate(week)}`); }
+    catch (e) { say('fuel-status', e.message, true); }
+  });
+  $('rem-save').addEventListener('click', async () => {
+    const recipients = $('rem-to').value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+    try { await api('/fuel/reminder', { enabled: $('rem-on').checked, recipients, start_day: Number($('rem-day').value), hour: Number($('rem-hour').value) });
+          await load(); say('rem-status', 'Saved'); }
+    catch (e) { say('rem-status', e.message, true); }
+  });
+  (async () => {
+    try { const me = await api('/me'); $('who').textContent = me.email; $('admin-link').hidden = me.role !== 'admin'; }
+    catch (e) { $('error').textContent = e.message; $('error').hidden = false; return; }
+    await load();
+  })();
+})();
+</script>
+</body>
+</html>
