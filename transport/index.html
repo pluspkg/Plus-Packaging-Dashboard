@@ -44,7 +44,7 @@
   .note { font-size: .85rem; color: var(--muted); }
 
   /* Headline strip: one panel, divided, not a wall of cards */
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); }
   .kpi { padding: .85rem 1.1rem; border-right: 1px solid var(--line); }
   .kpi:last-child { border-right: 0; }
   .kpi .label { font-size: .85rem; color: var(--muted); }
@@ -90,6 +90,10 @@
   tr.stops-row > td { padding: .2rem .7rem .9rem 1.6rem; background: #fbfcfe; }
   tr.vehicle-open > td { border-bottom-color: transparent; }
   tr.selected > td { background: var(--light); }
+  .pad-note { padding: .5rem 1.1rem 1rem; margin: 0; }
+  .cost-col { display: none; }
+  body.costs .cost-col { display: table-cell; }
+  .cost-flag { color: var(--bad); font-weight: 700; }
   .pill-run { font-size: .78rem; color: var(--muted); margin-left: .35rem; white-space: nowrap; }
   table.stops { font-size: .86rem; background: var(--white); border: 1px solid var(--line); }
   table.stops th { background: var(--bg); font-size: .78rem; }
@@ -193,6 +197,7 @@
       <span class="updated" id="updated"></span>
       <button class="alert-toggle" id="alerts" hidden></button>
       <span id="who"></span><span class="role" id="role" hidden></span>
+      <a href="/transport/admin/" id="admin-link" hidden>Admin</a>
       <a href="/transport/setup/" id="setup-link" hidden>Setup</a>
       <a href="/">Dashboards</a>
     </div>
@@ -210,7 +215,7 @@
         <div class="table-wrap"><table class="cards fleet" id="fleet">
           <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
             <th scope="col">Schedule</th><th scope="col">Next stop or last job</th>
-            <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n" title="MaxOptra’s run cost: its time and mileage rates applied to each planned run">Est. cost</th><th scope="col">Status</th></tr></thead>
+            <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" title="Plus cost: driver day rate, lease and fuel">Cost</th><th scope="col">Status</th></tr></thead>
           <tbody></tbody>
         </table></div>
       </div>
@@ -236,13 +241,14 @@
       <div class="table-wrap"><table class="cards fleet" id="day-fleet">
         <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
           <th scope="col">Against plan</th><th scope="col">Last job</th>
-          <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n" title="MaxOptra’s run cost: its time and mileage rates applied to each planned run">Est. cost</th><th scope="col">Status</th></tr></thead>
+          <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" title="Plus cost: driver day rate, lease and fuel">Cost</th><th scope="col">Status</th></tr></thead>
         <tbody></tbody>
       </table></div>
     </div>
     <div class="panel">
       <div class="panel-head"><h2>Full-time vans</h2></div>
       <div class="table-wrap"><table class="cards" id="vans"></table></div>
+      <p class="note pad-note" id="cost-note" hidden>Cost is Plus's own: driver day rates, lease (every weekday, whether or not the vehicle ran) and fuel from each vehicle's MPG and the week's fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Hover a cost for its breakdown; * means a rate is missing.</p>
     </div>
     <div class="panel">
       <div class="panel-head"><h2>Van drivers</h2><span class="note">Completed drops per day driven</span></div>
@@ -298,7 +304,22 @@
   const gbp2 = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const money = (n) => (n === null || n === undefined || !isFinite(n)) ? '–' : gbp0.format(n);
   const money2 = (n) => (n === null || n === undefined || !isFinite(n)) ? '–' : gbp2.format(n);
-  const COST_NOTE = 'MaxOptra’s run cost: its time and mileage rates applied to each planned run';
+  let canSeeCosts = false;                       // Admins only: a van's daily cost would reveal its driver's day rate
+  const COST_NOTE = 'Plus cost: driver day rates, vehicle lease or hire, and fuel from MPG and the week’s fuel price';
+  function costTitle(c, maxoptra) {
+    if (!c) return '';
+    const parts = [`Driver ${money2(c.driver)}`, `lease ${money2(c.lease)}`, `fuel ${money2(c.fuel)}${c.fuel_miles ? ` on ${fmtInt(c.fuel_miles)} miles` : ''}`];
+    let t = parts.join(', ') + '.';
+    if (c.missing && c.missing.length) t += ` Missing: ${c.missing.join(', ')}.`;
+    if (maxoptra !== undefined && maxoptra !== null) t += ` MaxOptra's own estimate: ${money(maxoptra)}.`;
+    return t;
+  }
+  function costCell(c, maxoptra) {
+    if (!c || c.total === null) return '<span class="muted" title="No rates set in Admin">–</span>';
+    const flag = c.missing && c.missing.length ? '<span class="cost-flag" aria-label="incomplete">*</span>' : '';
+    return `<span title="${esc(costTitle(c, maxoptra))}">${money(c.total)}${flag}</span>`;
+  }
+  const costCols = () => (canSeeCosts ? 10 : 9);
   const signed = (n, dp = 1) => (n === null || !isFinite(n)) ? '–' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(dp);
 
   async function api(path) {
@@ -326,7 +347,7 @@
   function drawToday() {
     if (!lastLive) return;
     $('fleet').querySelector('tbody').innerHTML = fleetRows(lastLive.vehicles, todayOpen, true)
-      || '<tr><td colspan="10" class="muted">No runs in MaxOptra for today yet.</td></tr>';
+      || `<tr><td colspan="${costCols()}" class="muted">No runs in MaxOptra for today yet.</td></tr>`;
   }
 
   function schedule(run) {
@@ -413,7 +434,7 @@
     for (const [label, test] of groups) {
       const list = vehicles.filter(test);
       if (!list.length) continue;
-      rows += `<tr class="group"><th colspan="10" scope="rowgroup">${label}</th></tr>`;
+      rows += `<tr class="group"><th colspan="${costCols()}" scope="rowgroup">${label}</th></tr>`;
       for (const v of list) {
         const r = v.current;
         const multi = v.runs.length > 1;
@@ -428,10 +449,10 @@
           <td data-label="Next stop or last job"><span class="cv">${nextOrLast(r)}</span></td>
           <td data-label="Back at Plus"><span class="cv">${backAtPlus(r)}</span></td>
           <td data-label="Miles" class="n"><span class="cv">${milesCell(v)}</span></td>
-          <td data-label="Est. cost" class="n"><span class="cv">${money(v.est_cost)}</span></td>
+          <td data-label="Cost" class="n cost-col"><span class="cv">${costCell(v.cost, v.est_cost)}</span></td>
           <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${r.status}">${STATUS[r.status] || r.status}</span>${runTag ? `<span class="pill-run">${runTag.trim()}</span>` : ''}</span></td></tr>`;
         if (!isOpen) continue;
-        if (!multi) { rows += `<tr class="stops-row"><td colspan="10">${stopsTable(v.runs[0].stops, live)}</td></tr>`; continue; }
+        if (!multi) { rows += `<tr class="stops-row"><td colspan="${costCols()}">${stopsTable(v.runs[0].stops, live)}</td></tr>`; continue; }
         for (const run of v.runs) {
           const runOpen = open.runs.has(run.run_key);
           rows += `<tr class="run-row">
@@ -443,9 +464,9 @@
             <td data-label="Next stop or last job"><span class="cv">${nextOrLast(run)}</span></td>
             <td data-label="Back at Plus"><span class="cv">${backAtPlus(run)}</span></td>
             <td data-label="Miles" class="n"><span class="cv">${milesCell(run)}</span></td>
-            <td data-label="Est. cost" class="n"><span class="cv">${money(run.est_cost)}</span></td>
+            <td data-label="Cost" class="n cost-col"><span class="cv">${costCell(run.cost, run.est_cost)}</span></td>
             <td data-label="Status" class="m-hide"><span class="cv"><span class="pill ${run.status}">${STATUS[run.status] || run.status}</span></span></td></tr>`;
-          if (runOpen) rows += `<tr class="stops-row"><td colspan="10">${stopsTable(run.stops, live)}</td></tr>`;
+          if (runOpen) rows += `<tr class="stops-row"><td colspan="${costCols()}">${stopsTable(run.stops, live)}</td></tr>`;
         }
       }
     }
@@ -486,8 +507,9 @@
       <div class="kpi"><div class="label">Failed deliveries</div><div class="value${h.failed_drops ? ' bad' : ''}">${fmtInt(h.failed_drops)}</div></div>
       <div class="kpi"><div class="label">Miles planned</div><div class="value">${fmtInt(h.planned_miles)}</div>
         <div class="sub">${h.runs_with_actual_miles ? `${fmtInt(h.actual_miles)} actual on ${h.runs_with_actual_miles} of ${h.runs} runs` : 'Actual miles not in yet'}</div></div>
-      <div class="kpi" title="${COST_NOTE}"><div class="label">Estimated cost</div><div class="value">${money(h.est_cost)}</div>
-        <div class="sub">${h.planned_drops ? `${money2(h.est_cost / h.planned_drops)} per planned drop` : ''}</div></div>`;
+      ${canSeeCosts ? `<div class="kpi" title="${esc(COST_NOTE)}"><div class="label">Cost today</div>
+        <div class="value">${h.cost && h.cost.total !== null ? money(h.cost.total) : '–'}${h.cost && h.cost.missing.length ? '<span class="cost-flag">*</span>' : ''}</div>
+        <div class="sub">${h.cost && h.cost.total !== null && h.planned_drops ? `${money2(h.cost.total / h.planned_drops)} per planned drop, full day` : '<a href="/transport/admin/">Set rates in Admin</a>'}</div></div>` : ''}`;
 
     lastLive = d;
     drawToday();
@@ -713,7 +735,8 @@
       periodState.dayData = d;
       const h = d.headline;
       $('day-summary').textContent = d.vehicles.length
-        ? `${fmtInt(h.completed_drops)} of ${fmtInt(h.planned_drops)} drops completed over ${fmtInt(h.runs)} run${h.runs === 1 ? '' : 's'}, ${fmtInt(h.planned_miles)} planned miles, ${money(h.est_cost)} estimated cost` +
+        ? `${fmtInt(h.completed_drops)} of ${fmtInt(h.planned_drops)} drops completed over ${fmtInt(h.runs)} run${h.runs === 1 ? '' : 's'}, ${fmtInt(h.planned_miles)} planned miles` +
+          `${canSeeCosts && h.cost && h.cost.total !== null ? `, costing ${money(h.cost.total)}${h.cost.missing.length ? ' (some rates missing)' : ''}` : ''}` +
           `${h.failed_drops ? `, ${h.failed_drops} failed` : ''}. Full-time vans averaged ${fmt1(per(h.van_completed, h.van_count))}${d.target !== null ? ` against a target of ${fmt1(d.target)}` : ''}. Click a registration for its runs and stops.`
         : 'No runs in MaxOptra for this day.';
       drawDay();
@@ -766,8 +789,17 @@
         <div class="sub">${diff === null ? '' : `${signed((diff / tgt.value) * 100, 0)}%`}</div></div>
       <div class="kpi"><div class="label">All completed drops</div><div class="value">${fmtInt(sum(r.vehicles, 'completed_drops'))}</div><div class="sub">every vehicle</div></div>
       <div class="kpi"><div class="label">Miles planned</div><div class="value">${fmtInt(sum(r.vehicles, 'planned_miles'))}</div><div class="sub">every vehicle</div></div>
-      <div class="kpi" title="${COST_NOTE}"><div class="label">Estimated cost</div><div class="value">${money(sum(r.vehicles, 'est_cost'))}</div>
-        <div class="sub">${sum(r.vehicles, 'completed_drops') ? `${money2(sum(r.vehicles, 'est_cost') / sum(r.vehicles, 'completed_drops'))} per completed drop` : ''}</div></div>
+      ${canSeeCosts ? (() => {
+        const fleet = r.vehicles.reduce((t, v) => t + (v.cost && v.cost.total !== null ? v.cost.total : 0), 0);
+        const any = r.vehicles.some((v) => v.cost && v.cost.total !== null);
+        const gaps = r.vehicles.some((v) => v.cost && v.cost.missing.length) || r.vehicles.some((v) => !v.cost && v.planned_drops);
+        const ext = (r.external || []).reduce((t, x) => t + (x.cost || 0), 0), jobs = (r.external || []).reduce((t, x) => t + x.jobs, 0);
+        const drops = sum(r.vehicles, 'completed_drops');
+        return `<div class="kpi" title="${esc(COST_NOTE)}"><div class="label">Fleet cost</div><div class="value">${any ? money(fleet) : '–'}${gaps ? '<span class="cost-flag">*</span>' : ''}</div>
+          <div class="sub">${any && drops ? `${money2(fleet / drops)} per completed drop` : '<a href="/transport/admin/">Set rates in Admin</a>'}</div></div>
+          <div class="kpi"><div class="label">Couriers and pallets</div><div class="value">${jobs ? money(ext) : '–'}</div>
+          <div class="sub">${jobs ? `${fmtInt(jobs)} unplanned job${jobs === 1 ? '' : 's'}` : 'No unplanned jobs yet'}</div></div>`;
+      })() : ''}
       <div class="kpi"><div class="label">Failed deliveries</div><div class="value${failed ? ' bad' : ''}">${fmtInt(failed)}</div>
         <div class="sub">${planned ? `${((failed / planned) * 100).toFixed(1)}% of drops` : ''}</div></div>
       <div class="kpi"><div class="label">Second runs</div><div class="value">${fmtInt(sum(r.vehicles, 'second_runs'))}</div>
@@ -778,17 +810,18 @@
     const vsT = (v) => (tgt && v !== null ? `<span class="${v - tgt.value < 0 ? 'behind' : 'ahead'}">${signed(v - tgt.value)}</span>` : '–');
     // Actual miles only exist on tracked days, so compare them with the plan for those same days (brief s.22)
     const miles = (v) => v.days_miles_tracked ? `${fmtInt(v.actual_miles)} <span class="small">vs ${fmtInt(v.planned_miles_tracked)} planned on the ${v.days_miles_tracked} tracked day${v.days_miles_tracked === 1 ? '' : 's'}</span>` : '<span class="small">Not tracked</span>';
-    $('vans').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n" scope="col" title="${COST_NOTE}">Est. cost</th><th class="n" scope="col">Cost per drop</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Utilisation</th></tr></thead><tbody>` +
+    $('vans').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n cost-col" scope="col" title="${esc(COST_NOTE)}">Cost</th><th class="n cost-col" scope="col">Cost per drop</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Utilisation</th></tr></thead><tbody>` +
       vans.map((v) => { const pd = per(v.completed_drops, v.days); return `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td>
         <td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td><td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td>
         <td class="n" data-label="Per day"><b>${fmt1(pd)}</b></td><td class="n" data-label="Against target">${vsT(pd)}</td>
         <td class="n" data-label="Failed">${v.failed_drops ? `<span class="fail">${v.failed_drops}</span>` : 0}</td><td class="n" data-label="Second runs">${v.second_runs}</td>
         <td class="n" data-label="Planned miles">${fmtInt(v.planned_miles)}</td><td data-label="Actual miles">${miles(v)}</td>
-        <td class="n" data-label="Est. cost">${money(v.est_cost)}</td><td class="n" data-label="Cost per drop">${money2(per(v.est_cost, v.completed_drops))}</td>
+        <td class="n cost-col" data-label="Cost">${costCell(v.cost, v.est_cost)}</td><td class="n cost-col" data-label="Cost per drop">${v.cost && v.cost.total !== null ? money2(per(v.cost.total, v.completed_drops)) : '–'}</td>
         <td class="n" data-label="Average back">${hhmm(v.avg_return_minute)}</td><td class="n" data-label="Utilisation">${v.utilisation === null ? '–' : v.utilisation + '%'}</td></tr>`; }).join('') +
       `<tr class="total"><td data-label="">All full-time vans</td><td class="n" data-label="Days">${vanDays}</td><td class="n" data-label="Runs">${fmtInt(sum(vans, 'runs'))}</td><td class="n" data-label="Completed drops">${fmtInt(vanDrops)}</td><td class="n" data-label="Per day">${fmt1(avg)}</td><td class="n" data-label="Against target">${vsT(avg)}</td><td colspan="2"></td>
         <td class="n" data-label="Planned miles">${fmtInt(sum(vans, 'planned_miles'))}</td><td></td>
-        <td class="n" data-label="Est. cost">${money(sum(vans, 'est_cost'))}</td><td class="n" data-label="Cost per drop">${money2(per(sum(vans, 'est_cost'), vanDrops))}</td><td colspan="2"></td></tr></tbody>`;
+        <td class="n cost-col" data-label="Cost">${vans.some((v) => v.cost && v.cost.total !== null) ? money(vans.reduce((t, v) => t + (v.cost && v.cost.total || 0), 0)) : '–'}</td>
+        <td class="n cost-col" data-label="Cost per drop">${vans.some((v) => v.cost && v.cost.total !== null) ? money2(per(vans.reduce((t, v) => t + (v.cost && v.cost.total || 0), 0), vanDrops)) : '–'}</td><td colspan="2"></td></tr></tbody>`;
 
     const drivers = r.drivers.map((d) => ({ ...d, pd: per(d.completed_drops, d.days) })).sort((a, b) => b.pd - a.pd || b.days - a.days);
     $('drivers').innerHTML = `<thead><tr><th class="n" scope="col">#</th><th scope="col">Driver</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th scope="col">Vans</th></tr></thead><tbody>` +
@@ -797,19 +830,20 @@
         <td class="n" data-label="Against target">${vsT(d.pd)}</td><td class="n" data-label="Failed">${d.failed_drops || 0}</td><td class="n" data-label="Second runs">${d.second_runs || 0}</td>
         <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
 
-    $('trucks').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Average day</th><th class="n" scope="col">Utilisation</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n" scope="col" title="${COST_NOTE}">Est. cost</th><th class="n" scope="col">Cost per drop</th></tr></thead><tbody>` +
+    $('cost-note').hidden = !canSeeCosts;
+    $('trucks').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Average day</th><th class="n" scope="col">Utilisation</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n cost-col" scope="col" title="${esc(COST_NOTE)}">Cost</th><th class="n cost-col" scope="col">Cost per drop</th></tr></thead><tbody>` +
       (trucks.length ? trucks.map((v) => `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td><td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td>
         <td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td><td class="n" data-label="Per day">${fmt1(per(v.completed_drops, v.days))}</td>
         <td class="n" data-label="Average day"><b>${hours(v.avg_day_minutes)}</b></td><td class="n" data-label="Utilisation"><b>${v.utilisation === null ? '–' : v.utilisation + '%'}</b></td>
         <td class="n" data-label="Average back">${hhmm(v.avg_return_minute)}</td><td class="n" data-label="Second runs">${v.second_runs}</td>
         <td class="n" data-label="Planned miles">${fmtInt(v.planned_miles)}</td><td data-label="Actual miles">${miles(v)}</td>
-        <td class="n" data-label="Est. cost">${money(v.est_cost)}</td><td class="n" data-label="Cost per drop">${money2(per(v.est_cost, v.completed_drops))}</td></tr>`).join('')
+        <td class="n cost-col" data-label="Cost">${costCell(v.cost, v.est_cost)}</td><td class="n cost-col" data-label="Cost per drop">${v.cost && v.cost.total !== null ? money2(per(v.cost.total, v.completed_drops)) : '–'}</td></tr>`).join('')
         : '<tr><td colspan="13" class="muted">No truck runs in this period.</td></tr>') + '</tbody>';
 
-    $('others').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th scope="col">Type</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Planned miles</th><th class="n" scope="col" title="${COST_NOTE}">Est. cost</th></tr></thead><tbody>` +
+    $('others').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th scope="col">Type</th><th class="n" scope="col">Days</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Planned miles</th><th class="n cost-col" scope="col" title="${esc(COST_NOTE)}">Cost</th></tr></thead><tbody>` +
       (others.length ? others.map((v) => `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td><td data-label="Type">${esc(TYPE[v.vehicle_type] || v.vehicle_type)}</td>
         <td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td><td class="n" data-label="Per day">${fmt1(per(v.completed_drops, v.days))}</td>
-        <td class="n" data-label="Failed">${v.failed_drops || 0}</td><td class="n" data-label="Planned miles">${fmtInt(v.planned_miles)}</td><td class="n" data-label="Est. cost">${money(v.est_cost)}</td></tr>`).join('') : '<tr><td colspan="8" class="muted">None.</td></tr>') + '</tbody>';
+        <td class="n" data-label="Failed">${v.failed_drops || 0}</td><td class="n" data-label="Planned miles">${fmtInt(v.planned_miles)}</td><td class="n cost-col" data-label="Cost">${costCell(v.cost, v.est_cost)}</td></tr>`).join('') : '<tr><td colspan="8" class="muted">None.</td></tr>') + '</tbody>';
 
     $('fail-note').textContent = r.failures.length >= 200 ? 'Latest 200 shown' : '';
     $('failures').innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col">Customer</th><th scope="col">Reason</th></tr></thead><tbody>` +
@@ -887,6 +921,9 @@
       $('role').textContent = me.role === 'admin' ? 'Admin' : 'Standard';
       $('role').hidden = false;
       $('setup-link').hidden = me.role !== 'admin';
+      $('admin-link').hidden = me.role !== 'admin';
+      canSeeCosts = me.role === 'admin';
+      document.body.classList.toggle('costs', canSeeCosts);
     } catch (e) { banner(`<b>${esc(e.message)}</b>${e.detail ? ` ${esc(e.detail)}` : ''}`); return; }
     alertButton();
     show();

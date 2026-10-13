@@ -365,26 +365,69 @@ export function buildLive(runs, now) {
   };
 }
 
+// Plus's own cost of each run (transport.run_costs): driver day rate, lease and fuel. Admins only, because a
+// vehicle's daily cost would otherwise reveal its driver's day rate.
+const RUN_COSTS = `
+  select run_key, driver_cost::float8, lease_cost::float8, fuel_cost::float8, fuel_miles::float8, fuel_on_actual,
+         driver_rate_missing, lease_missing, mpg_missing, fuel_price_missing
+  from transport.run_costs($1::date, $2::date)`;
+
+function costOf(c) {
+  if (!c) return null;
+  const parts = [c.driver_cost, c.lease_cost, c.fuel_cost];
+  const missing = [c.driver_rate_missing && 'driver rate', c.lease_missing && 'lease', c.mpg_missing && 'MPG', c.fuel_price_missing && 'fuel price'].filter(Boolean);
+  return { total: parts.some((x) => x !== null) ? parts.reduce((t, x) => t + (x || 0), 0) : null,
+           driver: c.driver_cost, lease: c.lease_cost, fuel: c.fuel_cost, fuel_miles: c.fuel_miles,
+           fuel_on_actual: c.fuel_on_actual, missing };
+}
+function addCosts(a, b) {
+  if (!b) return a;
+  if (!a) return { ...b, missing: [...b.missing] };
+  const add = (x, y) => (x === null && y === null ? null : (x || 0) + (y || 0));
+  return { total: add(a.total, b.total), driver: add(a.driver, b.driver), lease: add(a.lease, b.lease), fuel: add(a.fuel, b.fuel),
+           fuel_miles: add(a.fuel_miles, b.fuel_miles), fuel_on_actual: a.fuel_on_actual && b.fuel_on_actual,
+           missing: [...new Set([...a.missing, ...b.missing])] };
+}
+// MaxOptra's own run cost is a cost figure too, so it goes only to Admins (as a comparison).
+function stripCosts(built) {
+  for (const v of built.vehicles) {
+    delete v.est_cost;
+    for (const r of v.runs) delete r.est_cost;
+  }
+  delete built.headline.est_cost;
+  return built;
+}
+
 // A whole day: vehicles, their runs (with live status as at `stamp`) and every stop on each run.
-async function dayData(sql, date, stamp) {
-  const [runs, stops] = await Promise.all([sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date])]);
+async function dayData(sql, date, stamp, withCosts) {
+  const [runs, stops, costs] = await Promise.all([
+    sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date]),
+    withCosts ? sql.query(RUN_COSTS, [date, date]) : Promise.resolve([]),
+  ]);
   const built = buildLive(runs, stamp);
   const byRun = new Map();
   for (const st of stops) {
     if (!byRun.has(st.run_key)) byRun.set(st.run_key, []);
     byRun.get(st.run_key).push(mapStop(st, stamp));
   }
-  for (const v of built.vehicles) for (const r of v.runs) r.stops = byRun.get(r.run_key) || [];
-  return built;
+  const costBy = new Map(costs.map((c) => [c.run_key, costOf(c)]));
+  for (const v of built.vehicles) {
+    for (const r of v.runs) {
+      r.stops = byRun.get(r.run_key) || [];
+      if (withCosts) { r.cost = costBy.get(r.run_key) || null; v.cost = addCosts(v.cost || null, r.cost); }
+    }
+    if (withCosts) built.headline.cost = addCosts(built.headline.cost || null, v.cost);
+  }
+  return withCosts ? built : stripCosts(built);
 }
 
-async function day(url, sql) {
+async function day(url, sql, user) {
   const date = url.searchParams.get('date');
   if (!isDate(date)) return fail(400, 'Give date as YYYY-MM-DD');
   const now = londonNow();
   const stamp = date === now.date ? now.stamp : `${date} 23:59:59`;
   const [built, target] = await Promise.all([
-    dayData(sql, date, stamp),
+    dayData(sql, date, stamp, user.role === 'admin'),
     sql.query(`select transport.target_on('van_drops_per_day', $1::date) as target`, [date]),
   ]);
   return json({ date, live: date === now.date, target: target[0] && target[0].target !== null ? Number(target[0].target) : null, ...built });
@@ -425,10 +468,10 @@ async function customer(url, sql) {
                 customer_no: visits.map((v) => v.customer_no).find(Boolean) || null });
 }
 
-async function live(sql) {
+async function live(sql, user) {
   const now = londonNow();
   const [built, sync, events, target] = await Promise.all([
-    dayData(sql, now.date, now.stamp),
+    dayData(sql, now.date, now.stamp, user.role === 'admin'),
     // Today's freshness only: history being pulled in the background logs past dates and must not count.
     sql.query(`select
         (select started_at from transport.sync_log where source = 'report_api' and status = 'ok'
@@ -476,7 +519,7 @@ async function live(sql) {
 // Period report: any date range (the page asks for rolling month, rolling quarter or custom dates)
 // ---------------------------------------------------------------------------
 
-async function report(url, sql) {
+async function report(url, sql, user) {
   const from = url.searchParams.get('from');
   const to = url.searchParams.get('to');
   if (!isDate(from) || !isDate(to) || from > to) return fail(400, 'Give from and to as YYYY-MM-DD, from before to');
@@ -558,9 +601,45 @@ async function report(url, sql) {
       group by 1`, [from, to]),
   ]);
   const costBy = Object.fromEntries(costs.map((c) => [c.vehicle, c]));
+  const admin = user.role === 'admin';
   for (const v of vehicles) {
-    v.est_cost = costBy[v.vehicle] ? costBy[v.vehicle].est_cost : null;
-    v.runs_costed = costBy[v.vehicle] ? costBy[v.vehicle].runs_costed : 0;
+    if (admin) v.est_cost = costBy[v.vehicle] ? costBy[v.vehicle].est_cost : null;
+  }
+  let external = null;
+  if (admin) {
+    const [plus, lease, jobs] = await Promise.all([
+      sql.query(`
+        select coalesce(v.display_name, v.maxoptra_name) as vehicle,
+          sum(c.driver_cost)::float8 as driver, sum(c.fuel_cost)::float8 as fuel, sum(c.fuel_miles)::float8 as fuel_miles,
+          (count(*) filter (where c.fuel_on_actual))::int as runs_fuel_actual, count(*)::int as runs,
+          (count(*) filter (where c.driver_rate_missing))::int as runs_no_driver_rate,
+          bool_or(c.mpg_missing) as mpg_missing, bool_or(c.fuel_price_missing) as fuel_price_missing
+        from transport.run_costs($1::date, $2::date) c join transport.vehicles v on v.id = c.vehicle_id
+        group by 1`, [from, to]),
+      sql.query(`select coalesce(v.display_name, v.maxoptra_name) as vehicle, p.lease_cost::float8 as lease, p.weekdays
+                 from transport.period_lease($1::date, $2::date) p join transport.vehicles v on v.id = p.vehicle_id`, [from, to]),
+      sql.query(`select coalesce(job_type, 'unclassified') as job_type, count(*)::int as jobs, sum(job_cost)::float8 as cost,
+                        (count(*) filter (where job_cost is null))::int as no_cost
+                 from transport.v_external_jobs where job_date between $1 and $2 group by 1 order by 1`, [from, to]),
+    ]);
+    const plusBy = Object.fromEntries(plus.map((c) => [c.vehicle, c]));
+    const leaseBy = Object.fromEntries(lease.map((c) => [c.vehicle, c]));
+    for (const v of vehicles) {
+      const c = plusBy[v.vehicle];
+      const l = leaseBy[v.vehicle];
+      if (!c && !l) { v.cost = null; continue; }
+      const missing = [];
+      if (c && c.runs_no_driver_rate) missing.push(`driver rate on ${c.runs_no_driver_rate} run${c.runs_no_driver_rate === 1 ? '' : 's'}`);
+      if (!l) missing.push('lease');
+      if (c && c.mpg_missing) missing.push('MPG');
+      if (c && c.fuel_price_missing) missing.push('fuel price');
+      const parts = [c ? c.driver : null, l ? l.lease : null, c ? c.fuel : null];
+      v.cost = { total: parts.some((x) => x !== null) ? parts.reduce((t, x) => t + (x || 0), 0) : null,
+                 driver: c ? c.driver : null, lease: l ? l.lease : null, lease_weekdays: l ? l.weekdays : 0,
+                 fuel: c ? c.fuel : null, fuel_miles: c ? c.fuel_miles : null,
+                 runs_fuel_actual: c ? c.runs_fuel_actual : 0, runs: c ? c.runs : 0, missing };
+    }
+    external = jobs;
   }
   // Utilisation (brief s.24): estimated working time (loading allowance + first departure to return, less the
   // break) against the scheduled net day for vans or trucks.
@@ -571,7 +650,171 @@ async function report(url, sql) {
     v.utilisation = v.avg_day_minutes && h
       ? Math.round(((v.avg_day_minutes + (h.prep_minutes ?? 25) - h.break_minutes) / h.net_minutes) * 100) : null;
   }
-  return json({ from, to, vehicles, drivers, failures, daily, vehicle_daily: vehicleDaily, missing_weekdays: missing.map((m) => m.date) });
+  return json({ from, to, vehicles, drivers, failures, daily, vehicle_daily: vehicleDaily, missing_weekdays: missing.map((m) => m.date),
+                ...(admin ? { external } : {}) });
+}
+
+// ---------------------------------------------------------------------------
+// Admin: cost rates, vehicles, drivers, users and jobs sent by courier. Every route here is Admins only.
+// ---------------------------------------------------------------------------
+
+const RATE_TYPES = {
+  driver: ['day_rate'], vehicle: ['lease_monthly', 'hire_daily', 'mpg'], fuel: ['price_per_litre'],
+  external: ['same_day', 'overnight_parcel', 'overnight_pallet', 'other'],
+};
+const VEHICLE_TYPES = ['full_time_van', 'truck', 'support', 'temporary', 'excluded', 'unclassified'];
+const DRIVER_TYPES = ['van', 'truck', 'manager', 'agency', 'excluded', 'unclassified'];
+const JOB_TYPES = ['same_day', 'overnight_parcel', 'overnight_pallet', 'other'];
+
+async function adminState(sql) {
+  const [users, drivers, vehicles, rates, history, unplanned, fuel, reminderCfg, reminders] = await Promise.all([
+    sql.query(`select email, role, display_name, active from transport.app_users order by role, email`),
+    sql.query(`
+      select d.id, d.name, d.driver_type, d.kpi_included, d.active,
+        coalesce((select string_agg(a.raw_name, ', ' order by a.raw_name) from transport.driver_aliases a where a.driver_id = d.id), '') as spellings,
+        (select max(r.run_date)::text from transport.runs r where r.driver_id = d.id and r.removed_at is null) as last_run,
+        (select count(*)::int from transport.runs r where r.driver_id = d.id and r.removed_at is null
+           and r.run_date > (now() at time zone 'Europe/London')::date - 90) as runs_90
+      from transport.drivers d order by d.name`),
+    sql.query(`
+      select v.id, v.maxoptra_name, coalesce(v.display_name, v.maxoptra_name) as vehicle, v.vehicle_type, v.kpi_included, v.active, v.notes,
+        (select max(r.run_date)::text from transport.runs r where r.vehicle_id = v.id and r.removed_at is null) as last_run
+      from transport.vehicles v order by case v.vehicle_type when 'full_time_van' then 1 when 'truck' then 2 when 'support' then 3 else 4 end, 3`),
+    // the latest rate of each kind, with the date it applies from
+    sql.query(`select distinct on (subject_type, coalesce(subject_id, 0), rate_type)
+                 subject_type, subject_id, rate_type, value::float8, effective_from::text
+               from transport.cost_rates order by subject_type, coalesce(subject_id, 0), rate_type, effective_from desc`),
+    sql.query(`select c.subject_type, c.subject_id, c.rate_type, c.value::float8, c.effective_from::text, c.created_by, c.created_at,
+                 coalesce(d.name, coalesce(v.display_name, v.maxoptra_name)) as subject
+               from transport.cost_rates c
+               left join transport.drivers d on c.subject_type = 'driver' and d.id = c.subject_id
+               left join transport.vehicles v on c.subject_type = 'vehicle' and v.id = c.subject_id
+               order by c.created_at desc limit 40`),
+    sql.query(`select count(*)::int as jobs, min(job_date)::text as first_date from transport.external_jobs where removed_at is null`),
+    sql.query(`select effective_from::text as week_start, value::float8 as price, created_by, created_at
+               from transport.cost_rates where subject_type = 'fuel' and rate_type = 'price_per_litre'
+               order by effective_from desc limit 16`),
+    sql.query(`select value from transport.settings where key = 'fuel_reminder'`),
+    sql.query(`select sent_at, week_start::text, recipients, ok, message from transport.reminder_log
+               where kind = 'fuel' order by sent_at desc limit 5`),
+  ]);
+  const rateOf = (type, id, rate) => rates.find((r) => r.subject_type === type && (r.subject_id ?? null) === (id ?? null) && r.rate_type === rate) || null;
+  for (const d of drivers) d.day_rate = rateOf('driver', d.id, 'day_rate');
+  for (const v of vehicles) for (const k of RATE_TYPES.vehicle) v[k] = rateOf('vehicle', v.id, k);
+  const settings = { fuel_price: rateOf('fuel', null, 'price_per_litre') };
+  for (const k of RATE_TYPES.external) settings[k] = rateOf('external', null, k);
+  const today = londonNow().date;
+  const d = new Date(`${today}T12:00:00Z`);
+  const weekStart = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+  return json({ users, drivers, vehicles, settings, history, unplanned: unplanned[0],
+                fuel: { prices: fuel, week_start: weekStart, this_week: fuel.find((f) => f.week_start >= weekStart) || null },
+                reminder: { ...(reminderCfg[0] ? reminderCfg[0].value : {}), recent: reminders },
+                history_start: '2026-06-01', today });
+}
+
+async function saveRates(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  if (!isDate(b.effective_from)) return fail(400, 'Choose the date the rates apply from');
+  const rows = Array.isArray(b.rates) ? b.rates : [];
+  const clean = [];
+  for (const r of rows) {
+    const types = RATE_TYPES[r.subject_type];
+    const value = Number(r.value);
+    if (!types || !types.includes(r.rate_type) || !Number.isFinite(value) || value < 0) return fail(400, `Not a valid rate: ${JSON.stringify(r)}`);
+    if (r.rate_type === 'mpg' && value === 0) return fail(400, 'MPG cannot be 0');
+    const needsId = r.subject_type === 'driver' || r.subject_type === 'vehicle';
+    if (needsId && !Number.isInteger(r.subject_id)) return fail(400, 'Rate is missing its driver or vehicle');
+    clean.push([r.subject_type, needsId ? r.subject_id : null, r.rate_type, value]);
+  }
+  for (const [type, id, rate, value] of clean) {
+    await sql.query(
+      `insert into transport.cost_rates (subject_type, subject_id, rate_type, value, effective_from, created_by)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (subject_type, coalesce(subject_id, 0), rate_type, effective_from)
+       do update set value = excluded.value, created_by = excluded.created_by, created_at = now()`,
+      [type, id, rate, value, b.effective_from, user.email]);
+  }
+  return json({ saved: clean.length });
+}
+
+async function saveReminder(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  const recipients = [...new Set((Array.isArray(b.recipients) ? b.recipients : []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))];
+  const bad = recipients.filter((e) => !/^[^@\s]+@pluspkg\.com$/.test(e));
+  if (bad.length) return fail(400, `Use Plus Packaging email addresses: ${bad.join(', ')}`);
+  const startDay = Number(b.start_day), hour = Number(b.hour);
+  if (!Number.isInteger(startDay) || startDay < 1 || startDay > 5) return fail(400, 'Choose a weekday to start reminding');
+  if (!Number.isInteger(hour) || hour < 6 || hour > 17) return fail(400, 'Choose a time between 06:00 and 17:00');
+  const value = { enabled: Boolean(b.enabled) && recipients.length > 0, recipients, start_day: startDay, hour };
+  await sql.query(`insert into transport.settings (key, value, description) values ('fuel_reminder', $1::jsonb, 'Weekly fuel price reminder')
+                   on conflict (key) do update set value = excluded.value, updated_at = now()`, [JSON.stringify(value)]);
+  return json({ saved: value });
+}
+
+async function saveUser(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  const email = String(b.email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@pluspkg\.com$/.test(email)) return fail(400, 'Use a Plus Packaging email address');
+  const role = b.role === 'admin' ? 'admin' : 'standard';
+  const active = b.active !== false;
+  if (role !== 'admin' || !active) {
+    const others = await sql.query(`select count(*)::int as n from transport.app_users where role = 'admin' and active and email <> $1`, [email]);
+    if (others[0].n === 0) return fail(400, 'There must always be at least one Admin');
+  }
+  await sql.query(
+    `insert into transport.app_users (email, role, display_name, active) values ($1, $2, $3, $4)
+     on conflict (email) do update set role = excluded.role, active = excluded.active,
+       display_name = coalesce(excluded.display_name, transport.app_users.display_name)`,
+    [email, role, b.display_name ? String(b.display_name).slice(0, 80) : null, active]);
+  return json({ saved: email });
+}
+
+async function saveVehicle(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  if (!Number.isInteger(b.id) || !VEHICLE_TYPES.includes(b.vehicle_type)) return fail(400, 'Not a valid vehicle change');
+  await sql.query(
+    `update transport.vehicles set vehicle_type = $2, kpi_included = $3, hours_profile = case when $2 = 'truck' then 'truck' else hours_profile end,
+       notes = $4, updated_at = now() where id = $1`,
+    [b.id, b.vehicle_type, Boolean(b.kpi_included), b.notes ? String(b.notes).slice(0, 500) : null]);
+  return json({ saved: b.id });
+}
+
+async function saveDriver(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  if (!Number.isInteger(b.id) || !DRIVER_TYPES.includes(b.driver_type)) return fail(400, 'Not a valid driver change');
+  await sql.query(`update transport.drivers set driver_type = $2, kpi_included = $3, updated_at = now() where id = $1`,
+    [b.id, b.driver_type, Boolean(b.kpi_included)]);
+  return json({ saved: b.id });
+}
+
+async function mergeDrivers(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  if (!Number.isInteger(b.from_id) || !Number.isInteger(b.into_id) || b.from_id === b.into_id) return fail(400, 'Choose two different drivers');
+  await sql.query('select transport.merge_drivers($1, $2)', [b.from_id, b.into_id]);
+  return json({ merged: b.from_id, into: b.into_id });
+}
+
+async function externalJobs(url, sql) {
+  const from = url.searchParams.get('from'), to = url.searchParams.get('to');
+  if (!isDate(from) || !isDate(to)) return fail(400, 'Give from and to as YYYY-MM-DD');
+  const jobs = await sql.query(`
+    select order_ref, job_date::text, client_name, location_name, location_postcode, vehicle_requirements,
+           size_1::float8, size_2::float8, order_status, job_type, cost::float8, job_cost::float8, cost_is_default, notes
+    from transport.v_external_jobs where job_date between $1 and $2 order by job_date desc, client_name limit 1000`, [from, to]);
+  return json({ from, to, jobs });
+}
+
+async function saveExternal(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  if (!b.order_ref || !isDate(b.job_date)) return fail(400, 'Not a valid job');
+  if (b.job_type !== null && b.job_type !== undefined && !JOB_TYPES.includes(b.job_type)) return fail(400, 'Not a valid job type');
+  const cost = b.cost === null || b.cost === '' || b.cost === undefined ? null : Number(b.cost);
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0)) return fail(400, 'Cost must be a positive amount');
+  const rows = await sql.query(
+    `update transport.external_jobs set job_type = $3, cost = $4, notes = $5, updated_at = now(), updated_by = $6
+     where order_ref = $1 and job_date = $2 returning order_ref`,
+    [b.order_ref, b.job_date, b.job_type || null, cost, b.notes ? String(b.notes).slice(0, 500) : null, user.email]);
+  return rows.length ? json({ saved: b.order_ref }) : fail(404, 'Job not found');
 }
 
 async function importBatch(request, sql) {
@@ -620,10 +863,23 @@ export async function onRequest(context) {
     if (method === 'GET' && route === 'me') return json(user);
     if (method === 'GET' && route === 'status') return status(sql);
     if (method === 'GET' && route === 'validation') return validation(url, sql);
-    if (method === 'GET' && route === 'live') return live(sql);
-    if (method === 'GET' && route === 'day') return day(url, sql);
+    if (method === 'GET' && route === 'live') return live(sql, user);
+    if (method === 'GET' && route === 'day') return day(url, sql, user);
     if (method === 'GET' && route === 'customer') return customer(url, sql);
-    if (method === 'GET' && route === 'report') return report(url, sql);
+    if (method === 'GET' && route === 'report') return report(url, sql, user);
+    if (route.startsWith('admin')) {
+      if (!admin) return fail(403, 'Admins only');
+      if (method === 'GET' && route === 'admin/state') return adminState(sql);
+      if (method === 'POST' && route === 'admin/rates') return saveRates(request, sql, user);
+      if (method === 'POST' && route === 'admin/user') return saveUser(request, sql);
+      if (method === 'POST' && route === 'admin/reminder') return saveReminder(request, sql);
+      if (method === 'POST' && route === 'admin/vehicle') return saveVehicle(request, sql);
+      if (method === 'POST' && route === 'admin/driver') return saveDriver(request, sql);
+      if (method === 'POST' && route === 'admin/merge-drivers') return mergeDrivers(request, sql);
+      if (method === 'GET' && route === 'admin/external') return externalJobs(url, sql);
+      if (method === 'POST' && route === 'admin/external') return saveExternal(request, sql, user);
+      return fail(404, `No admin route for ${method} /api/transport/${route}`);
+    }
     if (method === 'POST' && route === 'import') return admin ? importBatch(request, sql) : fail(403, 'Admins only');
     if (method === 'POST' && route === 'import/log') return admin ? importLog(request, sql, user) : fail(403, 'Admins only');
 
