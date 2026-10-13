@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Transport board | Plus Packaging</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  /* Made for the transport office TV: read from across the room, through glare, on one screen.
+     Everything is sized from --u, which follows the screen (1024 x 768 or 1920 x 1080 both fit). */
+  :root {
+    --navy: #002b75;      /* Plus navy: the page */
+    --deep: #00215c;      /* a shade deeper, for alternate rows */
+    --blue: #003da5;      /* Plus blue */
+    --sky: #8fb4ff;       /* Plus blue, lifted to read on navy */
+    --light: #eaf2ff;     /* Plus light blue: main text */
+    --grey: #9ea2a2;      /* Plus grey: secondary text */
+    --good: #3ccf7f;      /* on or ahead of plan */
+    --bad: #ff6b5e;       /* behind, late or failed */
+    --u: min(1vh, 0.75vw);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: var(--navy); color: var(--light); font-family: Lato, "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums;
+         display: flex; flex-direction: column; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); gap: calc(var(--u) * 1.2); }
+  body.idle, body.idle * { cursor: none !important; }
+
+  /* Header: name, date, the time now, and when MaxOptra last updated */
+  header { display: flex; align-items: baseline; gap: calc(var(--u) * 2.4); flex: none; }
+  .brand { font-weight: 900; font-size: calc(var(--u) * 3.4); color: #fff; letter-spacing: .01em; }
+  .date { font-size: calc(var(--u) * 2.6); color: var(--light); }
+  .right { margin-left: auto; display: flex; align-items: baseline; gap: calc(var(--u) * 2); }
+  .updated { font-size: calc(var(--u) * 2); color: var(--grey); }
+  .clock { font-weight: 900; font-size: calc(var(--u) * 4.4); color: #fff; }
+  #sound { font: inherit; font-size: calc(var(--u) * 1.8); font-weight: 700; color: var(--navy); background: var(--light); border: 0;
+           border-radius: calc(var(--u) * 0.5); padding: calc(var(--u) * 0.5) calc(var(--u) * 1.2); cursor: pointer; }
+  .alarm { background: var(--bad); color: #fff; font-weight: 900; font-size: calc(var(--u) * 2.6);
+           padding: calc(var(--u) * 0.9) calc(var(--u) * 1.6); border-radius: calc(var(--u) * 0.6); flex: none; }
+
+  /* The day in five figures */
+  .figures { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1.2fr 1fr; gap: calc(var(--u) * 1.2); flex: none; }
+  .fig { background: var(--deep); border-radius: calc(var(--u) * 0.8); padding: calc(var(--u) * 1.1) calc(var(--u) * 1.6); }
+  .fig .v { font-weight: 900; font-size: calc(var(--u) * 6.4); line-height: 1; color: #fff; }
+  .fig .v small { font-size: .45em; font-weight: 700; color: var(--light); margin-left: .25em; }
+  .fig .l { font-size: calc(var(--u) * 2.1); color: var(--light); margin-top: calc(var(--u) * 0.6); }
+  .fig .l b { color: #fff; }
+  .fig.bad .v { color: var(--bad); }
+  .daybar { height: calc(var(--u) * 1.2); background: rgba(234, 242, 255, .16); border-radius: 99px; margin-top: calc(var(--u) * 0.9); overflow: hidden; }
+  .daybar span { display: block; height: 100%; background: var(--light); border-radius: 99px; }
+
+  /* One row per vehicle. The coloured edge is its state; the blocks are its drops, one each. */
+  .board { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .cols, .row { display: grid; align-items: center; column-gap: calc(var(--u) * 1.2);
+                grid-template-columns: minmax(0, 13fr) minmax(0, 13fr) minmax(0, 6fr) minmax(0, 19fr) minmax(0, 11fr) minmax(0, 17fr) minmax(0, 10fr) minmax(0, 10fr); }
+  .cols { font-size: calc(var(--u) * 1.8); color: var(--grey); padding: 0 calc(var(--u) * 1.6) calc(var(--u) * 0.6) calc(var(--u) * 2.2); flex: none; }
+  .rows { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); min-height: 0; }
+  .row { flex: 1 1 0; min-height: calc(var(--u) * 4.6); max-height: calc(var(--u) * 9); background: var(--deep); border-radius: calc(var(--u) * 0.7);
+         padding: 0 calc(var(--u) * 1.6) 0 calc(var(--u) * 2.2); position: relative; font-size: calc(var(--u) * 2.5); overflow: hidden; }
+  .row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--u) * 0.9); background: var(--edge, var(--grey)); }
+  .row.group-start { margin-top: calc(var(--u) * 0.8); }
+  .reg { font-weight: 900; font-size: calc(var(--u) * 2.9); color: #fff; white-space: nowrap; }
+  .kind { display: block; font-size: calc(var(--u) * 1.6); font-weight: 400; color: var(--grey); }
+  .driver, .now { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { display: block; font-size: calc(var(--u) * 1.7); color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run { color: var(--light); white-space: nowrap; }
+  .drops { display: flex; align-items: center; gap: calc(var(--u) * 1); min-width: 0; }
+  .blocks { display: flex; gap: calc(var(--u) * 0.3); flex: 1 1 auto; min-width: 0; height: calc(var(--u) * 2.2); }
+  .blocks i { flex: 1 1 0; border-radius: calc(var(--u) * 0.25); background: rgba(234, 242, 255, .14); }
+  .blocks i.d { background: var(--light); }
+  .blocks i.f { background: var(--bad); }
+  .blocks.solid { background: rgba(234, 242, 255, .14); border-radius: calc(var(--u) * 0.3); overflow: hidden; }
+  .blocks.solid span { background: var(--light); height: 100%; }
+  .count { font-weight: 900; white-space: nowrap; color: #fff; }
+  .good { color: var(--good); font-weight: 900; }
+  .badt { color: var(--bad); font-weight: 900; }
+  .muted { color: var(--grey); }
+  .back { white-space: nowrap; font-weight: 900; }
+  .state { font-weight: 900; font-size: calc(var(--u) * 2.1); white-space: nowrap; text-align: right; }
+
+  /* Last jobs finished, newest first */
+  footer { flex: none; display: flex; align-items: center; gap: calc(var(--u) * 2.4); font-size: calc(var(--u) * 2.1); color: var(--light);
+           white-space: nowrap; overflow: hidden; border-top: 2px solid rgba(234, 242, 255, .18); padding-top: calc(var(--u) * 1); }
+  footer .t { color: var(--grey); }
+  footer .e b { color: #fff; }
+
+  /* A vehicle that has just finished its last job */
+  #toast { position: fixed; right: calc(var(--u) * 2.2); bottom: calc(var(--u) * 7); max-width: 46vw; background: var(--light); color: var(--navy);
+           border-left: calc(var(--u) * 1.2) solid var(--good); border-radius: calc(var(--u) * 0.8); padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2);
+           font-size: calc(var(--u) * 2.8); box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0, 0, 0, .35); }
+  #toast b { font-weight: 900; }
+  #toast .sub { color: #3a4a66; font-size: calc(var(--u) * 2.2); white-space: normal; margin-top: calc(var(--u) * 0.4); }
+  .empty { margin: auto; font-size: calc(var(--u) * 3); color: var(--light); }
+  @media (prefers-reduced-motion: no-preference) { #toast:not([hidden]) { animation: rise .35s ease-out; } }
+  @keyframes rise { from { transform: translateY(calc(var(--u) * 3)); opacity: 0; } to { transform: none; opacity: 1; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Plus Transport</div>
+  <div class="date" id="date"></div>
+  <div class="right">
+    <button id="sound" hidden>Click for sound</button>
+    <div class="updated" id="updated"></div>
+    <div class="clock" id="clock"></div>
+  </div>
+</header>
+<div class="alarm" id="alarm" hidden></div>
+<section class="figures" id="figures" aria-label="Today in figures"></section>
+<section class="board" aria-label="Vehicles today">
+  <div class="cols"><span>Vehicle</span><span>Driver</span><span>Run</span><span>Drops</span><span>Schedule</span><span>Now</span><span>Back at Plus</span><span style="text-align:right">State</span></div>
+  <div class="rows" id="rows"></div>
+</section>
+<footer id="footer"></footer>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const POLL_MS = 60 * 1000;
+  const STATE = { out: 'Out', returning: 'Heading back', back: 'Back', back_estimated: 'Back', not_departed: 'Not left', late: 'Late', no_data: 'No data' };
+  const EDGE = { out: 'var(--sky)', returning: 'var(--light)', back: 'var(--good)', back_estimated: 'var(--good)', not_departed: 'var(--grey)', late: 'var(--bad)', no_data: 'var(--grey)' };
+  const KIND = (v) => v.vehicle_type === 'full_time_van' && v.in_kpi ? 'Van' : v.vehicle_type === 'truck' ? 'Truck' : 'Other';
+  const ORDER = { Van: 1, Truck: 2, Other: 3 };
+
+  // ---- clock
+  function tick() {
+    const now = new Date();
+    $('clock').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+    $('date').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London' });
+  }
+  tick(); setInterval(tick, 15 * 1000);
+
+  // ---- rows
+  // 47 min, or 2h 41m once it's over an hour: quicker to read across a room
+  const span = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m} min`);
+  function schedule(r) {
+    const v = r.variance;
+    if (r.status === 'late') return `<span class="badt">${span(Math.abs(v))} late leaving</span>`;
+    if (['back', 'back_estimated'].includes(r.status)) return '<span class="muted">Done</span>';
+    if (v === null || v === undefined) return '<span class="muted">–</span>';
+    if (v >= 5) return `<span class="good">${span(v)} ahead</span>`;
+    if (v <= -5) return `<span class="badt">${span(-v)} behind</span>`;
+    return '<span class="good">On time</span>';
+  }
+  // full names where there's room; first name and initial on a small screen
+  const driverName = (n) => {
+    if (!n) return '–';
+    if (window.innerWidth >= 1400) return n;
+    const parts = n.trim().split(/\s+/);
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : n;
+  };
+  function now(r) {
+    if (r.status === 'out' && r.on_site_client) return `At ${esc(r.on_site_client)}<span class="sub">since ${esc(r.on_site_since)}</span>`;
+    if (r.status === 'out' && r.next_client) return `${esc(r.next_client)}<span class="sub">next, due ${esc(r.next_due || '')}</span>`;
+    if (r.status === 'returning') return `Heading back<span class="sub">last job ${esc(r.last_job || '')}</span>`;
+    if (['back', 'back_estimated'].includes(r.status)) return `<span class="muted">Last job ${esc(r.last_job || '–')}</span>`;
+    if (['not_departed', 'late'].includes(r.status)) return `Leaves ${esc(r.planned_departure || '')}`;
+    if (r.status === 'no_data') return '<span class="muted">No updates from the app</span>';
+    return '–';
+  }
+  function back(r) {
+    if (r.status === 'back' && r.actual_return) return `${esc(r.actual_return)}<span class="sub">back</span>`;
+    if (r.status === 'back_estimated' && r.estimated_return) return `${esc(r.estimated_return)}<span class="sub">about</span>`;
+    if (r.expected_return && ['out', 'returning', 'late'].includes(r.status)) {
+      const late = r.expected_late_by !== null && r.expected_late_by > 0;
+      return `<span class="${late ? 'badt' : 'good'}">${esc(r.expected_return)}</span><span class="sub">plan ${esc(r.planned_return || '–')}</span>`;
+    }
+    return r.planned_return ? `<span class="muted">${esc(r.planned_return)}</span><span class="sub">plan</span>` : '–';
+  }
+  function blocks(v) {
+    const n = v.planned_drops || 0;
+    if (!n) return '<span class="blocks"></span>';
+    if (n > 24) return `<span class="blocks solid"><span style="width:${Math.round((v.completed_drops / n) * 100)}%"></span></span>`;
+    const done = v.completed_drops || 0, failed = v.failed_drops || 0;
+    return '<span class="blocks">' + Array.from({ length: n }, (_, i) => `<i class="${i < done ? 'd' : i < done + failed ? 'f' : ''}"></i>`).join('') + '</span>';
+  }
+  function render(d) {
+    const h = d.headline;
+    // figures
+    const pct = h.planned_drops ? Math.round((h.completed_drops / h.planned_drops) * 100) : 0;
+    const perVan = h.van_count ? (h.van_completed / h.van_count) : null;
+    const backCount = d.vehicles.filter((v) => ['back', 'back_estimated'].includes(v.current.status)).length;
+    $('figures').innerHTML = `
+      <div class="fig"><div class="v">${h.completed_drops}<small>of ${h.planned_drops}</small></div><div class="daybar"><span style="width:${pct}%"></span></div><div class="l">drops done, ${pct}%</div></div>
+      <div class="fig"><div class="v">${h.open_drops}</div><div class="l">drops left</div></div>
+      <div class="fig"><div class="v">${perVan === null ? '–' : perVan.toFixed(1)}</div><div class="l">per full-time van${d.target ? `, target <b>${d.target}</b>` : ''}</div></div>
+      <div class="fig"><div class="v">${h.vehicles_out}<small>out</small></div><div class="l">${h.vehicles_returning ? `<b>${h.vehicles_returning}</b> heading back, ` : ''}<b>${backCount}</b> back</div></div>
+      <div class="fig${h.failed_drops ? ' bad' : ''}"><div class="v">${h.failed_drops}</div><div class="l">failed deliveries</div></div>`;
+    // vehicles: vans, then trucks, then others
+    const list = d.vehicles.slice().sort((a, b) => ORDER[KIND(a)] - ORDER[KIND(b)] || a.vehicle.localeCompare(b.vehicle));
+    let prev = null;
+    $('rows').innerHTML = list.length ? list.map((v) => {
+      const r = v.current; const kind = KIND(v); const start = prev !== null && kind !== prev; prev = kind;
+      const failed = v.failed_drops ? `<span class="sub badt">${v.failed_drops} failed</span>` : `<span class="sub">${v.open_drops} left</span>`;
+      return `<div class="row${start ? ' group-start' : ''}" style="--edge:${EDGE[r.status] || 'var(--grey)'}">
+        <div class="reg">${esc(v.vehicle)}<span class="kind">${kind}</span></div>
+        <div class="driver">${esc(driverName(v.driver))}</div>
+        <div class="run">${v.runs.length > 1 ? `${r.run_number} of ${v.runs.length}` : '1'}</div>
+        <div class="drops">${blocks(v)}<span class="count">${v.completed_drops}/${v.planned_drops}${failed}</span></div>
+        <div>${schedule(r)}</div>
+        <div class="now">${now(r)}</div>
+        <div class="back">${back(r)}</div>
+        <div class="state" style="color:${EDGE[r.status] || 'var(--grey)'}">${STATE[r.status] || r.status}</div></div>`;
+    }).join('') : '<div class="empty">No runs in MaxOptra for today yet.</div>';
+    // footer: last jobs finished
+    const ev = (d.events || []).slice(0, 4);
+    $('footer').innerHTML = ev.length ? `<span class="t">Finished last job</span>` + ev.map((e) => `<span class="e"><b>${esc(e.vehicle)}</b> run ${e.run_number}, last job ${esc(e.last_job_at || '–')}, back ${e.actual_return ? esc(e.actual_return) : `about ${esc(e.estimated_return || '–')}`}</span>`).join('')
+      : '<span class="t">No vehicle has finished its last job yet today.</span>';
+    // freshness
+    const s = d.sync || {};
+    $('updated').textContent = s.last_ok ? `updated ${s.last_ok}` : 'not updated yet';
+    $('alarm').hidden = !(s.stale || s.failing);
+    $('alarm').textContent = s.failing ? 'Live updates from MaxOptra are failing. Figures may be out of date.'
+      : s.stale ? `No update from MaxOptra for ${s.age_minutes} minutes. Figures may be out of date.` : '';
+    announce(d.date, d.events || []);
+  }
+
+  // ---- a vehicle finishing its last job: a large notice and a chime
+  let seen = null, toastTimer = null;
+  function announce(date, events) {
+    const key = `transport-tv-seen-${date}`;
+    const maxId = events.reduce((m, e) => Math.max(m, e.id), 0);
+    if (seen === null) { seen = Math.max(Number(localStorage.getItem(key) || 0), maxId); localStorage.setItem(key, String(seen)); return; }
+    const fresh = events.filter((e) => e.id > seen);
+    if (!fresh.length) return;
+    const e = fresh[0];
+    $('toast').innerHTML = `<b>${esc(e.vehicle)}</b> has finished its last job${fresh.length > 1 ? ` (and ${fresh.length - 1} more)` : ''}.<div class="sub">Run ${e.run_number}${e.driver ? `, ${esc(e.driver)}` : ''}. Back at Plus about ${esc(e.estimated_return || '–')}.</div>`;
+    $('toast').hidden = false; chime();
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 45 * 1000);
+    seen = maxId; localStorage.setItem(key, String(maxId));
+  }
+  let audio = null;
+  function unlock() {
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch { /* no sound */ }
+    setTimeout(() => { $('sound').hidden = Boolean(audio && audio.state === 'running'); }, 200);
+  }
+  function chime() {
+    if (!audio || audio.state !== 'running') return;
+    const t0 = audio.currentTime;
+    [[880, 0], [1318.5, 0.18]].forEach(([f, at]) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + at); g.gain.exponentialRampToValueAtTime(0.4, t0 + at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.9);
+      o.connect(g).connect(audio.destination); o.start(t0 + at); o.stop(t0 + at + 1);
+    });
+  }
+  $('sound').hidden = false;
+  $('sound').addEventListener('click', () => { unlock(); setTimeout(chime, 250); });
+  ['click', 'keydown', 'touchstart'].forEach((ev) => document.addEventListener(ev, unlock, { passive: true }));
+
+  // ---- staying up on a wall: refresh, keep the screen on, pick up new versions, recover from an expired sign-in
+  let failures = 0;
+  async function load() {
+    try {
+      const res = await fetch('/api/transport/live', { credentials: 'same-origin', cache: 'no-store' });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      render(await res.json()); failures = 0;
+    } catch (e) {
+      console.error('Transport board:', e);
+      if (++failures >= 5) {
+        $('alarm').hidden = false; $('alarm').textContent = 'Can’t reach the transport data. Reloading.';
+        const last = Number(sessionStorage.getItem('tv-reloaded') || 0);
+        if (Date.now() - last > 10 * 60 * 1000) { sessionStorage.setItem('tv-reloaded', String(Date.now())); location.reload(); }
+      }
+    }
+  }
+  load(); setInterval(load, POLL_MS);
+  let lock = null;
+  async function keepAwake() { try { if ('wakeLock' in navigator && !document.hidden && !lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } } catch { /* not allowed */ } }
+  keepAwake(); document.addEventListener('visibilitychange', () => { if (!document.hidden) { keepAwake(); load(); } });
+  let version = null;
+  async function checkVersion() {
+    try {
+      const res = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
+      const v = res.headers.get('etag') || res.headers.get('last-modified');
+      if (res.ok && v) { if (version && v !== version) location.reload(); version = v; }
+    } catch { /* offline for a moment */ }
+  }
+  checkVersion(); setInterval(checkVersion, 30 * 60 * 1000);
+  // hide the mouse pointer when nobody's using it
+  let idle = null;
+  function wake() { document.body.classList.remove('idle'); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add('idle'), 4000); }
+  ['mousemove', 'mousedown', 'keydown'].forEach((ev) => document.addEventListener(ev, wake, { passive: true })); wake();
+})();
+</script>
+</body>
+</html>
