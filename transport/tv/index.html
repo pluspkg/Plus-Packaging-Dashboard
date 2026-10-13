@@ -81,11 +81,18 @@
   .back { white-space: nowrap; font-weight: 900; }
   .state { font-weight: 900; font-size: calc(var(--u) * 2.1); white-space: nowrap; text-align: right; }
 
-  /* Last jobs finished, newest first */
-  footer { flex: none; display: flex; align-items: center; gap: calc(var(--u) * 2.4); font-size: calc(var(--u) * 2.1); color: var(--light);
+  /* Last jobs finished, newest first, moving across the bottom like a news ticker */
+  footer { flex: none; display: flex; align-items: center; gap: calc(var(--u) * 2); font-size: calc(var(--u) * 2.3); color: var(--light);
            white-space: nowrap; overflow: hidden; border-top: 2px solid rgba(234, 242, 255, .18); padding-top: calc(var(--u) * 1); }
-  footer .t { color: var(--grey); }
-  footer .e b { color: #fff; }
+  footer .t { color: var(--grey); flex: none; }
+  .ticker { flex: 1 1 auto; min-width: 0; overflow: hidden;
+            -webkit-mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%);
+                    mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%); }
+  .track { display: inline-flex; white-space: nowrap; will-change: transform; }
+  .track .e { display: inline-flex; align-items: center; }
+  .track .e b { color: #fff; margin-right: .35em; }
+  .track .e::after { content: ""; width: calc(var(--u) * 0.9); height: calc(var(--u) * 0.9); background: var(--sky);
+                     border-radius: 1px; margin: 0 calc(var(--u) * 3); }
 
   /* A vehicle that has just finished its last job */
   #toast { position: fixed; right: calc(var(--u) * 2.2); bottom: calc(var(--u) * 7); max-width: 46vw; background: var(--light); color: var(--navy);
@@ -115,7 +122,7 @@
   <div class="cols"><span>Vehicle</span><span>Driver</span><span>Run</span><span>Drops</span><span>Schedule</span><span>Now</span><span>Back at Plus</span><span style="text-align:right">State</span></div>
   <div class="rows" id="rows"></div>
 </section>
-<footer id="footer"></footer>
+<footer><span class="t">Finished last job</span><div class="ticker"><div class="track" id="track"></div></div></footer>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
@@ -208,10 +215,8 @@
         <div class="back">${back(r)}</div>
         <div class="state" style="color:${EDGE[r.status] || 'var(--grey)'}">${STATE[r.status] || r.status}</div></div>`;
     }).join('') : '<div class="empty">No runs in MaxOptra for today yet.</div>';
-    // footer: last jobs finished
-    const ev = (d.events || []).slice(0, 4);
-    $('footer').innerHTML = ev.length ? `<span class="t">Finished last job</span>` + ev.map((e) => `<span class="e"><b>${esc(e.vehicle)}</b> run ${e.run_number}, last job ${esc(e.last_job_at || '–')}, back ${e.actual_return ? esc(e.actual_return) : `about ${esc(e.estimated_return || '–')}`}</span>`).join('')
-      : '<span class="t">No vehicle has finished its last job yet today.</span>';
+    lastEvents = d.events || [];
+    ticker(lastEvents);
     // freshness
     const s = d.sync || {};
     $('updated').textContent = s.last_ok ? `updated ${s.last_ok}` : 'not updated yet';
@@ -220,6 +225,33 @@
       : s.stale ? `No update from MaxOptra for ${s.age_minutes} minutes. Figures may be out of date.` : '';
     announce(d.date, d.events || []);
   }
+
+  // ---- the moving strip at the bottom: the latest ten, newest first, looping without a gap
+  let lastEvents = [], tickerKey = null, tickerAnim = null;
+  const stillMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function ticker(events) {
+    const items = events.slice(0, 10).map((e) => `<span class="e"><b>${esc(e.vehicle)}</b>run ${e.run_number}, last job ${esc(e.last_job_at || '–')}, back ${e.actual_return ? esc(e.actual_return) : `about ${esc(e.estimated_return || '–')}`}${e.driver ? `, ${esc(e.driver)}` : ''}</span>`).join('');
+    const key = `${items}|${innerWidth}x${innerHeight}`;
+    if (key === tickerKey) return;                    // nothing new: leave it moving
+    tickerKey = key;
+    const track = $('track');
+    if (tickerAnim) { tickerAnim.cancel(); tickerAnim = null; }
+    if (!items) { track.innerHTML = '<span class="muted">No vehicle has finished its last job yet today.</span>'; return; }
+    track.innerHTML = items;
+    if (stillMotion || !track.animate) return;        // reduced motion: a still list
+    // repeat the items until one set is wider than the strip, then show two sets and slide by exactly one
+    const strip = track.parentElement.clientWidth;
+    const once = track.scrollWidth || 1;
+    const copies = Math.max(1, Math.ceil(strip / once));
+    const set = items.repeat(copies);
+    track.innerHTML = set + set;
+    const width = track.scrollWidth / 2;
+    const u = Math.min(innerHeight / 100, innerWidth * 0.0075);
+    const speed = 12 * u;                              // pixels a second: about 90 on 1024 x 768, 130 on 1080p
+    tickerAnim = track.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${-width}px)` }],
+      { duration: (width / speed) * 1000, iterations: Infinity, easing: 'linear' });
+  }
+  window.addEventListener('resize', () => ticker(lastEvents));
 
   // ---- a vehicle finishing its last job: a large notice and a chime
   let seen = null, toastTimer = null;
