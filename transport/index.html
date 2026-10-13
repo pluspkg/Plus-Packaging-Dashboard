@@ -221,7 +221,7 @@
         <div class="panel-head"><h2>Fleet today</h2><span class="note" id="today-note"></span></div>
         <div class="table-wrap"><table class="cards fleet" id="fleet">
           <thead><tr><th scope="col">Vehicle</th><th scope="col">Driver</th><th scope="col" class="n">Runs</th><th scope="col">Drops completed</th>
-            <th scope="col">Schedule</th><th scope="col">Next stop or last job</th>
+            <th scope="col" title="Ahead or behind the plan, from the stops reached so far in whatever order the driver takes them">Schedule</th><th scope="col">Next stop or last job</th>
             <th scope="col">Back at Plus</th><th scope="col" class="n">Miles</th><th scope="col" class="n cost-col" id="cost-head">Cost</th><th scope="col">Status</th></tr></thead>
           <tbody></tbody>
         </table></div>
@@ -258,7 +258,7 @@
       <p class="note pad-note" id="cost-note" hidden>Cost is Plus's own: driver pay (a day rate for each day driven, or a monthly salary spread over every weekday), lease (every weekday, whether or not the vehicle ran) and fuel from each vehicle's MPG and the week's fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Hover a cost for its breakdown; * means a rate is missing.</p>
     </div>
     <div class="panel" id="couriers-panel" hidden>
-      <div class="panel-head"><h2>Couriers and pallets</h2><span class="note">Jobs that didn't go on a Plus vehicle</span></div>
+      <div class="panel-head"><h2>Couriers and pallets</h2><span class="note">Unallocated orders: work that didn't go on a Plus vehicle</span></div>
       <div class="split">
         <div class="table-wrap"><table class="cards" id="couriers-type"></table></div>
         <div class="table-wrap"><table class="cards" id="couriers-reason"></table></div>
@@ -372,11 +372,13 @@
     const v = run.variance;
     if (run.status === 'late') return `<span class="behind">${Math.abs(v)} min late leaving</span>`;
     if (v === null || v === undefined) return '<span class="small">–</span>';
-    if (v >= 5) return `<span class="ahead">${v} min ahead</span>`;
-    if (v <= -5) return `<span class="behind">${Math.abs(v)} min behind</span>`;
-    return 'On time';
+    const own = run.resequenced ? '<span class="drop-note" title="Stops done in a different order from the plan">Own order</span>' : '';
+    if (v >= 5) return `<span class="ahead">${v} min ahead</span>${own}`;
+    if (v <= -5) return `<span class="behind">${Math.abs(v)} min behind</span>${own}`;
+    return `On time${own}`;
   }
   function nextOrLast(run) {
+    if (run.status === 'out' && run.on_site_client) return `At ${esc(run.on_site_client)} <span class="small">since ${esc(run.on_site_since || '')}</span>`;
     if (run.status === 'out' && run.next_client) return `${esc(run.next_due || '')} <span class="small">${esc(run.next_client)}</span>`;
     if (['returning', 'back', 'back_estimated'].includes(run.status)) return run.last_job ? `Last job ${esc(run.last_job)}` : '–';
     if (['not_departed', 'late'].includes(run.status)) return run.planned_departure ? `Due to leave ${esc(run.planned_departure)}` : '–';
@@ -416,6 +418,7 @@
   // ---------------------------------------------------------------- Drill-downs (Today and the day panel)
   const STOP_STATUS = { delivered: 'Delivered', collected: 'Collected', failed: 'Failed', closed_no_items: 'Closed, no items recorded' };
   function stopStatus(st, live) {
+    if (st.status === 'on_site') return live ? `<span class="st-delivered">On site</span><span class="stop-meta">since ${esc(st.arrived)}</span>` : '<span class="st-open-past">Arrived, not closed</span>';
     if (st.status === 'open') return live ? `<span class="st-open">Due ${esc(st.eta || st.planned || '–')}</span>` : '<span class="st-open-past">Not reported</span>';
     const reason = st.status === 'failed' && st.fail_reason ? `<span class="stop-meta">${esc(st.fail_reason)}</span>` : '';
     return `<span class="st-${st.status}">${STOP_STATUS[st.status] || esc(st.status)}</span>${reason}`;
@@ -884,8 +887,9 @@
       })() : ''}
       ${canSeeCouriers && r.external ? (() => {
         const ext = r.external.by_type.reduce((t, x) => t + (x.cost || 0), 0), jobs = r.external.by_type.reduce((t, x) => t + x.jobs, 0);
-        return `<div class="kpi"><div class="label">Couriers and pallets</div><div class="value">${jobs ? money(ext) : '–'}</div>
-          <div class="sub">${jobs ? `${fmtInt(jobs)} job${jobs === 1 ? '' : 's'}; <a href="#couriers-panel">by reason</a>` : 'No jobs yet'}</div></div>`;
+        const needing = r.external.by_type.reduce((t, x) => t + (x.needing || 0), 0);
+        return `<div class="kpi"><div class="label">Couriers and pallets</div><div class="value">${jobs ? money(ext) : '–'}${needing ? '<span class="cost-flag">*</span>' : ''}</div>
+          <div class="sub">${jobs ? `${fmtInt(jobs)} unallocated order${jobs === 1 ? '' : 's'}${needing ? `; <a href="/transport/couriers/?todo=1" class="behind">${needing} need${needing === 1 ? 's' : ''} a reason or cost</a>` : '; <a href="#couriers-panel">by reason</a>'}` : 'No unallocated orders'}</div></div>`;
       })() : ''}
       <div class="kpi"><div class="label">Failed deliveries</div><div class="value${failed ? ' bad' : ''}">${fmtInt(failed)}</div>
         <div class="sub">${planned ? `${((failed / planned) * 100).toFixed(1)}% of drops` : ''}</div></div>

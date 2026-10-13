@@ -214,7 +214,15 @@ const LIVE_RUNS = `
     ((array_agg(s.planned_departure order by s.seq desc nulls last))[1])::text as last_stop_planned_departure,
     ((array_agg(s.planned_arrival order by s.seq desc nulls last))[1])::text as last_stop_planned_arrival,
     ((array_agg(s.etd order by s.seq desc nulls last) filter (where not s.done))[1])::text as final_etd,
-    ((array_agg(s.eta order by s.seq desc nulls last) filter (where not s.done))[1])::text as final_eta
+    ((array_agg(s.eta order by s.seq desc nulls last) filter (where not s.done))[1])::text as final_eta,
+    -- progress whatever order the driver takes: which stops are reached, and the plan's arrival times in plan order
+    array_agg(s.planned_arrival::text order by s.seq nulls last) filter (where s.stop_key is not null) as plan_arrivals,
+    array_agg(coalesce(s.done, false) or s.act_arr is not null order by s.seq nulls last) filter (where s.stop_key is not null) as reached_flags,
+    (max(s.act_arr) filter (where s.done or s.act_arr is not null))::text as latest_arrival,
+    array_agg(s.act_arr::text order by s.seq nulls last) filter (where s.stop_key is not null) as actual_arrivals,
+    -- the stop the driver is at now: arrived, not finished
+    ((array_agg(s.client order by s.act_arr desc) filter (where not s.done and s.act_arr is not null))[1]) as on_site_client,
+    (max(s.act_arr) filter (where not s.done))::text as on_site_since
   from transport.runs r
   join transport.vehicles v on v.id = r.vehicle_id
   left join transport.drivers d on d.id = r.driver_id
@@ -262,6 +270,7 @@ export function mapStop(s, now) {
   if (s.completed) status = s.is_drop ? 'delivered' : 'collected';
   else if (s.any_failed) status = 'failed';
   else if (s.done) status = 'closed_no_items';
+  else if (arrivedClock) status = 'on_site';
   else status = 'open';
   const attr = (s.attributes || '').match(/Sell To Customer No:\s*([A-Za-z0-9]+)/);
   return {
@@ -304,10 +313,23 @@ export function runState(run, now) {
   } else status = 'out';
   // Left but nothing reported since, and well past the planned return: the driver app isn't being used
   if (status === 'out' && run.stops_open === run.stops && run.planned_end && minutesBetween(run.planned_end, now) > NO_DATA_AFTER) status = 'no_data';
+  let resequenced = false;
   if (status === 'out') {
-    // still out: the next stop's ETA against its planned arrival, else the last stop reached
-    if (run.next_eta && run.next_planned) variance = minutesBetween(run.next_eta, run.next_planned);
-    else if (run.last_done_actual && run.last_done_planned) variance = minutesBetween(run.last_done_actual, run.last_done_planned);
+    // Ahead or behind, in whatever order the driver takes the stops: when he reached his k-th stop against when
+    // the plan had the k-th stop reached. He can't be further ahead than the time left until the plan's next
+    // arrival, so the lead shrinks while he's on site or driving.
+    const flags = run.reached_flags || [];
+    const plans = run.plan_arrivals || [];
+    const k = flags.filter(Boolean).length;
+    // re-ordered: stops reached that aren't the plan's first ones, or arrival times out of plan order
+    const arrivals = (run.actual_arrivals || []).filter(Boolean);
+    resequenced = !flags.slice(0, k).every(Boolean) || arrivals.some((a, i) => i > 0 && a < arrivals[i - 1]);
+    if (k > 0 && run.latest_arrival && plans[k - 1]) variance = minutesBetween(run.latest_arrival, plans[k - 1]);
+    else if (k === 0 && run.actual_departure && run.planned_departure) variance = minutesBetween(run.actual_departure, run.planned_departure);
+    if (k < plans.length && plans[k]) {
+      const bound = minutesBetween(now, plans[k]);
+      if (bound !== null && (variance === null || bound < variance)) variance = bound;
+    }
   } else if (['returning', 'back', 'back_estimated'].includes(status) && run.planned_end) {
     // finished: back at Plus (actual, else estimated) against the planned return
     const back = actualEnd || estimatedReturn;
@@ -315,16 +337,13 @@ export function runState(run, now) {
   }
   // When it should be back at Plus. Out: MaxOptra's ETA for the final stop, plus the planned time there and the
   // planned drive home; without ETAs, the plan moved by how far ahead or behind it is. Returning: the estimate.
+  // Out or late leaving: the planned return moved by how far ahead or behind it is (the same figure as the
+  // Schedule column, so the two always agree). Returning: the estimate from the last job. Never before now.
   let expected = null;
-  const legOk = leg !== null && leg >= 0 && leg <= 300;
-  if (status === 'out') {
-    const service = minutesBetween(run.last_stop_planned_arrival, run.last_stop_planned_departure);
-    if (run.final_etd && legOk) expected = addMinutes(run.final_etd, leg);
-    else if (run.final_eta && legOk) expected = addMinutes(run.final_eta, (service !== null && service >= 0 && service <= 240 ? service : 0) + leg);
-    else if (variance !== null && run.planned_end) expected = addMinutes(run.planned_end, -variance);
-  } else if (status === 'returning') expected = estimatedReturn;
-  else if (status === 'late' && run.planned_end && variance !== null) expected = addMinutes(run.planned_end, -variance);
-  return { status, variance, estimated_return: estimatedReturn, actual_end: actualEnd, expected_return: expected,
+  if ((status === 'out' || status === 'late') && run.planned_end && variance !== null) expected = addMinutes(run.planned_end, -variance);
+  else if (status === 'returning') expected = estimatedReturn;
+  if (expected && ['out', 'late'].includes(status) && minutesBetween(now, expected) < 0) expected = now;
+  return { status, variance, estimated_return: estimatedReturn, actual_end: actualEnd, expected_return: expected, resequenced,
            expected_vs_plan: expected && run.planned_end ? minutesBetween(run.planned_end, expected) : null };
 }
 
@@ -340,7 +359,8 @@ export function buildLive(runs, now) {
       planned_departure: clock(r.planned_departure), actual_departure: clock(r.actual_departure),
       planned_return: clock(r.planned_end), actual_return: clock(state.actual_end),
       estimated_return: clock(state.estimated_return), last_job: clock(r.last_departure),
-      expected_return: clock(state.expected_return), expected_late_by: state.expected_vs_plan,
+      expected_return: clock(state.expected_return), expected_late_by: state.expected_vs_plan, resequenced: state.resequenced,
+      on_site_client: r.on_site_client, on_site_since: clock(r.on_site_since),
       next_client: r.next_client, next_due: clock(r.next_eta || r.next_planned),
       planned_miles: r.planned_miles, actual_miles: r.actual_miles, est_cost: r.est_cost };
     if (!vehicles.has(r.vehicle_id)) vehicles.set(r.vehicle_id, { vehicle: r.vehicle, vehicle_type: r.vehicle_type, in_kpi: r.in_kpi, runs: [] });
@@ -624,7 +644,8 @@ async function report(url, sql, user) {
   {
     const [byType, byReason] = await Promise.all([
       sql.query(`select coalesce(job_type, 'unclassified') as job_type, count(*)::int as jobs, sum(job_cost)::float8 as cost,
-                        (count(*) filter (where job_cost is null))::int as no_cost
+                        (count(*) filter (where job_cost is null))::int as no_cost,
+                        (count(*) filter (where reason_code is null or job_cost is null))::int as needing
                  from transport.v_external_jobs where job_date between $1 and $2 group by 1 order by 1`, [from, to]),
       sql.query(`select coalesce(j.reason_code, 'none') as reason_code, coalesce(r.description, 'No reason given') as description,
                         count(*)::int as jobs, sum(j.job_cost)::float8 as cost
@@ -934,8 +955,10 @@ async function courierState(sql, user) {
     sql.query(`select code, description, active, sort_order from transport.reason_codes order by sort_order, code`),
     sql.query(`select distinct on (rate_type) rate_type, value::float8, effective_from::text from transport.cost_rates
                where subject_type = 'external' order by rate_type, effective_from desc`),
-    sql.query(`select count(*)::int as jobs, (count(*) filter (where source = 'manual'))::int as manual
-               from transport.external_jobs where removed_at is null`),
+    sql.query(`select count(*)::int as jobs, (count(*) filter (where source = 'manual'))::int as manual,
+                      (count(*) filter (where reason_code is null or job_cost is null))::int as needing,
+                      min(job_date) filter (where reason_code is null or job_cost is null) as oldest_needing
+               from transport.v_external_jobs where job_date > (now() at time zone 'Europe/London')::date - 90`),
   ]);
   const defaults = Object.fromEntries(rates.map((r) => [r.rate_type, r]));
   return json({ codes, defaults, counts: counts[0], can_edit: user.couriers, today: londonNow().date, history_start: '2026-06-01' });
@@ -960,15 +983,21 @@ async function saveReason(request, sql) {
   return json({ saved: code });
 }
 
+// Unallocated orders and jobs added by hand. Each one needs a reason code and a cost; todo=1 lists only those
+// still missing either, over the dates given.
 async function courierJobs(url, sql) {
   const from = url.searchParams.get('from'), to = url.searchParams.get('to');
+  const todo = url.searchParams.get('todo') === '1';
   if (!isDate(from) || !isDate(to)) return fail(400, 'Give from and to as YYYY-MM-DD');
   const jobs = await sql.query(`
     select order_ref, job_date::text, client_name, customer_no, depot, location_name, location_postcode, vehicle_requirements,
            size_1::float8, size_2::float8, order_status, job_type, reason_code, cost::float8, job_cost::float8,
-           cost_is_default, notes, source, created_by, updated_by
-    from transport.v_external_jobs where job_date between $1 and $2 order by job_date desc, client_name limit 1000`, [from, to]);
-  return json({ from, to, jobs });
+           cost_is_default, notes, source, created_by, updated_by,
+           array_remove(array[case when reason_code is null then 'reason' end, case when job_cost is null then 'cost' end], null) as needs
+    from transport.v_external_jobs
+    where job_date between $1 and $2 and (not $3 or reason_code is null or job_cost is null)
+    order by (reason_code is null or job_cost is null) desc, job_date desc, client_name limit 1000`, [from, to, todo]);
+  return json({ from, to, todo, jobs });
 }
 
 async function saveCourierJob(request, sql, user) {

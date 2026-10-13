@@ -61,6 +61,12 @@
   .big { font-size: 26px; font-weight: 900; color: var(--blue); }
   .gate { max-width: 40em; margin: 40px auto; text-align: center; }
   #jobs-table td:first-child, #jobs-table td:nth-child(3) { white-space: nowrap; }
+  #jobs-table tr.needs td { background: #fdf3f2; }
+  #jobs-table tr.needs td:first-child { box-shadow: inset 4px 0 0 var(--bad); }
+  .chip { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
+  .chip.todo { color: var(--bad); border: 1px solid var(--bad); }
+  .chip.done { color: var(--blue); border: 1px solid var(--blue); }
+  #todo-banner a { color: var(--bad); font-weight: 700; }
   body.view-only .edit-only { display: none !important; }
   body.view-only input, body.view-only select { pointer-events: none; border-color: transparent; background: transparent; color: var(--ink); appearance: none; }
   @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
@@ -75,22 +81,24 @@
 </header>
 <div class="gate" id="gate" hidden><h2>Couriers and pallets</h2><p id="gate-text"></p></div>
 <div id="app" hidden>
-  <nav class="jump" aria-label="Sections"><a href="#jobs">Jobs</a><a href="#add" class="edit-only">Add a job</a><a href="#reasons">Reason codes</a><a href="#prices">Default prices</a></nav>
+  <nav class="jump" aria-label="Sections"><a href="#jobs">Unallocated orders</a><a href="#add" class="edit-only">Add by hand</a><a href="#reasons">Reason codes</a><a href="#prices">Default prices</a></nav>
   <main>
     <div class="banner" id="error" hidden></div>
 
+    <div class="banner" id="todo-banner" hidden></div>
     <section id="jobs" aria-labelledby="jobs-title">
-      <div class="head"><h2 id="jobs-title">Jobs</h2><span class="note">Same day couriers and overnight parcels or pallets: work that didn't go on a Plus vehicle</span></div>
+      <div class="head"><h2 id="jobs-title">Unallocated orders</h2><span class="note">Orders MaxOptra didn't put on a Plus run. Each one needs a reason code and a cost.</span></div>
       <div class="pad">
         <div class="row"><label>From <input type="date" id="jobs-from"></label><label>To <input type="date" id="jobs-to"></label>
-          <button class="ghost" id="jobs-show">Show jobs</button><span class="note" id="jobs-total"></span></div>
+          <label><input type="checkbox" id="jobs-todo"> Only orders still needing a reason or cost</label>
+          <button class="ghost" id="jobs-show">Show</button><span class="note" id="jobs-total"></span></div>
         <div class="table-wrap"><table id="jobs-table"></table></div>
-        <p class="note">Unplanned jobs come in from MaxOptra every 30 minutes, and drop off if they're later planned onto a run. A cost left empty uses the default price for that type. People with courier access can also add a job by hand below.</p>
+        <p class="note">Unallocated orders come in from MaxOptra every 30 minutes, and drop off if they're later put on a run. A cost left empty uses the default price for the order's type, if one is set. People with courier access can also add an order by hand below.</p>
       </div>
     </section>
 
     <section id="add" aria-labelledby="add-title" class="edit-only">
-      <div class="head"><h2 id="add-title">Add a job</h2></div>
+      <div class="head"><h2 id="add-title">Add an order by hand</h2><span class="note">For anything sent by courier or pallet that isn't in MaxOptra</span></div>
       <div class="pad">
         <div class="row">
           <label>Date <input type="date" id="new-date"></label>
@@ -103,7 +111,7 @@
           <label>Reason <select id="new-reason"></select></label>
           <label>Cost £ <input type="number" min="0" step="0.01" id="new-cost" placeholder="default"></label>
           <label>Notes <input type="text" id="new-notes" size="30"></label>
-          <button id="new-save">Add job</button><span class="status" id="new-status" aria-live="polite"></span>
+          <button id="new-save">Add order</button><span class="status" id="new-status" aria-live="polite"></span>
         </div>
       </div>
     </section>
@@ -164,17 +172,29 @@
     $('prices-row').innerHTML = Object.entries(JOB).map(([k, l]) => `<label>${l} ${s.can_edit ? `£ <input type="number" min="0" step="0.01" data-price="${k}" aria-label="Default price for ${l}">` : ''}
       <span class="current">${s.defaults[k] ? `Now ${gbp(s.defaults[k].value)} from ${longDate(s.defaults[k].effective_from)}` : '<span class="bad">Not set</span>'}</span></label>`).join('');
     if (!$('prices-from').value) $('prices-from').value = Object.keys(s.defaults).length ? s.today : s.history_start;
-    if (!$('jobs-from').value) { $('jobs-from').value = s.today.slice(0, 8) + '01'; $('jobs-to').value = s.today; }
+    const c = s.counts;
+    $('todo-banner').hidden = !c.needing;
+    $('todo-banner').innerHTML = c.needing ? `<b>${c.needing} unallocated order${c.needing > 1 ? 's need' : ' needs'} a reason code or cost</b>, the oldest from ${longDate(c.oldest_needing)}. <a href="#jobs" id="todo-show">Show them</a>` : '';
+    if (!$('jobs-from').value) {
+      const todoFirst = c.needing > 0 || new URLSearchParams(location.search).get('todo') === '1';
+      $('jobs-todo').checked = todoFirst;
+      $('jobs-from').value = todoFirst && c.oldest_needing ? String(c.oldest_needing).slice(0, 10) : s.today.slice(0, 8) + '01';
+      $('jobs-to').value = s.today;
+    }
+    const show = $('todo-show');
+    if (show) show.addEventListener('click', () => { $('jobs-todo').checked = true; $('jobs-from').value = String(c.oldest_needing).slice(0, 10); $('jobs-to').value = s.today; loadJobs(); });
   }
   async function load() { try { state = await api('/couriers/state'); render(); await loadJobs(); $('error').hidden = true; } catch (e) { $('error').textContent = e.message; $('error').hidden = false; } }
 
   async function loadJobs() {
     try {
-      const r = await api(`/couriers/jobs?from=${$('jobs-from').value}&to=${$('jobs-to').value}`);
+      const r = await api(`/couriers/jobs?from=${$('jobs-from').value}&to=${$('jobs-to').value}${$('jobs-todo').checked ? '&todo=1' : ''}`);
       const total = r.jobs.reduce((t, j) => t + (j.job_cost || 0), 0);
-      $('jobs-total').textContent = r.jobs.length ? `${r.jobs.length} job${r.jobs.length > 1 ? 's' : ''}, ${gbp(total)}` : '';
-      $('jobs-table').innerHTML = `<thead><tr><th>Date</th><th>Order and customer</th><th>Postcode</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th></th></tr></thead><tbody>` +
-        (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}">
+      const waiting = r.jobs.filter((j) => j.needs.length).length;
+      $('jobs-total').textContent = r.jobs.length ? `${r.jobs.length} order${r.jobs.length > 1 ? 's' : ''}, ${gbp(total)}${waiting ? `; ${waiting} still need a reason or cost` : ''}` : '';
+      const NEED = { reason: 'Needs reason', cost: 'Needs cost' };
+      $('jobs-table').innerHTML = `<thead><tr><th>Date</th><th>Order and customer</th><th>Postcode</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody>` +
+        (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}" class="${j.needs.length ? 'needs' : ''}">
           <td>${longDate(j.job_date)}</td>
           <td><b>${esc(j.order_ref)}</b><span class="current">${esc(j.client_name || (j.customer_no ? `Customer ${j.customer_no}` : '–'))}${j.client_name && j.customer_no ? ` (${esc(j.customer_no)})` : ''}</span>
             <span class="current">${j.source === 'manual' ? 'Added by hand' : `From MaxOptra${j.depot ? `, ${esc(j.depot)}` : ''}`}</span></td>
@@ -184,11 +204,13 @@
           <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" aria-label="Cost for ${esc(j.order_ref)}">
             <span class="current">${j.cost_is_default ? (j.job_cost !== null ? 'Default price' : 'No default set') : 'Own cost'}</span></td>
           <td><input type="text" data-f="notes" value="${esc(j.notes || '')}" size="18" aria-label="Notes for ${esc(j.order_ref)}"></td>
+          <td>${j.needs.length ? j.needs.map((n) => `<span class="chip todo">${NEED[n]}</span>`).join(' ') : '<span class="chip done">Complete</span>'}</td>
           <td class="edit-only" style="white-space:nowrap"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost" data-remove-job>Remove</button>' : ''}</td></tr>`).join('')
-          : '<tr><td colspan="8" class="muted">No jobs in these dates.</td></tr>') + '</tbody>';
+          : `<tr><td colspan="9" class="muted">${$('jobs-todo').checked ? 'Nothing waiting for a reason or cost in these dates.' : 'No orders in these dates.'}</td></tr>`) + '</tbody>';
     } catch (e) { $('jobs-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
   }
   $('jobs-show').addEventListener('click', loadJobs);
+  $('jobs-todo').addEventListener('change', loadJobs);
 
   $('jobs-table').addEventListener('click', async (e) => {
     const tr = e.target.closest('tr'); if (!tr) return;
@@ -197,7 +219,7 @@
       const b = e.target.closest('[data-save-job]');
       try { await api('/couriers/job', { ...key, job_type: tr.querySelector('[data-f=job_type]').value || null, reason_code: tr.querySelector('[data-f=reason_code]').value || null,
                                         cost: tr.querySelector('[data-f=cost]').value, notes: tr.querySelector('[data-f=notes]').value });
-            await loadJobs(); }
+            await load(); }
       catch (err) { b.textContent = 'Failed'; b.title = err.message; }
     }
     if (e.target.closest('[data-remove-job]') && confirm(`Remove ${key.order_ref}?`)) {
