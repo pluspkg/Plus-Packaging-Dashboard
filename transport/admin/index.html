@@ -67,7 +67,7 @@
   <div class="bar">
     <div class="brand">Plus Transport<span>Admin</span></div>
     <div class="tools"><span id="who"></span><span class="role" id="role" hidden></span>
-      <a href="/transport/">Transport</a><a href="/transport/setup/">Setup</a><a href="/">Dashboards</a></div>
+      <a href="/transport/">Transport</a><a href="/transport/pay/" id="pay-link" hidden>Pay</a><a href="/transport/couriers/" id="couriers-link" hidden>Couriers</a><a href="/transport/setup/">Setup</a><a href="/">Dashboards</a></div>
   </div>
 </header>
 
@@ -76,7 +76,7 @@
 <div id="app" hidden>
   <nav class="jump" aria-label="Sections">
     <a href="#fuel">Fuel price</a><a href="#drivers">Drivers</a><a href="#vehicles">Vehicles</a>
-    <a href="#couriers">Couriers and pallets</a><a href="#users">Users</a><a href="#changes">Recent changes</a>
+    <a href="#users">Users</a><a href="#changes">Recent changes</a>
   </nav>
   <main>
     <div class="banner" id="error" hidden></div>
@@ -112,10 +112,8 @@
     </section>
 
     <section id="drivers" aria-labelledby="drivers-title">
-      <div class="head"><h2 id="drivers-title">Drivers</h2><span class="note">A driver's day rate is charged once for each day they drive, shared across their runs</span></div>
+      <div class="head"><h2 id="drivers-title">Drivers</h2><span class="note">Type, whether they count in the KPIs, and spellings of the same person. Pay is set on the separate Pay page.</span></div>
       <div class="pad">
-        <div class="row"><label>New rates apply from <input type="date" id="drivers-from"></label>
-          <span class="note">Earlier days keep the rate they had. Leave a box empty to keep the current rate.</span></div>
         <div class="table-wrap"><table id="drivers-table"></table></div>
         <div class="row"><button id="drivers-save">Save drivers</button><span class="status" id="drivers-status" aria-live="polite"></span></div>
       </div>
@@ -131,25 +129,13 @@
       </div>
     </section>
 
-    <section id="couriers" aria-labelledby="couriers-title">
-      <div class="head"><h2 id="couriers-title">Couriers and pallets</h2><span class="note">Jobs in MaxOptra that weren't planned onto a Plus vehicle</span></div>
-      <div class="pad">
-        <h3>Default cost per job</h3>
-        <div class="row" id="ext-defaults"></div>
-        <div class="row"><label>Apply from <input type="date" id="ext-from"></label>
-          <button id="ext-save">Save defaults</button><span class="status" id="ext-status" aria-live="polite"></span></div>
-        <h3>Jobs</h3>
-        <div id="jobs"></div>
-      </div>
-    </section>
-
     <section id="users" aria-labelledby="users-title">
-      <div class="head"><h2 id="users-title">Users</h2><span class="note">Admins can open this page and see costs on the dashboard. Everyone else at Plus sees the dashboard without costs.</span></div>
+      <div class="head"><h2 id="users-title">Users</h2><span class="note">Admins run this page. Courier access opens the Couriers and pallets page on its own. Pay access is given only on the Pay page.</span></div>
       <div class="pad">
         <div class="table-wrap"><table id="users-table"></table></div>
         <div class="row">
           <label>Add <input type="email" id="user-email" placeholder="name@pluspkg.com"></label>
-          <label>as <select id="user-role"><option value="admin">Admin</option><option value="standard">Standard</option></select></label>
+          <label>as <select id="user-role"><option value="admin">Admin</option><option value="couriers">Courier access only</option></select></label>
           <button id="user-add">Add user</button><span class="status" id="users-status" aria-live="polite"></span>
         </div>
       </div>
@@ -171,7 +157,6 @@
   const gbp = (n, dp = 2) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp });
   const TYPE_V = { full_time_van: 'Full-time van', truck: 'Truck', support: 'Support', temporary: 'Temporary or hire', excluded: 'Excluded', unclassified: 'Not classified' };
   const TYPE_D = { van: 'Van driver', truck: 'Truck driver', manager: 'Manager', agency: 'Agency', excluded: 'Excluded', unclassified: 'Not classified' };
-  const JOB = { same_day: 'Same day courier', overnight_parcel: 'Overnight parcel', overnight_pallet: 'Overnight pallet', other: 'Other' };
   let state = null;
 
   async function api(path, body) {
@@ -189,9 +174,6 @@
     const s = state;
     // gaps
     const gaps = [];
-    const activeDrivers = s.drivers.filter((d) => d.runs_90 > 0 && d.kpi_included);
-    const noRate = activeDrivers.filter((d) => !d.day_rate);
-    if (noRate.length) gaps.push(`<a href="#drivers">${noRate.length} driver${noRate.length > 1 ? 's' : ''} who drove in the last 90 days ha${noRate.length > 1 ? 've' : 's'} no day rate</a>: ${esc(noRate.map((d) => d.name).join(', '))}`);
     const used = s.vehicles.filter((v) => v.last_run && !['excluded'].includes(v.vehicle_type));
     const noLease = used.filter((v) => !v.lease_monthly && !v.hire_daily);
     if (noLease.length) gaps.push(`<a href="#vehicles">${noLease.length} vehicle${noLease.length > 1 ? 's have' : ' has'} no lease or hire cost</a>: ${esc(noLease.map((v) => v.vehicle).join(', '))}`);
@@ -221,14 +203,11 @@
       : 'No reminder has been sent yet.';
 
     // drivers
-    const anyDriverRate = s.drivers.some((d) => d.day_rate);
-    if (!$('drivers-from').value) $('drivers-from').value = anyDriverRate ? s.today : s.history_start;
-    $('drivers-table').innerHTML = `<thead><tr><th>Driver</th><th>Type</th><th>In KPIs</th><th class="n">Day rate £</th><th>Last drove</th><th>Same person as</th></tr></thead><tbody>` +
+    $('drivers-table').innerHTML = `<thead><tr><th>Driver</th><th>Type</th><th>In KPIs</th><th>Last drove</th><th>Same person as</th></tr></thead><tbody>` +
       s.drivers.map((d) => `<tr data-id="${d.id}">
         <td><b>${esc(d.name)}</b>${d.spellings && d.spellings !== d.name ? `<span class="current">Also written ${esc(d.spellings.split(', ').filter((x) => x !== d.name).join(', '))}</span>` : ''}</td>
         <td><select data-f="driver_type">${options(TYPE_D, d.driver_type)}</select></td>
         <td><input type="checkbox" data-f="kpi_included"${d.kpi_included ? ' checked' : ''} aria-label="Include ${esc(d.name)} in KPIs"></td>
-        <td class="n"><input type="number" min="0" step="0.01" data-f="day_rate" aria-label="Day rate for ${esc(d.name)}">${rateNote(d.day_rate)}</td>
         <td>${d.last_run ? longDate(d.last_run) : '<span class="muted">Never</span>'}</td>
         <td><select data-merge aria-label="Merge ${esc(d.name)} into"><option value="">Nobody else</option>${s.drivers.filter((o) => o.id !== d.id).map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select>
           <button class="ghost" data-merge-go hidden>Merge</button></td></tr>`).join('') + '</tbody>';
@@ -246,25 +225,17 @@
         <td class="n"><input type="number" min="1" step="0.1" data-f="mpg" aria-label="MPG for ${esc(v.vehicle)}">${rateNote(v.mpg, 'mpg')}</td>
         <td>${v.last_run ? longDate(v.last_run) : '<span class="muted">Never</span>'}</td></tr>`).join('') + '</tbody>';
 
-    // couriers and pallets
-    const anyExt = Object.keys(JOB).some((k) => s.settings[k]);
-    if (!$('ext-from').value) $('ext-from').value = anyExt ? s.today : s.history_start;
-    $('ext-defaults').innerHTML = Object.entries(JOB).map(([k, label]) => `<label>${esc(label)} £ <input type="number" min="0" step="0.01" data-ext="${k}" aria-label="Default cost for ${esc(label)}">${rateNote(s.settings[k])}</label>`).join('');
-    $('jobs').innerHTML = s.unplanned && s.unplanned.jobs
-      ? `<div class="row"><label>From <input type="date" id="jobs-from"></label><label>To <input type="date" id="jobs-to"></label><button class="ghost" id="jobs-show">Show jobs</button></div><div class="table-wrap"><table id="jobs-table"></table></div>`
-      : `<p class="note">No unplanned jobs yet. The MaxOptra report feeds the dashboard reads only include jobs planned onto a run, so these will appear once we've connected MaxOptra's unplanned-jobs feed. Each job will then show here with its type and cost, using the defaults above unless you enter a cost for that job.</p>`;
-    if ($('jobs-show')) { $('jobs-from').value = s.today.slice(0, 8) + '01'; $('jobs-to').value = s.today; $('jobs-show').addEventListener('click', loadJobs); }
-
     // users
-    $('users-table').innerHTML = `<thead><tr><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead><tbody>` +
+    $('users-table').innerHTML = `<thead><tr><th>Email</th><th>Role</th><th>Courier access</th><th>Active</th><th></th></tr></thead><tbody>` +
       s.users.map((u) => `<tr data-email="${esc(u.email)}"><td>${esc(u.email)}</td>
         <td><select data-f="role"><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option><option value="standard"${u.role !== 'admin' ? ' selected' : ''}>Standard</option></select></td>
+        <td><input type="checkbox" data-f="courier_access"${u.courier_access || u.role === 'admin' ? ' checked' : ''}${u.role === 'admin' ? ' disabled title="Admins have it already"' : ''} aria-label="${esc(u.email)} courier access"></td>
         <td><input type="checkbox" data-f="active"${u.active ? ' checked' : ''} aria-label="${esc(u.email)} active"></td>
         <td><button class="ghost" data-save-user>Save</button></td></tr>`).join('') + '</tbody>';
 
     // recent changes
-    const what = (h) => h.subject_type === 'fuel' ? 'Fuel price per litre' : h.subject_type === 'external' ? `Default: ${JOB[h.rate_type] || h.rate_type}`
-      : `${h.subject || '–'}: ${({ day_rate: 'day rate', lease_monthly: 'lease a month', hire_daily: 'hire a day', mpg: 'MPG' })[h.rate_type] || h.rate_type}`;
+    const what = (h) => h.subject_type === 'fuel' ? 'Fuel price per litre'
+      : `${h.subject || '–'}: ${({ lease_monthly: 'lease a month', hire_daily: 'hire a day', mpg: 'MPG' })[h.rate_type] || h.rate_type}`;
     $('changes-table').innerHTML = s.history.length
       ? `<thead><tr><th>When</th><th>Who</th><th>What</th><th class="n">Value</th><th>Applies from</th></tr></thead><tbody>` +
         s.history.map((h) => `<tr><td>${new Date(h.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' })}</td><td>${esc(h.created_by || '–')}</td>
@@ -300,18 +271,14 @@
   });
 
   $('drivers-save').addEventListener('click', async () => {
-    const from = $('drivers-from').value; const rows = changedRows('drivers-table');
+    const rows = changedRows('drivers-table');
     if (!rows.length) { say('drivers-status', 'Nothing has changed'); return; }
-    const rates = [];
     try {
       for (const tr of rows) {
         const id = Number(tr.dataset.id); const d = state.drivers.find((x) => x.id === id);
         const type = tr.querySelector('[data-f=driver_type]').value, kpi = tr.querySelector('[data-f=kpi_included]').checked;
         if (type !== d.driver_type || kpi !== d.kpi_included) await api('/admin/driver', { id, driver_type: type, kpi_included: kpi });
-        const rate = tr.querySelector('[data-f=day_rate]').value;
-        if (rate !== '') rates.push({ subject_type: 'driver', subject_id: id, rate_type: 'day_rate', value: Number(rate) });
       }
-      if (rates.length) { if (!from) throw new Error('Choose the date the new rates apply from'); await api('/admin/rates', { effective_from: from, rates }); }
       await load(); say('drivers-status', `Saved ${rows.length} driver${rows.length > 1 ? 's' : ''}`);
     } catch (e) { say('drivers-status', e.message, true); }
   });
@@ -343,41 +310,15 @@
     } catch (e) { say('vehicles-status', e.message, true); }
   });
 
-  $('ext-save').addEventListener('click', async () => {
-    const from = $('ext-from').value;
-    const rates = [...document.querySelectorAll('[data-ext]')].filter((i) => i.value !== '').map((i) => ({ subject_type: 'external', rate_type: i.dataset.ext, value: Number(i.value) }));
-    if (!rates.length) { say('ext-status', 'Enter at least one cost'); return; }
-    try { await api('/admin/rates', { effective_from: from, rates }); await load(); say('ext-status', 'Saved'); }
-    catch (e) { say('ext-status', e.message, true); }
-  });
-
-  async function loadJobs() {
-    try {
-      const r = await api(`/admin/external?from=${$('jobs-from').value}&to=${$('jobs-to').value}`);
-      $('jobs-table').innerHTML = `<thead><tr><th>Date</th><th>Customer</th><th>Postcode</th><th>Requirements</th><th>Type</th><th class="n">Cost £</th><th></th></tr></thead><tbody>` +
-        (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}"><td>${longDate(j.job_date)}</td>
-          <td><b>${esc(j.client_name || '–')}</b><span class="current">${esc(j.order_ref)}</span></td><td>${esc(j.location_postcode || '–')}</td><td>${esc(j.vehicle_requirements || '–')}</td>
-          <td><select data-job-type><option value="">Choose</option>${options(JOB, j.job_type)}</select></td>
-          <td class="n"><input type="number" min="0" step="0.01" data-job-cost value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" aria-label="Cost for ${esc(j.order_ref)}">
-            <span class="current">${j.cost_is_default ? (j.job_cost !== null ? 'Default' : 'No default set') : 'Entered'}</span></td>
-          <td><button class="ghost" data-job-save>Save</button></td></tr>`).join('') : '<tr><td colspan="7" class="muted">No jobs in these dates.</td></tr>') + '</tbody>';
-    } catch (e) { $('jobs-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
-  }
-  document.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-job-save]'); if (!b) return;
-    const tr = b.closest('tr');
-    try { await api('/admin/external', { order_ref: tr.dataset.ref, job_date: tr.dataset.date, job_type: tr.querySelector('[data-job-type]').value || null, cost: tr.querySelector('[data-job-cost]').value }); b.textContent = 'Saved'; }
-    catch (err) { b.textContent = 'Failed'; b.title = err.message; }
-  });
-
   $('users-table').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-save-user]'); if (!b) return;
     const tr = b.closest('tr');
-    try { await api('/admin/user', { email: tr.dataset.email, role: tr.querySelector('[data-f=role]').value, active: tr.querySelector('[data-f=active]').checked }); await load(); say('users-status', 'Saved'); }
+    try { await api('/admin/user', { email: tr.dataset.email, role: tr.querySelector('[data-f=role]').value, courier_access: tr.querySelector('[data-f=courier_access]').checked, active: tr.querySelector('[data-f=active]').checked }); await load(); say('users-status', 'Saved'); }
     catch (err) { say('users-status', err.message, true); await load(); }
   });
   $('user-add').addEventListener('click', async () => {
-    try { await api('/admin/user', { email: $('user-email').value, role: $('user-role').value, active: true }); $('user-email').value = ''; await load(); say('users-status', 'Added'); }
+    const choice = $('user-role').value;
+    try { await api('/admin/user', { email: $('user-email').value, role: choice === 'admin' ? 'admin' : 'standard', courier_access: choice === 'couriers', active: true }); $('user-email').value = ''; await load(); say('users-status', 'Added'); }
     catch (e) { say('users-status', e.message, true); }
   });
 
@@ -387,6 +328,7 @@
     try { me = await api('/me'); } catch (e) { $('gate').hidden = false; $('gate-text').textContent = e.message; return; }
     $('who').textContent = me.email; $('role').textContent = me.role === 'admin' ? 'Admin' : 'Standard'; $('role').hidden = false;
     if (me.role !== 'admin') { $('gate').hidden = false; $('gate-text').textContent = 'This page is for Transport admins. Ask an Admin to add you if you need it.'; return; }
+    $('pay-link').hidden = !me.pay; $('couriers-link').hidden = !me.couriers;
     $('app').hidden = false;
     await load();
     if (location.hash) { const t = document.querySelector(location.hash); if (t && t.scrollIntoView) t.scrollIntoView(); }

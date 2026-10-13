@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Couriers and pallets | Plus Packaging</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #003da5; --navy: #002b75; --grey: #9ea2a2; --light: #eaf2ff; --bg: #f4f7fb; --white: #ffffff;
+    --ink: #1c2733; --muted: #5d6566; --line: #d9dee3; --bad: #b42318; --bad-bg: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Lato, "Segoe UI", Arial, sans-serif; }
+  a { color: var(--blue); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  header { background: var(--navy); color: var(--white); }
+  .bar { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .brand { font-weight: 900; font-size: 18px; }
+  .brand span { font-weight: 400; opacity: .85; margin-left: 10px; }
+  .tools { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 14px; flex-wrap: wrap; }
+  .tools a { color: var(--white); }
+  .role { border: 1px solid rgba(255,255,255,.55); border-radius: 3px; padding: 0 6px; font-size: 12px; font-weight: 700; }
+  nav.jump { max-width: 1280px; margin: 0 auto; padding: 12px 20px 0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 12px 20px 48px; }
+  section { background: var(--white); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; scroll-margin-top: 12px; }
+  .head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 4px; }
+  h2 { margin: 0; font-size: 17px; font-weight: 900; color: var(--navy); }
+  h3 { margin: 18px 0 6px; font-size: 15px; color: var(--navy); }
+  .pad { padding: 8px 18px 16px; }
+  .note { font-size: 13px; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .bad { color: var(--bad); font-weight: 700; }
+  .good { color: var(--blue); font-weight: 700; }
+  .banner { background: var(--bad-bg); color: var(--bad); border-left: 4px solid var(--bad); padding: 10px 14px; margin-bottom: 16px; }
+  ul.gaps { margin: 0; padding: 0 0 0 18px; }
+  ul.gaps li { margin: 3px 0; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 6px 9px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { background: var(--light); color: var(--navy); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.changed td { background: #fffbe6; }
+  input, select, textarea, button { font: inherit; }
+  input[type=number], input[type=text], input[type=email], input[type=date], select, textarea {
+    border: 1px solid var(--grey); border-radius: 3px; padding: 4px 7px; background: var(--white); color: var(--ink); }
+  input[type=number] { width: 7em; text-align: right; }
+  textarea { width: 100%; max-width: 30em; min-height: 5.5em; }
+  button { border: 1px solid var(--blue); background: var(--blue); color: var(--white); border-radius: 3px; padding: 6px 14px; font-weight: 700; cursor: pointer; }
+  button.ghost { background: var(--white); color: var(--blue); }
+  button:disabled { background: var(--grey); border-color: var(--grey); cursor: default; }
+  .row { display: flex; gap: 12px 18px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .row label { display: flex; gap: 6px; align-items: center; }
+  .current { display: block; font-size: 12px; color: var(--muted); }
+  .status { font-size: 14px; margin-left: 6px; }
+  .big { font-size: 26px; font-weight: 900; color: var(--blue); }
+  .gate { max-width: 40em; margin: 40px auto; text-align: center; }
+  #jobs-table td:first-child, #jobs-table td:nth-child(3) { white-space: nowrap; }
+  @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Plus Transport<span>Couriers and pallets</span></div>
+    <div class="tools"><span id="who"></span><a href="/transport/">Transport</a><a href="/transport/admin/" id="admin-link" hidden>Admin</a><a href="/">Dashboards</a></div>
+  </div>
+</header>
+<div class="gate" id="gate" hidden><h2>Couriers and pallets</h2><p id="gate-text"></p></div>
+<div id="app" hidden>
+  <nav class="jump" aria-label="Sections"><a href="#jobs">Jobs</a><a href="#add">Add a job</a><a href="#reasons">Reason codes</a><a href="#prices">Default prices</a></nav>
+  <main>
+    <div class="banner" id="error" hidden></div>
+
+    <section id="jobs" aria-labelledby="jobs-title">
+      <div class="head"><h2 id="jobs-title">Jobs</h2><span class="note">Same day couriers and overnight parcels or pallets: work that didn't go on a Plus vehicle</span></div>
+      <div class="pad">
+        <div class="row"><label>From <input type="date" id="jobs-from"></label><label>To <input type="date" id="jobs-to"></label>
+          <button class="ghost" id="jobs-show">Show jobs</button><span class="note" id="jobs-total"></span></div>
+        <div class="table-wrap"><table id="jobs-table"></table></div>
+        <p class="note">A cost left empty uses the default price for that type. MaxOptra's unplanned jobs will appear here by themselves once we have its feed; until then, add them below.</p>
+      </div>
+    </section>
+
+    <section id="add" aria-labelledby="add-title">
+      <div class="head"><h2 id="add-title">Add a job</h2></div>
+      <div class="pad">
+        <div class="row">
+          <label>Date <input type="date" id="new-date"></label>
+          <label>Order <input type="text" id="new-ref" placeholder="SO123456" size="12"></label>
+          <label>Customer <input type="text" id="new-client" size="24"></label>
+          <label>Postcode <input type="text" id="new-postcode" size="9"></label>
+        </div>
+        <div class="row">
+          <label>Type <select id="new-type"></select></label>
+          <label>Reason <select id="new-reason"></select></label>
+          <label>Cost £ <input type="number" min="0" step="0.01" id="new-cost" placeholder="default"></label>
+          <label>Notes <input type="text" id="new-notes" size="30"></label>
+          <button id="new-save">Add job</button><span class="status" id="new-status" aria-live="polite"></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="reasons" aria-labelledby="reasons-title">
+      <div class="head"><h2 id="reasons-title">Reason codes</h2><span class="note">Why a job had to go another way, mostly for same day deliveries</span></div>
+      <div class="pad">
+        <div class="table-wrap"><table id="reasons-table"></table></div>
+        <div class="row"><label>Code <input type="text" id="reason-code" size="8" placeholder="SD1"></label>
+          <label>Description <input type="text" id="reason-desc" size="36" placeholder="Customer ordered after the cut-off"></label>
+          <button id="reason-add">Add reason</button><span class="status" id="reasons-status" aria-live="polite"></span></div>
+      </div>
+    </section>
+
+    <section id="prices" aria-labelledby="prices-title">
+      <div class="head"><h2 id="prices-title">Default prices</h2><span class="note">Used for any job without its own cost</span></div>
+      <div class="pad">
+        <div class="row" id="prices-row"></div>
+        <div class="row"><label>Apply from <input type="date" id="prices-from"></label>
+          <button id="prices-save">Save prices</button><span class="status" id="prices-status" aria-live="polite"></span></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+(() => {
+  const API = '/api/transport';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const longDate = (iso) => iso ? new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '–';
+  const when = (ts) => ts ? new Date(ts).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' }) : '–';
+  const gbp = (n, dp = 2) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  async function api(path, body) {
+    const res = await fetch(API + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' } : { credentials: 'same-origin' });
+    let data = null; try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) throw new Error((data && (data.error + (data.detail ? `: ${data.detail}` : ''))) || `Error ${res.status}`);
+    return data;
+  }
+  function say(id, text, bad) { const el = $(id); el.textContent = text; el.className = 'status ' + (bad ? 'bad' : 'good'); if (!bad) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 5000); }
+
+  const JOB = { same_day: 'Same day courier', overnight_parcel: 'Overnight parcel', overnight_pallet: 'Overnight pallet', other: 'Other' };
+  let state = null;
+  const typeOptions = (v) => `<option value="">Choose</option>` + Object.entries(JOB).map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${l}</option>`).join('');
+  const reasonOptions = (v) => `<option value="">None</option>` + state.codes.filter((c) => c.active || c.code === v).map((c) => `<option value="${esc(c.code)}"${c.code === v ? ' selected' : ''}>${esc(c.code)}: ${esc(c.description)}</option>`).join('');
+
+  function render() {
+    const s = state;
+    $('new-type').innerHTML = typeOptions('same_day'); $('new-reason').innerHTML = reasonOptions('');
+    if (!$('new-date').value) $('new-date').value = s.today;
+    $('reasons-table').innerHTML = s.codes.length
+      ? `<thead><tr><th>Code</th><th>Description</th><th>In use</th><th class="n">Order</th><th></th></tr></thead><tbody>` +
+        s.codes.map((c) => `<tr data-code="${esc(c.code)}"><td><input type="text" data-f="code" value="${esc(c.code)}" size="8" aria-label="Code"></td>
+          <td><input type="text" data-f="description" value="${esc(c.description)}" size="40" aria-label="Description for ${esc(c.code)}"></td>
+          <td><input type="checkbox" data-f="active"${c.active ? ' checked' : ''} aria-label="${esc(c.code)} in use"></td>
+          <td class="n"><input type="number" data-f="sort_order" value="${c.sort_order}" step="1" style="width:5em" aria-label="Order for ${esc(c.code)}"></td>
+          <td><button class="ghost" data-save-reason>Save</button></td></tr>`).join('') + '</tbody>'
+      : '<tbody><tr><td class="muted">No reason codes yet. Add your same day reason codes below.</td></tr></tbody>';
+    $('prices-row').innerHTML = Object.entries(JOB).map(([k, l]) => `<label>${l} £ <input type="number" min="0" step="0.01" data-price="${k}" aria-label="Default price for ${l}">
+      <span class="current">${s.defaults[k] ? `Now ${gbp(s.defaults[k].value)} from ${longDate(s.defaults[k].effective_from)}` : '<span class="bad">Not set</span>'}</span></label>`).join('');
+    if (!$('prices-from').value) $('prices-from').value = Object.keys(s.defaults).length ? s.today : s.history_start;
+    if (!$('jobs-from').value) { $('jobs-from').value = s.today.slice(0, 8) + '01'; $('jobs-to').value = s.today; }
+  }
+  async function load() { try { state = await api('/couriers/state'); render(); await loadJobs(); $('error').hidden = true; } catch (e) { $('error').textContent = e.message; $('error').hidden = false; } }
+
+  async function loadJobs() {
+    try {
+      const r = await api(`/couriers/jobs?from=${$('jobs-from').value}&to=${$('jobs-to').value}`);
+      const total = r.jobs.reduce((t, j) => t + (j.job_cost || 0), 0);
+      $('jobs-total').textContent = r.jobs.length ? `${r.jobs.length} job${r.jobs.length > 1 ? 's' : ''}, ${gbp(total)}` : '';
+      $('jobs-table').innerHTML = `<thead><tr><th>Date</th><th>Order and customer</th><th>Postcode</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th></th></tr></thead><tbody>` +
+        (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}">
+          <td>${longDate(j.job_date)}</td>
+          <td><b>${esc(j.order_ref)}</b><span class="current">${esc(j.client_name || '–')}${j.source === 'manual' ? ', added by hand' : ', from MaxOptra'}</span></td>
+          <td>${esc(j.location_postcode || '–')}</td>
+          <td><select data-f="job_type" aria-label="Type for ${esc(j.order_ref)}">${typeOptions(j.job_type)}</select></td>
+          <td><select data-f="reason_code" aria-label="Reason for ${esc(j.order_ref)}">${reasonOptions(j.reason_code)}</select></td>
+          <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" aria-label="Cost for ${esc(j.order_ref)}">
+            <span class="current">${j.cost_is_default ? (j.job_cost !== null ? 'Default price' : 'No default set') : 'Own cost'}</span></td>
+          <td><input type="text" data-f="notes" value="${esc(j.notes || '')}" size="18" aria-label="Notes for ${esc(j.order_ref)}"></td>
+          <td style="white-space:nowrap"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost" data-remove-job>Remove</button>' : ''}</td></tr>`).join('')
+          : '<tr><td colspan="8" class="muted">No jobs in these dates.</td></tr>') + '</tbody>';
+    } catch (e) { $('jobs-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
+  }
+  $('jobs-show').addEventListener('click', loadJobs);
+
+  $('jobs-table').addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr'); if (!tr) return;
+    const key = { order_ref: tr.dataset.ref, job_date: tr.dataset.date };
+    if (e.target.closest('[data-save-job]')) {
+      const b = e.target.closest('[data-save-job]');
+      try { await api('/couriers/job', { ...key, job_type: tr.querySelector('[data-f=job_type]').value || null, reason_code: tr.querySelector('[data-f=reason_code]').value || null,
+                                        cost: tr.querySelector('[data-f=cost]').value, notes: tr.querySelector('[data-f=notes]').value });
+            await loadJobs(); }
+      catch (err) { b.textContent = 'Failed'; b.title = err.message; }
+    }
+    if (e.target.closest('[data-remove-job]') && confirm(`Remove ${key.order_ref}?`)) {
+      try { await api('/couriers/job/remove', key); await loadJobs(); } catch (err) { alert(err.message); }
+    }
+  });
+  $('new-save').addEventListener('click', async () => {
+    try {
+      await api('/couriers/job', { new: true, job_date: $('new-date').value, order_ref: $('new-ref').value, client_name: $('new-client').value, location_postcode: $('new-postcode').value,
+                                   job_type: $('new-type').value || null, reason_code: $('new-reason').value || null, cost: $('new-cost').value, notes: $('new-notes').value });
+      for (const id of ['new-ref', 'new-client', 'new-postcode', 'new-cost', 'new-notes', 'new-reason']) $(id).value = '';
+      say('new-status', 'Added'); await loadJobs();
+    } catch (e) { say('new-status', e.message, true); }
+  });
+  $('reasons-table').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-save-reason]'); if (!b) return;
+    const tr = b.closest('tr');
+    try { await api('/couriers/reason', { was: tr.dataset.code, code: tr.querySelector('[data-f=code]').value, description: tr.querySelector('[data-f=description]').value,
+                                          active: tr.querySelector('[data-f=active]').checked, sort_order: Number(tr.querySelector('[data-f=sort_order]').value) || 100 });
+          await load(); say('reasons-status', 'Saved'); }
+    catch (err) { say('reasons-status', err.message, true); }
+  });
+  $('reason-add').addEventListener('click', async () => {
+    try { await api('/couriers/reason', { code: $('reason-code').value, description: $('reason-desc').value, active: true, sort_order: (state.codes.length + 1) * 10 });
+          $('reason-code').value = ''; $('reason-desc').value = ''; await load(); say('reasons-status', 'Added'); }
+    catch (e) { say('reasons-status', e.message, true); }
+  });
+  $('prices-save').addEventListener('click', async () => {
+    const rates = [...document.querySelectorAll('[data-price]')].filter((i) => i.value !== '').map((i) => ({ subject_type: 'external', rate_type: i.dataset.price, value: Number(i.value) }));
+    if (!rates.length) { say('prices-status', 'Enter at least one price', true); return; }
+    try { await api('/couriers/defaults', { effective_from: $('prices-from').value, rates }); await load(); say('prices-status', 'Saved'); }
+    catch (e) { say('prices-status', e.message, true); }
+  });
+
+  (async () => {
+    let me;
+    try { me = await api('/me'); } catch (e) { $('gate').hidden = false; $('gate-text').textContent = e.message; return; }
+    $('who').textContent = me.email;
+    if (!me.couriers) { $('gate').hidden = false; $('gate-text').textContent = 'This page is for the people who arrange couriers and pallets. Ask a Transport admin for access.'; return; }
+    $('admin-link').hidden = me.role !== 'admin';
+    $('app').hidden = false;
+    await load();
+  })();
+})();
+</script>
+</body>
+</html>

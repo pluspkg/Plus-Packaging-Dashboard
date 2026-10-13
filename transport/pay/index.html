@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Driver pay | Plus Packaging</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #003da5; --navy: #002b75; --grey: #9ea2a2; --light: #eaf2ff; --bg: #f4f7fb; --white: #ffffff;
+    --ink: #1c2733; --muted: #5d6566; --line: #d9dee3; --bad: #b42318; --bad-bg: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Lato, "Segoe UI", Arial, sans-serif; }
+  a { color: var(--blue); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  header { background: var(--navy); color: var(--white); }
+  .bar { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .brand { font-weight: 900; font-size: 18px; }
+  .brand span { font-weight: 400; opacity: .85; margin-left: 10px; }
+  .tools { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 14px; flex-wrap: wrap; }
+  .tools a { color: var(--white); }
+  .role { border: 1px solid rgba(255,255,255,.55); border-radius: 3px; padding: 0 6px; font-size: 12px; font-weight: 700; }
+  nav.jump { max-width: 1280px; margin: 0 auto; padding: 12px 20px 0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 12px 20px 48px; }
+  section { background: var(--white); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; scroll-margin-top: 12px; }
+  .head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 4px; }
+  h2 { margin: 0; font-size: 17px; font-weight: 900; color: var(--navy); }
+  h3 { margin: 18px 0 6px; font-size: 15px; color: var(--navy); }
+  .pad { padding: 8px 18px 16px; }
+  .note { font-size: 13px; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .bad { color: var(--bad); font-weight: 700; }
+  .good { color: var(--blue); font-weight: 700; }
+  .banner { background: var(--bad-bg); color: var(--bad); border-left: 4px solid var(--bad); padding: 10px 14px; margin-bottom: 16px; }
+  ul.gaps { margin: 0; padding: 0 0 0 18px; }
+  ul.gaps li { margin: 3px 0; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 6px 9px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { background: var(--light); color: var(--navy); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.changed td { background: #fffbe6; }
+  input, select, textarea, button { font: inherit; }
+  input[type=number], input[type=text], input[type=email], input[type=date], select, textarea {
+    border: 1px solid var(--grey); border-radius: 3px; padding: 4px 7px; background: var(--white); color: var(--ink); }
+  input[type=number] { width: 7em; text-align: right; }
+  textarea { width: 100%; max-width: 30em; min-height: 5.5em; }
+  button { border: 1px solid var(--blue); background: var(--blue); color: var(--white); border-radius: 3px; padding: 6px 14px; font-weight: 700; cursor: pointer; }
+  button.ghost { background: var(--white); color: var(--blue); }
+  button:disabled { background: var(--grey); border-color: var(--grey); cursor: default; }
+  .row { display: flex; gap: 12px 18px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .row label { display: flex; gap: 6px; align-items: center; }
+  .current { display: block; font-size: 12px; color: var(--muted); }
+  .status { font-size: 14px; margin-left: 6px; }
+  .big { font-size: 26px; font-weight: 900; color: var(--blue); }
+  .gate { max-width: 40em; margin: 40px auto; text-align: center; }
+  @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Plus Transport<span>Driver pay</span></div>
+    <div class="tools"><span id="who"></span><a href="/transport/">Transport</a><a href="/transport/admin/" id="admin-link" hidden>Admin</a><a href="/">Dashboards</a></div>
+  </div>
+</header>
+<div class="gate" id="gate" hidden><h2>Driver pay</h2><p id="gate-text"></p></div>
+<div id="app" hidden>
+  <main>
+    <div class="banner" id="error" hidden></div>
+    <section aria-labelledby="conf-title">
+      <div class="head"><h2 id="conf-title">Confidential</h2></div>
+      <div class="pad"><p class="note" style="margin:0">Only the people listed below can open this page or see any cost that includes driver pay. Every time it's opened or changed is logged at the bottom.</p></div>
+    </section>
+
+    <section id="pay" aria-labelledby="pay-title">
+      <div class="head"><h2 id="pay-title">Drivers</h2>
+        <span class="note">Day rate: agency and temporary drivers, charged for each day they drive. Monthly cost: employees, charged every weekday whether or not they drive.</span></div>
+      <div class="pad">
+        <div class="row"><label>Changes apply from <input type="date" id="pay-from"></label>
+          <span class="note">Earlier days keep the pay they had. Leave the amount empty to keep the current pay.</span></div>
+        <div class="table-wrap"><table id="pay-table"></table></div>
+        <div class="row"><button id="pay-save">Save pay</button><span class="status" id="pay-status" aria-live="polite"></span></div>
+        <p class="note" id="pay-gaps"></p>
+      </div>
+    </section>
+
+    <section id="access" aria-labelledby="access-title">
+      <div class="head"><h2 id="access-title">Who can see pay</h2><span class="note">Only people on this list can add or remove someone</span></div>
+      <div class="pad">
+        <div class="table-wrap"><table id="people-table"></table></div>
+        <div class="row"><label>Give access to <input type="email" id="person-email" placeholder="name@pluspkg.com"></label>
+          <button id="person-add">Give access</button><span class="status" id="people-status" aria-live="polite"></span></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="hist-title">
+      <div class="head"><h2 id="hist-title">Pay changes</h2></div>
+      <div class="pad"><div class="table-wrap"><table id="hist-table"></table></div></div>
+    </section>
+
+    <section aria-labelledby="log-title">
+      <div class="head"><h2 id="log-title">Access log</h2><span class="note">Latest 40</span></div>
+      <div class="pad"><div class="table-wrap"><table id="log-table"></table></div></div>
+    </section>
+  </main>
+</div>
+<script>
+(() => {
+  const API = '/api/transport';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const longDate = (iso) => iso ? new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '–';
+  const when = (ts) => ts ? new Date(ts).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' }) : '–';
+  const gbp = (n, dp = 2) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  async function api(path, body) {
+    const res = await fetch(API + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' } : { credentials: 'same-origin' });
+    let data = null; try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) throw new Error((data && (data.error + (data.detail ? `: ${data.detail}` : ''))) || `Error ${res.status}`);
+    return data;
+  }
+  function say(id, text, bad) { const el = $(id); el.textContent = text; el.className = 'status ' + (bad ? 'bad' : 'good'); if (!bad) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 5000); }
+
+  let state = null;
+  const BASIS = { day_rate: 'Day rate', salary_monthly: 'Monthly cost' };
+  const payText = (p) => p ? `${p.basis === 'day_rate' ? `${gbp(p.value)} a day` : `${gbp(p.value)} a month`} from ${longDate(p.effective_from)}` : '';
+
+  function render() {
+    const s = state;
+    if (!$('pay-from').value) $('pay-from').value = s.drivers.some((d) => d.pay) ? s.today : s.history_start;
+    $('pay-table').innerHTML = `<thead><tr><th>Driver</th><th>Last drove</th><th>Paid by</th><th class="n">Amount £</th><th>Now</th></tr></thead><tbody>` +
+      s.drivers.map((d) => `<tr data-id="${d.id}">
+        <td><b>${esc(d.name)}</b></td>
+        <td>${d.last_run ? longDate(d.last_run) : '<span class="muted">Never</span>'}</td>
+        <td><select data-f="basis" aria-label="How ${esc(d.name)} is paid">${Object.entries(BASIS).map(([k, v]) => `<option value="${k}"${(d.pay ? d.pay.basis : 'day_rate') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
+        <td class="n"><input type="number" min="0" step="0.01" data-f="value" aria-label="Pay for ${esc(d.name)}"></td>
+        <td>${d.pay ? esc(payText(d.pay)) : '<span class="bad">Not set</span>'}</td></tr>`).join('') + '</tbody>';
+    const missing = s.drivers.filter((d) => d.runs_90 > 0 && d.kpi_included && !d.pay);
+    $('pay-gaps').innerHTML = missing.length ? `<span class="bad">${missing.length} driver${missing.length > 1 ? 's' : ''} who drove in the last 90 days ha${missing.length > 1 ? 've' : 's'} no pay set:</span> ${esc(missing.map((d) => d.name).join(', '))}` : '';
+    $('people-table').innerHTML = `<thead><tr><th>Email</th><th></th></tr></thead><tbody>` +
+      s.people.map((p) => `<tr data-email="${esc(p.email)}"><td>${esc(p.email)}${p.active ? '' : ' <span class="muted">(inactive)</span>'}</td><td><button class="ghost" data-remove>Remove access</button></td></tr>`).join('') + '</tbody>';
+    $('hist-table').innerHTML = s.history.length
+      ? `<thead><tr><th>When</th><th>Who</th><th>Driver</th><th>Paid by</th><th class="n">Amount</th><th>Applies from</th></tr></thead><tbody>` +
+        s.history.map((h) => `<tr><td>${when(h.created_at)}</td><td>${esc(h.created_by || '–')}</td><td>${esc(h.name || '–')}</td><td>${BASIS[h.basis] || esc(h.basis)}</td><td class="n">${gbp(h.value)}</td><td>${longDate(h.effective_from)}</td></tr>`).join('') + '</tbody>'
+      : '<tbody><tr><td class="muted">No pay entered yet.</td></tr></tbody>';
+    const ACT = { 'pay.view': 'Opened this page', 'pay.change': 'Changed pay', 'pay.access_given': 'Gave access', 'pay.access_removed': 'Removed access' };
+    $('log-table').innerHTML = `<thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead><tbody>` +
+      s.log.map((l) => `<tr><td>${when(l.at)}</td><td>${esc(l.email)}</td><td>${esc(ACT[l.action] || l.action)}${l.detail && l.detail.email ? `: ${esc(l.detail.email)}` : ''}${l.detail && l.detail.drivers ? `: ${l.detail.drivers.length} driver${l.detail.drivers.length > 1 ? 's' : ''}, from ${longDate(l.detail.effective_from)}` : ''}</td></tr>`).join('') + '</tbody>';
+  }
+  async function load() { try { state = await api('/pay/state'); render(); $('error').hidden = true; } catch (e) { $('error').textContent = e.message; $('error').hidden = false; } }
+
+  document.addEventListener('input', (e) => { const tr = e.target.closest('#pay-table tr'); if (tr) tr.classList.add('changed'); });
+  document.addEventListener('change', (e) => { const tr = e.target.closest('#pay-table tr'); if (tr) tr.classList.add('changed'); });
+  $('pay-save').addEventListener('click', async () => {
+    const from = $('pay-from').value;
+    const pay = [...document.querySelectorAll('#pay-table tbody tr.changed')].map((tr) => ({ driver_id: Number(tr.dataset.id), basis: tr.querySelector('[data-f=basis]').value, value: tr.querySelector('[data-f=value]').value }))
+      .filter((p) => p.value !== '').map((p) => ({ ...p, value: Number(p.value) }));
+    if (!pay.length) { say('pay-status', 'Enter an amount to change someone\'s pay', true); return; }
+    if (!from) { say('pay-status', 'Choose the date the pay applies from', true); return; }
+    try { await api('/pay/rates', { effective_from: from, pay }); await load(); say('pay-status', `Saved pay for ${pay.length} driver${pay.length > 1 ? 's' : ''}`); }
+    catch (e) { say('pay-status', e.message, true); }
+  });
+  $('people-table').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-remove]'); if (!b) return;
+    const email = b.closest('tr').dataset.email;
+    if (!confirm(`Remove ${email}'s access to driver pay?`)) return;
+    try { await api('/pay/access', { email, pay_access: false }); await load(); say('people-status', 'Removed'); }
+    catch (err) { say('people-status', err.message, true); }
+  });
+  $('person-add').addEventListener('click', async () => {
+    try { await api('/pay/access', { email: $('person-email').value, pay_access: true }); $('person-email').value = ''; await load(); say('people-status', 'Access given'); }
+    catch (e) { say('people-status', e.message, true); }
+  });
+
+  (async () => {
+    let me;
+    try { me = await api('/me'); } catch (e) { $('gate').hidden = false; $('gate-text').textContent = e.message; return; }
+    $('who').textContent = me.email;
+    if (!me.pay) { $('gate').hidden = false; $('gate-text').textContent = 'Driver pay is confidential. Only the people on its access list can open this page.'; return; }
+    $('admin-link').hidden = me.role !== 'admin';
+    $('app').hidden = false;
+    await load();
+  })();
+})();
+</script>
+</body>
+</html>

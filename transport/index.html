@@ -91,6 +91,11 @@
   tr.vehicle-open > td { border-bottom-color: transparent; }
   tr.selected > td { background: var(--light); }
   .pad-note { padding: .5rem 1.1rem 1rem; margin: 0; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 0 1.2rem; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+  .expected { display: block; font-weight: 700; white-space: nowrap; }
+  .expected.early { color: #1a7f37; }               /* green: back on or before the plan */
+  .expected.late { color: var(--bad); }             /* red: later than the plan */
   .cost-col { display: none; }
   body.costs .cost-col { display: table-cell; }
   .cost-flag { color: var(--bad); font-weight: 700; }
@@ -198,6 +203,8 @@
       <button class="alert-toggle" id="alerts" hidden></button>
       <span id="who"></span><span class="role" id="role" hidden></span>
       <a href="/transport/admin/" id="admin-link" hidden>Admin</a>
+      <a href="/transport/pay/" id="pay-link" hidden>Pay</a>
+      <a href="/transport/couriers/" id="couriers-link" hidden>Couriers</a>
       <a href="/transport/setup/" id="setup-link" hidden>Setup</a>
       <a href="/">Dashboards</a>
     </div>
@@ -248,7 +255,14 @@
     <div class="panel">
       <div class="panel-head"><h2>Full-time vans</h2></div>
       <div class="table-wrap"><table class="cards" id="vans"></table></div>
-      <p class="note pad-note" id="cost-note" hidden>Cost is Plus's own: driver day rates, lease (every weekday, whether or not the vehicle ran) and fuel from each vehicle's MPG and the week's fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Hover a cost for its breakdown; * means a rate is missing.</p>
+      <p class="note pad-note" id="cost-note" hidden>Cost is Plus's own: driver pay (a day rate for each day driven, or a monthly salary spread over every weekday), lease (every weekday, whether or not the vehicle ran) and fuel from each vehicle's MPG and the week's fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Hover a cost for its breakdown; * means a rate is missing.</p>
+    </div>
+    <div class="panel" id="couriers-panel" hidden>
+      <div class="panel-head"><h2>Couriers and pallets</h2><span class="note">Jobs that didn't go on a Plus vehicle</span></div>
+      <div class="split">
+        <div class="table-wrap"><table class="cards" id="couriers-type"></table></div>
+        <div class="table-wrap"><table class="cards" id="couriers-reason"></table></div>
+      </div>
     </div>
     <div class="panel">
       <div class="panel-head"><h2>Van drivers</h2><span class="note">Completed drops per day driven</span></div>
@@ -304,8 +318,9 @@
   const gbp2 = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const money = (n) => (n === null || n === undefined || !isFinite(n)) ? '–' : gbp0.format(n);
   const money2 = (n) => (n === null || n === undefined || !isFinite(n)) ? '–' : gbp2.format(n);
-  let canSeeCosts = false;                       // Admins only: a van's daily cost would reveal its driver's day rate
-  const COST_NOTE = 'Plus cost: driver day rates, vehicle lease or hire, and fuel from MPG and the week’s fuel price';
+  let canSeeCosts = false;                       // pay access only: a van's daily cost would reveal its driver's pay
+  let canSeeCouriers = false;
+  const COST_NOTE = 'Plus cost: driver pay, vehicle lease or hire, and fuel from MPG and the week’s fuel price';
   function costTitle(c, maxoptra) {
     if (!c) return '';
     const parts = [`Driver ${money2(c.driver)}`, `lease ${money2(c.lease)}`, `fuel ${money2(c.fuel)}${c.fuel_miles ? ` on ${fmtInt(c.fuel_miles)} miles` : ''}`];
@@ -367,8 +382,14 @@
   }
   function backAtPlus(run) {
     if (run.status === 'back' && run.actual_return) return `<b>${esc(run.actual_return)}</b>`;
-    if (['returning', 'back_estimated'].includes(run.status) && run.estimated_return) return `About ${esc(run.estimated_return)} <span class="small">estimated</span>`;
-    return run.planned_return ? `<span class="small">Plan ${esc(run.planned_return)}</span>` : '–';
+    if (run.status === 'back_estimated' && run.estimated_return) return `About ${esc(run.estimated_return)} <span class="small">estimated</span>`;
+    const plan = run.planned_return ? `<span class="small">Plan ${esc(run.planned_return)}</span>` : '';
+    if (run.expected_return && ['out', 'returning', 'late'].includes(run.status)) {
+      const late = run.expected_late_by !== null && run.expected_late_by > 0;
+      const tip = run.expected_late_by === null ? '' : late ? `${run.expected_late_by} min later than planned` : run.expected_late_by < 0 ? `${-run.expected_late_by} min earlier than planned` : 'on plan';
+      return `${plan}<span class="expected ${late ? 'late' : 'early'}" title="${tip}">Expected ${esc(run.expected_return)}</span>`;
+    }
+    return plan || '–';
   }
 
   // Planned miles, with MaxOptra's actual miles underneath where it recorded them
@@ -550,28 +571,87 @@
     }
     if (maxId > seenEvents) { seenEvents = maxId; localStorage.setItem(key, String(maxId)); }
   }
+  // A short two-note chime, made in the browser so there's no sound file to load.
+  let audio = null;
+  function unlockAudio() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+    } catch { /* no Web Audio */ }
+    alertButton();
+  }
+  function chime() {
+    if (!audio || audio.state !== 'running') return false;
+    const t0 = audio.currentTime;
+    [[880, 0], [1318.5, 0.18]].forEach(([freq, at]) => {
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t0 + at);
+      gain.gain.exponentialRampToValueAtTime(0.35, t0 + at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.9);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t0 + at); osc.stop(t0 + at + 1);
+    });
+    return true;
+  }
+  ['click', 'keydown', 'touchstart'].forEach((ev) => document.addEventListener(ev, unlockAudio, { passive: true }));
   function toast(html) {
+    chime();
     const t = document.createElement('div');
     t.className = 'toast'; t.innerHTML = html;
     $('toasts').appendChild(t);
     setTimeout(() => t.remove(), 60 * 1000);
     t.addEventListener('click', () => t.remove());
   }
+  // One button for pop-ups and sound. Until someone clicks the page, browsers keep it silent.
   function alertButton() {
     const b = $('alerts');
-    if (!('Notification' in window)) { b.hidden = true; return; }
     b.hidden = false;
-    const p = Notification.permission;
-    b.textContent = p === 'granted' ? 'Alerts on' : p === 'denied' ? 'Alerts blocked' : 'Turn on alerts';
-    b.disabled = p !== 'default';
-    b.title = p === 'denied' ? 'Allow notifications for this site in the browser settings' : '';
+    const p = 'Notification' in window ? Notification.permission : 'unsupported';
+    const sound = audio && audio.state === 'running';
+    if (p === 'default') { b.textContent = 'Turn on alerts'; b.title = 'Pop-up alerts and a chime when a vehicle finishes its last job'; }
+    else if (!sound) { b.textContent = 'Click for sound'; b.title = 'Browsers stay silent until someone clicks the page'; }
+    else { b.textContent = p === 'denied' ? 'Sound on' : 'Alerts and sound on'; b.title = 'Click to hear the chime'; }
+    b.disabled = false;
   }
-  $('alerts').addEventListener('click', async () => { await Notification.requestPermission(); alertButton(); });
+  $('alerts').addEventListener('click', async () => {
+    unlockAudio();
+    if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    alertButton();
+    setTimeout(chime, 100);                         // a test chime, so the TV's volume can be checked
+  });
 
+  let failures = 0;
   async function loadToday() {
-    try { renderToday(await api('/live')); }
-    catch (e) { banner(`<b>${esc(e.message)}</b>${e.detail ? ` ${esc(e.detail)}` : ''}`); }
+    try { renderToday(await api('/live')); failures = 0; }
+    catch (e) {
+      banner(`<b>${esc(e.message)}</b>${e.detail ? ` ${esc(e.detail)}` : ''}`);
+      // Five failed refreshes in a row (about five minutes) usually means the sign-in has expired: reload the
+      // page so Cloudflare Access can sign in again. At most once every ten minutes, so it can't loop.
+      if (++failures >= 5) {
+        const last = Number(sessionStorage.getItem('transport-reloaded') || 0);
+        if (Date.now() - last > 10 * 60 * 1000) { sessionStorage.setItem('transport-reloaded', String(Date.now())); location.reload(); }
+      }
+    }
   }
+
+  // For a TV: keep the screen on while the Today view is showing, and reload when a new version is published.
+  let wakeLock = null;
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator && !document.hidden && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } }
+    catch { /* not allowed here; the screen may sleep */ }
+  }
+  let pageVersion = null;
+  async function checkVersion() {
+    try {
+      const res = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
+      const v = res.headers.get('etag') || res.headers.get('last-modified');
+      if (!res.ok || !v) return;
+      if (pageVersion && v !== pageVersion) location.reload();
+      pageVersion = v;
+    } catch { /* offline for a moment */ }
+  }
+  checkVersion(); setInterval(checkVersion, 30 * 60 * 1000);
 
   // ---------------------------------------------------------------- Customer drill-down
   let customerOpener = null;
@@ -793,12 +873,16 @@
         const fleet = r.vehicles.reduce((t, v) => t + (v.cost && v.cost.total !== null ? v.cost.total : 0), 0);
         const any = r.vehicles.some((v) => v.cost && v.cost.total !== null);
         const gaps = r.vehicles.some((v) => v.cost && v.cost.missing.length) || r.vehicles.some((v) => !v.cost && v.planned_drops);
-        const ext = (r.external || []).reduce((t, x) => t + (x.cost || 0), 0), jobs = (r.external || []).reduce((t, x) => t + x.jobs, 0);
+        const idle = r.salaries_idle ? r.salaries_idle.idle_cost : 0;
+        const total = fleet + idle;
         const drops = sum(r.vehicles, 'completed_drops');
-        return `<div class="kpi" title="${esc(COST_NOTE)}"><div class="label">Fleet cost</div><div class="value">${any ? money(fleet) : '–'}${gaps ? '<span class="cost-flag">*</span>' : ''}</div>
-          <div class="sub">${any && drops ? `${money2(fleet / drops)} per completed drop` : '<a href="/transport/admin/">Set rates in Admin</a>'}</div></div>
-          <div class="kpi"><div class="label">Couriers and pallets</div><div class="value">${jobs ? money(ext) : '–'}</div>
-          <div class="sub">${jobs ? `${fmtInt(jobs)} unplanned job${jobs === 1 ? '' : 's'}` : 'No unplanned jobs yet'}</div></div>`;
+        return `<div class="kpi" title="${esc(COST_NOTE)}"><div class="label">Fleet cost</div><div class="value">${any ? money(total) : '–'}${gaps ? '<span class="cost-flag">*</span>' : ''}</div>
+          <div class="sub">${any && drops ? `${money2(total / drops)} per completed drop` : '<a href="/transport/pay/">Set pay</a> and <a href="/transport/admin/">rates</a>'}${idle > 0 ? `; includes ${money(idle)} salaried pay on days not driving` : ''}</div></div>`;
+      })() : ''}
+      ${canSeeCouriers && r.external ? (() => {
+        const ext = r.external.by_type.reduce((t, x) => t + (x.cost || 0), 0), jobs = r.external.by_type.reduce((t, x) => t + x.jobs, 0);
+        return `<div class="kpi"><div class="label">Couriers and pallets</div><div class="value">${jobs ? money(ext) : '–'}</div>
+          <div class="sub">${jobs ? `${fmtInt(jobs)} job${jobs === 1 ? '' : 's'}; <a href="#couriers-panel">by reason</a>` : 'No jobs yet'}</div></div>`;
       })() : ''}
       <div class="kpi"><div class="label">Failed deliveries</div><div class="value${failed ? ' bad' : ''}">${fmtInt(failed)}</div>
         <div class="sub">${planned ? `${((failed / planned) * 100).toFixed(1)}% of drops` : ''}</div></div>
@@ -831,6 +915,15 @@
         <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
 
     $('cost-note').hidden = !canSeeCosts;
+    const ext = canSeeCouriers && r.external && r.external.by_type.length ? r.external : null;
+    $('couriers-panel').hidden = !ext;
+    if (ext) {
+      const JOB = { same_day: 'Same day courier', overnight_parcel: 'Overnight parcel', overnight_pallet: 'Overnight pallet', other: 'Other', unclassified: 'Type not set' };
+      $('couriers-type').innerHTML = `<thead><tr><th scope="col">Type</th><th class="n" scope="col">Jobs</th><th class="n" scope="col">Cost</th></tr></thead><tbody>` +
+        ext.by_type.map((x) => `<tr><td data-label="Type">${esc(JOB[x.job_type] || x.job_type)}</td><td class="n" data-label="Jobs">${fmtInt(x.jobs)}</td><td class="n" data-label="Cost">${money(x.cost)}${x.no_cost ? ` <span class="small">${x.no_cost} without a cost</span>` : ''}</td></tr>`).join('') + '</tbody>';
+      $('couriers-reason').innerHTML = `<thead><tr><th scope="col">Reason</th><th class="n" scope="col">Jobs</th><th class="n" scope="col">Cost</th></tr></thead><tbody>` +
+        ext.by_reason.map((x) => `<tr><td data-label="Reason">${x.reason_code === 'none' ? '<span class="muted">No reason given</span>' : `<b>${esc(x.reason_code)}</b> ${esc(x.description)}`}</td><td class="n" data-label="Jobs">${fmtInt(x.jobs)}</td><td class="n" data-label="Cost">${money(x.cost)}</td></tr>`).join('') + '</tbody>';
+    }
     $('trucks').innerHTML = `<thead><tr><th scope="col">Vehicle</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Average day</th><th class="n" scope="col">Utilisation</th><th class="n" scope="col">Average back</th><th class="n" scope="col">Second runs</th><th class="n" scope="col">Planned miles</th><th scope="col">Actual miles</th><th class="n cost-col" scope="col" title="${esc(COST_NOTE)}">Cost</th><th class="n cost-col" scope="col">Cost per drop</th></tr></thead><tbody>` +
       (trucks.length ? trucks.map((v) => `<tr data-row-vehicle="${esc(v.vehicle)}"><td class="lead-cell" data-label="Vehicle">${regButton(v.vehicle)}</td><td class="n" data-label="Days">${v.days}</td><td class="n" data-label="Runs">${fmtInt(v.runs)}</td>
         <td class="n" data-label="Completed drops">${fmtInt(v.completed_drops)}</td><td class="n" data-label="Per day">${fmt1(per(v.completed_drops, v.days))}</td>
@@ -908,11 +1001,11 @@
     $('view-today').hidden = view !== 'today';
     $('view-period').hidden = view === 'today';
     clearInterval(pollTimer);
-    if (view === 'today') { loadToday(); pollTimer = setInterval(loadToday, POLL_MS); }
+    if (view === 'today') { loadToday(); keepAwake(); pollTimer = setInterval(loadToday, POLL_MS); }
     else loadPeriod(['month', 'quarter', 'range'].includes(view) ? view : 'month');
   }
   window.addEventListener('hashchange', show);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('view-today').hidden) loadToday(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('view-today').hidden) { loadToday(); keepAwake(); } });
 
   (async () => {
     try {
@@ -922,7 +1015,10 @@
       $('role').hidden = false;
       $('setup-link').hidden = me.role !== 'admin';
       $('admin-link').hidden = me.role !== 'admin';
-      canSeeCosts = me.role === 'admin';
+      $('pay-link').hidden = !me.pay;
+      $('couriers-link').hidden = !me.couriers;
+      canSeeCosts = Boolean(me.pay);                  // costs include driver pay
+      canSeeCouriers = Boolean(me.couriers || me.pay);
       document.body.classList.toggle('costs', canSeeCosts);
     } catch (e) { banner(`<b>${esc(e.message)}</b>${e.detail ? ` ${esc(e.detail)}` : ''}`); return; }
     alertButton();
