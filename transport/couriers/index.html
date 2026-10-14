@@ -27,7 +27,7 @@
   .tools a { color: var(--white); }
   .role { border: 1px solid rgba(255,255,255,.55); border-radius: 3px; padding: 0 6px; font-size: 12px; font-weight: 700; }
   nav.jump { max-width: 1280px; margin: 0 auto; padding: 12px 20px 0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
-  main { max-width: 1280px; margin: 0 auto; padding: 12px 20px 48px; }
+  main { max-width: 1600px; margin: 0 auto; padding: 12px 20px 48px; }
   section { background: var(--white); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; scroll-margin-top: 12px; }
   .head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 4px; }
   h2 { margin: 0; font-size: 17px; font-weight: 900; color: var(--navy); }
@@ -60,7 +60,19 @@
   .status { font-size: 14px; margin-left: 6px; }
   .big { font-size: 26px; font-weight: 900; color: var(--blue); }
   .gate { max-width: 40em; margin: 40px auto; text-align: center; }
-  #jobs-table td:first-child, #jobs-table td:nth-child(3) { white-space: nowrap; }
+  /* One line per order */
+  #jobs-table { font-size: 13.5px; }
+  #jobs-table th, #jobs-table td { padding: 4px 5px; white-space: nowrap; }
+  #jobs-table select, #jobs-table input { font-size: 13px; padding: 2px 3px; }
+  #jobs-table input[data-f=cost] { width: 4.8em; }
+  #jobs-table input[data-f=notes] { width: 7.5em; }
+  #jobs-table .cust { max-width: 11em; overflow: hidden; text-overflow: ellipsis; }
+  #jobs-table .reqs { max-width: 7.5em; overflow: hidden; text-overflow: ellipsis; }
+  #jobs-table .x { padding: 2px 7px; }
+  @media (max-width: 1340px) { #jobs-table .ord { display: none; } }   /* smaller screens: the order date moves into the delivery date's tooltip */
+  #jobs-table .muted { color: var(--muted); }
+  #jobs-table button { padding: 2px 9px; font-size: 13px; }
+  #jobs-table .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin-left: 4px; font-weight: 400; }
   #jobs-table tr.needs td { background: #fdf3f2; }
   #jobs-table tr.needs td:first-child { box-shadow: inset 4px 0 0 var(--bad); }
   .chip { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
@@ -154,8 +166,12 @@
 
   const JOB = { same_day: 'Same day courier', overnight_parcel: 'Overnight parcel', overnight_pallet: 'Overnight pallet', other: 'Other' };
   let state = null;
-  const typeOptions = (v) => `<option value="">Choose</option>` + Object.entries(JOB).map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${l}</option>`).join('');
-  const reasonOptions = (v) => `<option value="">None</option>` + state.codes.filter((c) => c.active || c.code === v).map((c) => `<option value="${esc(c.code)}"${c.code === v ? ' selected' : ''}>${esc(c.code)}: ${esc(c.description)}</option>`).join('');
+  const SHORT = { same_day: 'Same day', overnight_parcel: 'Parcel', overnight_pallet: 'Pallet', other: 'Other' };
+  const typeOptions = (v, short) => `<option value="">Choose</option>` + Object.entries(short ? SHORT : JOB).map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${l}</option>`).join('');
+  const reasonOptions = (v) => `<option value="">None</option>` + state.codes.filter((c) => c.active || c.code === v).map((c) => `<option value="${esc(c.code)}"${c.code === v ? ' selected' : ''}>${esc(c.code)} ${esc(c.description)}</option>`).join('');
+  // 14 Oct (the year only when it isn't this year)
+  const dayMonth = (iso) => { if (!iso) return '–'; const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(d.getUTCFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}), timeZone: 'UTC' }); };
 
   function render() {
     const s = state;
@@ -192,25 +208,33 @@
       const total = r.jobs.reduce((t, j) => t + (j.job_cost || 0), 0);
       const waiting = r.jobs.filter((j) => j.needs.length).length;
       $('jobs-total').textContent = r.jobs.length ? `${r.jobs.length} order${r.jobs.length > 1 ? 's' : ''}, ${gbp(total)}${waiting ? `; ${waiting} still need a reason or cost` : ''}` : '';
-      const NEED = { reason: 'Needs reason', cost: 'Needs cost' };
-      $('jobs-table').innerHTML = `<thead><tr><th title="The day MaxOptra had the order down for delivery">Delivery date</th><th>Order and customer</th><th>Postcode</th><th>Vehicle requirements</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody>` +
-        (r.jobs.length ? r.jobs.map((j) => `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}" class="${j.needs.length ? 'needs' : ''}">
-          <td>${longDate(j.job_date)}${j.order_date && j.order_date !== j.job_date ? `<span class="current">Ordered ${longDate(j.order_date)}</span>` : ''}</td>
-          <td><b>${esc(j.order_ref)}</b><span class="current">${esc(j.client_name || (j.customer_no ? `Customer ${j.customer_no}` : '–'))}${j.client_name && j.customer_no ? ` (${esc(j.customer_no)})` : ''}</span>
-            <span class="current">${j.source === 'manual' ? 'Added by hand' : `From MaxOptra${j.depot ? `, ${esc(j.depot)}` : ''}`}</span></td>
+      const need = (n) => (n.length === 2 ? 'Reason, cost' : n[0] === 'reason' ? 'Reason' : 'Cost');
+      $('jobs-table').innerHTML = `<thead><tr><th title="The day MaxOptra had the order down for delivery">Delivery</th><th class="ord">Ordered</th><th>Order</th><th>Customer</th><th>Postcode</th>
+        <th>Requirements</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th title="What the order still needs">Needs</th><th class="edit-only"></th></tr></thead><tbody>` +
+        (r.jobs.length ? r.jobs.map((j) => {
+          const customer = j.client_name || (j.customer_no ? `Customer ${j.customer_no}` : '–');
+          const costHint = j.cost_is_default ? (j.job_cost !== null ? `Default price for this type: ${gbp(j.job_cost)}` : 'No default price for this type: enter a cost') : 'Cost entered for this order';
+          return `<tr data-ref="${esc(j.order_ref)}" data-date="${j.job_date}" class="${j.needs.length ? 'needs' : ''}">
+          <td title="${j.order_date ? `Ordered ${esc(longDate(j.order_date))}` : ''}">${dayMonth(j.job_date)}</td>
+          <td class="muted ord">${j.order_date ? dayMonth(j.order_date) : '–'}</td>
+          <td title="${esc(j.source === 'manual' ? 'Added by hand' : `From MaxOptra${j.depot ? `, ${j.depot}` : ''}`)}"><b>${esc(j.order_ref)}</b>${j.source === 'manual' ? '<span class="tag">by hand</span>' : ''}</td>
+          <td class="cust" title="${esc(customer)}${j.client_name && j.customer_no ? ` (${esc(j.customer_no)})` : ''}">${esc(customer)}</td>
           <td>${esc(j.location_postcode || '–')}</td>
-          <td>${j.vehicle_requirements === '' ? '<span class="muted">None</span>' : esc(j.vehicle_requirements || '–')}</td>
-          <td><select data-f="job_type" aria-label="Type for ${esc(j.order_ref)}">${typeOptions(j.job_type)}</select></td>
+          <td class="reqs" title="${esc(j.vehicle_requirements || '')}">${j.vehicle_requirements === '' ? '<span class="muted">None</span>' : esc(j.vehicle_requirements || '–')}</td>
+          <td><select data-f="job_type" aria-label="Type for ${esc(j.order_ref)}">${typeOptions(j.job_type, true)}</select></td>
           <td><select data-f="reason_code" aria-label="Reason for ${esc(j.order_ref)}">${reasonOptions(j.reason_code)}</select></td>
-          <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" aria-label="Cost for ${esc(j.order_ref)}">
-            <span class="current">${j.cost_is_default ? (j.job_cost !== null ? 'Default price' : 'No default set') : 'Own cost'}</span></td>
-          <td><input type="text" data-f="notes" value="${esc(j.notes || '')}" size="18" aria-label="Notes for ${esc(j.order_ref)}"></td>
-          <td>${j.needs.length ? j.needs.map((n) => `<span class="chip todo">${NEED[n]}</span>`).join(' ') : '<span class="chip done">Complete</span>'}</td>
-          <td class="edit-only" style="white-space:nowrap"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost" data-remove-job>Remove</button>' : ''}</td></tr>`).join('')
-          : `<tr><td colspan="10" class="muted">${$('jobs-todo').checked ? 'Nothing waiting for a reason or cost in these dates.' : 'No orders in these dates.'}</td></tr>`) + '</tbody>';
+          <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" title="${esc(costHint)}" aria-label="Cost for ${esc(j.order_ref)}"></td>
+          <td><input type="text" data-f="notes" value="${esc(j.notes || '')}" aria-label="Notes for ${esc(j.order_ref)}"></td>
+          <td>${j.needs.length ? `<span class="chip todo">${need(j.needs)}</span>` : '<span class="chip done">Done</span>'}</td>
+          <td class="edit-only"><button class="ghost" data-save-job>Save</button>${j.source === 'manual' ? ' <button class="ghost x" data-remove-job title="Remove this order" aria-label="Remove ${esc(j.order_ref)}">×</button>' : ''}</td></tr>`;
+        }).join('')
+          : `<tr><td colspan="12" class="muted">${$('jobs-todo').checked ? 'Nothing waiting for a reason or cost in these dates.' : 'No orders in these dates.'}</td></tr>`) + '</tbody>';
     } catch (e) { $('jobs-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
   }
   $('jobs-show').addEventListener('click', loadJobs);
+  $('jobs-table').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('input[data-f]')) { e.preventDefault(); const b = e.target.closest('tr').querySelector('[data-save-job]'); if (b) b.click(); }
+  });
   $('jobs-todo').addEventListener('change', loadJobs);
 
   $('jobs-table').addEventListener('click', async (e) => {
