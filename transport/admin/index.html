@@ -76,7 +76,7 @@
 <div id="app" hidden>
   <nav class="jump" aria-label="Sections">
     <a href="/transport/fuel/">Fuel price</a><a href="#drivers">Drivers</a><a href="#vehicles">Vehicles</a>
-    <a href="#users">Users</a><a href="#changes">Recent changes</a>
+    <a href="#one-offs">One-off vehicle costs</a><a href="#users">Users</a><a href="#changes">Recent changes</a>
   </nav>
   <main>
     <div class="banner" id="error" hidden></div>
@@ -95,12 +95,28 @@
     </section>
 
     <section id="vehicles" aria-labelledby="vehicles-title">
-      <div class="head"><h2 id="vehicles-title">Vehicles</h2><span class="note">Lease is charged for every weekday; fuel uses the vehicle's MPG and the week's fuel price</span></div>
+      <div class="head"><h2 id="vehicles-title">Vehicles</h2><span class="note">Lease and insurance are spread over each month's weekdays, whether or not the vehicle runs. Day hire only counts on days it's used. Fuel uses the MPG and the week's fuel price.</span></div>
       <div class="pad">
         <div class="row"><label>New rates apply from <input type="date" id="vehicles-from"></label>
           <span class="note">When a vehicle goes back, set its lease to 0 from that date.</span></div>
         <div class="table-wrap"><table id="vehicles-table"></table></div>
         <div class="row"><button id="vehicles-save">Save vehicles</button><span class="status" id="vehicles-status" aria-live="polite"></span></div>
+      </div>
+    </section>
+
+    <section id="one-offs" aria-labelledby="one-offs-title">
+      <div class="head"><h2 id="one-offs-title">One-off vehicle costs</h2><span class="note">Repairs, maintenance, one-off insurance charges and anything else, entered one at a time</span></div>
+      <div class="pad">
+        <div class="row">
+          <label>Date <input type="date" id="oc-date"></label>
+          <label>Vehicle <select id="oc-vehicle"></select></label>
+          <label>For <select id="oc-category"><option value="repair">Repair</option><option value="maintenance">Maintenance</option><option value="insurance">Insurance</option><option value="other">Other</option></select></label>
+          <label>£ <input type="number" min="0" step="0.01" id="oc-amount"></label>
+          <label>Details <input type="text" id="oc-desc" size="28" placeholder="e.g. new clutch"></label>
+          <button id="oc-add">Add cost</button><span class="status" id="oc-status" aria-live="polite"></span>
+        </div>
+        <div class="row"><label>Show from <input type="date" id="oc-from"></label><label>to <input type="date" id="oc-to"></label><button class="ghost" id="oc-show">Show</button><span class="note" id="oc-total"></span></div>
+        <div class="table-wrap"><table id="oc-table"></table></div>
       </div>
     </section>
 
@@ -171,15 +187,20 @@
     // vehicles
     const anyVehicleRate = s.vehicles.some((v) => v.lease_monthly || v.hire_daily || v.mpg);
     if (!$('vehicles-from').value) $('vehicles-from').value = anyVehicleRate ? s.today : s.history_start;
-    $('vehicles-table').innerHTML = `<thead><tr><th>Vehicle</th><th>Type</th><th>In KPIs</th><th class="n">Lease £ a month</th><th class="n">Hire £ a day</th><th class="n">MPG</th><th>Last ran</th></tr></thead><tbody>` +
+    $('vehicles-table').innerHTML = `<thead><tr><th>Vehicle</th><th>Type</th><th>In KPIs</th><th class="n">Lease £ a month</th><th class="n">Insurance £ a month</th><th class="n">Hire £ a day</th><th class="n">MPG</th><th>Last ran</th></tr></thead><tbody>` +
       s.vehicles.map((v) => `<tr data-id="${v.id}">
         <td><b>${esc(v.vehicle)}</b>${v.maxoptra_name !== v.vehicle ? `<span class="current">${esc(v.maxoptra_name)} in MaxOptra</span>` : ''}</td>
         <td><select data-f="vehicle_type">${options(TYPE_V, v.vehicle_type)}</select></td>
         <td><input type="checkbox" data-f="kpi_included"${v.kpi_included ? ' checked' : ''} aria-label="Include ${esc(v.vehicle)} in KPIs"></td>
         <td class="n"><input type="number" min="0" step="0.01" data-f="lease_monthly" aria-label="Monthly lease for ${esc(v.vehicle)}">${rateNote(v.lease_monthly)}</td>
-        <td class="n"><input type="number" min="0" step="0.01" data-f="hire_daily" aria-label="Daily hire for ${esc(v.vehicle)}">${v.hire_daily ? rateNote(v.hire_daily) : '<span class="current">Only for hired vehicles</span>'}</td>
+        <td class="n"><input type="number" min="0" step="0.01" data-f="insurance_monthly" aria-label="Monthly insurance for ${esc(v.vehicle)}">${rateNote(v.insurance_monthly)}</td>
+        <td class="n"><input type="number" min="0" step="0.01" data-f="hire_daily" aria-label="Daily hire for ${esc(v.vehicle)}">${v.hire_daily ? rateNote(v.hire_daily) : '<span class="current">Only for hired vehicles, days used</span>'}</td>
         <td class="n"><input type="number" min="1" step="0.1" data-f="mpg" aria-label="MPG for ${esc(v.vehicle)}">${rateNote(v.mpg, 'mpg')}</td>
         <td>${v.last_run ? longDate(v.last_run) : '<span class="muted">Never</span>'}</td></tr>`).join('') + '</tbody>';
+
+    // one-off costs: vehicles to choose from, and dates
+    $('oc-vehicle').innerHTML = vehicleOptions(null);
+    if (!$('oc-date').value) { $('oc-date').value = s.today; $('oc-from').value = s.today.slice(0, 8) + '01'; $('oc-to').value = s.today; loadCosts(); }
 
     // users
     $('users-table').innerHTML = `<thead><tr><th>Email</th><th>Role</th><th>Courier access</th><th>Active</th><th></th></tr></thead><tbody>` +
@@ -191,7 +212,7 @@
 
     // recent changes
     const what = (h) => h.subject_type === 'fuel' ? 'Fuel price per litre'
-      : `${h.subject || '–'}: ${({ lease_monthly: 'lease a month', hire_daily: 'hire a day', mpg: 'MPG' })[h.rate_type] || h.rate_type}`;
+      : `${h.subject || '–'}: ${({ lease_monthly: 'lease a month', insurance_monthly: 'insurance a month', hire_daily: 'hire a day', mpg: 'MPG' })[h.rate_type] || h.rate_type}`;
     $('changes-table').innerHTML = s.history.length
       ? `<thead><tr><th>When</th><th>Who</th><th>What</th><th class="n">Value</th><th>Applies from</th></tr></thead><tbody>` +
         s.history.map((h) => `<tr><td>${new Date(h.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' })}</td><td>${esc(h.created_by || '–')}</td>
@@ -242,7 +263,7 @@
         const id = Number(tr.dataset.id); const v = state.vehicles.find((x) => x.id === id);
         const type = tr.querySelector('[data-f=vehicle_type]').value, kpi = tr.querySelector('[data-f=kpi_included]').checked;
         if (type !== v.vehicle_type || kpi !== v.kpi_included) await api('/admin/vehicle', { id, vehicle_type: type, kpi_included: kpi, notes: v.notes });
-        for (const k of ['lease_monthly', 'hire_daily', 'mpg']) {
+        for (const k of ['lease_monthly', 'insurance_monthly', 'hire_daily', 'mpg']) {
           const val = tr.querySelector(`[data-f=${k}]`).value;
           if (val !== '') rates.push({ subject_type: 'vehicle', subject_id: id, rate_type: k, value: Number(val) });
         }
@@ -250,6 +271,53 @@
       if (rates.length) { if (!from) throw new Error('Choose the date the new rates apply from'); await api('/admin/rates', { effective_from: from, rates }); }
       await load(); say('vehicles-status', `Saved ${rows.length} vehicle${rows.length > 1 ? 's' : ''}`);
     } catch (e) { say('vehicles-status', e.message, true); }
+  });
+
+  // ----- one-off vehicle costs -----
+  const CAT = { repair: 'Repair', maintenance: 'Maintenance', insurance: 'Insurance', other: 'Other' };
+  async function loadCosts() {
+    try {
+      const r = await api(`/admin/vehicle-costs?from=${$('oc-from').value}&to=${$('oc-to').value}`);
+      $('oc-total').textContent = r.costs.length ? `${r.costs.length} cost${r.costs.length > 1 ? 's' : ''}, ${gbp(r.costs.reduce((t, c) => t + c.amount, 0))}` : '';
+      $('oc-table').innerHTML = r.costs.length
+        ? `<thead><tr><th>Date</th><th>Vehicle</th><th>For</th><th class="n">£</th><th>Details</th><th>Entered by</th><th></th></tr></thead><tbody>` +
+          r.costs.map((c) => `<tr data-cost="${c.id}"><td>${longDate(c.date)}</td><td><b>${esc(c.vehicle)}</b></td><td>${CAT[c.category] || esc(c.category)}</td><td class="n">${gbp(c.amount)}</td>
+            <td>${esc(c.description || '')}</td><td>${esc(c.by || '–')}</td><td style="white-space:nowrap"><button class="ghost" data-edit>Change</button> <button class="ghost" data-delete>Delete</button></td></tr>`).join('') + '</tbody>'
+        : '<tbody><tr><td class="muted">No one-off costs in these dates.</td></tr></tbody>';
+      costs = r.costs;
+    } catch (e) { $('oc-table').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
+  }
+  let costs = [];
+  function vehicleOptions(sel) { return state.vehicles.map((v) => `<option value="${v.id}"${v.id === sel ? ' selected' : ''}>${esc(v.vehicle)}</option>`).join(''); }
+  $('oc-add').addEventListener('click', async () => {
+    try {
+      await api('/admin/vehicle-cost', { cost_date: $('oc-date').value, vehicle_id: Number($('oc-vehicle').value), category: $('oc-category').value,
+                                          amount: $('oc-amount').value, description: $('oc-desc').value });
+      $('oc-amount').value = ''; $('oc-desc').value = ''; await loadCosts(); say('oc-status', 'Added');
+    } catch (e) { say('oc-status', e.message, true); }
+  });
+  $('oc-show').addEventListener('click', loadCosts);
+  $('oc-table').addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr[data-cost]'); if (!tr) return;
+    const id = Number(tr.dataset.cost); const c = costs.find((x) => x.id === id);
+    if (e.target.closest('[data-delete]')) {
+      if (!confirm(`Delete the ${gbp(c.amount)} ${CAT[c.category].toLowerCase()} cost for ${c.vehicle} on ${longDate(c.date)}?`)) return;
+      try { await api('/admin/vehicle-cost/delete', { id }); await loadCosts(); say('oc-status', 'Deleted'); } catch (err) { say('oc-status', err.message, true); }
+      return;
+    }
+    if (e.target.closest('[data-edit]')) {
+      tr.innerHTML = `<td><input type="date" data-k="date" value="${c.date}"></td><td><select data-k="vehicle">${vehicleOptions(c.vehicle_id)}</select></td>
+        <td><select data-k="category">${Object.entries(CAT).map(([k, v]) => `<option value="${k}"${k === c.category ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
+        <td class="n"><input type="number" min="0" step="0.01" data-k="amount" value="${c.amount}" style="width:7em"></td><td><input type="text" data-k="desc" value="${esc(c.description || '')}" size="24"></td><td></td>
+        <td style="white-space:nowrap"><button data-ok>Save</button> <button class="ghost" data-cancel>Cancel</button></td>`;
+      tr.querySelector('[data-cancel]').addEventListener('click', loadCosts);
+      tr.querySelector('[data-ok]').addEventListener('click', async () => {
+        const k = (x) => tr.querySelector(`[data-k=${x}]`).value;
+        try { await api('/admin/vehicle-cost', { id, cost_date: k('date'), vehicle_id: Number(k('vehicle')), category: k('category'), amount: k('amount'), description: k('desc') });
+              await loadCosts(); say('oc-status', 'Changed'); }
+        catch (err) { say('oc-status', err.message, true); }
+      });
+    }
   });
 
   $('users-table').addEventListener('click', async (e) => {

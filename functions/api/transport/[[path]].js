@@ -295,10 +295,15 @@ const BACK_AFTER_ESTIMATE = 30; // returning, and this long past the estimated r
 
 export function runState(run, now) {
   // MaxOptra sometimes records a return earlier than the run's last job (seen on second runs): ignore it.
-  const actualEnd = run.actual_end && (!run.last_departure || run.actual_end >= run.last_departure) ? run.actual_end : null;
+  const lastSeen = run.finish_seen || run.last_departure;
+  const actualEnd = run.actual_end && (!lastSeen || run.actual_end >= lastSeen) ? run.actual_end : null;
   const leg = minutesBetween(run.last_stop_planned_departure, run.planned_end);
-  const estimatedReturn = run.stops > 0 && run.stops_open === 0 && run.last_departure && leg !== null && leg >= 0 && leg <= 300
-    ? addMinutes(run.last_departure, leg) : null;
+  // all jobs done: when he left the stop he actually finished at (whatever order he took), plus the drive home
+  // from that stop (transport.run_finish); otherwise the old way, from the last departure and the plan's last leg
+  const estimatedReturn = !(run.stops > 0 && run.stops_open === 0) ? null
+    : (run.finish_left && run.home_minutes !== null && run.home_minutes !== undefined && run.home_minutes >= 0 && run.home_minutes <= 300)
+      ? addMinutes(run.finish_left, Math.round(run.home_minutes))
+      : (run.last_departure && leg !== null && leg >= 0 && leg <= 300 ? addMinutes(run.last_departure, leg) : null);
   const started = Boolean(run.actual_departure || run.first_arrival || run.stops_open < run.stops);
   let status;
   let variance = null;                           // minutes: positive = ahead of plan
@@ -358,7 +363,7 @@ export function buildLive(runs, now) {
       open_drops: r.open_drops, closed_no_items: r.closed_no_items,
       planned_departure: clock(r.planned_departure), actual_departure: clock(r.actual_departure),
       planned_return: clock(r.planned_end), actual_return: clock(state.actual_end),
-      estimated_return: clock(state.estimated_return), last_job: clock(r.last_departure),
+      estimated_return: clock(state.estimated_return), last_job: clock(r.finish_seen || r.last_departure),
       expected_return: clock(state.expected_return), expected_late_by: state.expected_vs_plan, resequenced: state.resequenced,
       on_site_client: r.on_site_client, on_site_since: clock(r.on_site_since),
       next_client: r.next_client, next_due: clock(r.next_eta || r.next_planned),
@@ -407,23 +412,23 @@ export function buildLive(runs, now) {
 // (lease or hire, and fuel). Driver pay, and any total that includes it, goes only to people with pay access:
 // a van's daily cost would otherwise reveal its driver's pay.
 const RUN_COSTS = `
-  select run_key, driver_cost::float8, lease_cost::float8, fuel_cost::float8, fuel_miles::float8, fuel_on_actual,
+  select run_key, driver_cost::float8, lease_cost::float8, hire_cost::float8, fuel_cost::float8, fuel_miles::float8, fuel_on_actual,
          driver_rate_missing, lease_missing, mpg_missing, fuel_price_missing
   from transport.run_costs($1::date, $2::date)`;
 
 function costOf(c, withPay) {
   if (!c) return null;
-  const parts = withPay ? [c.driver_cost, c.lease_cost, c.fuel_cost] : [c.lease_cost, c.fuel_cost];
-  const missing = [withPay && c.driver_rate_missing && 'driver pay', c.lease_missing && 'lease', c.mpg_missing && 'MPG', c.fuel_price_missing && 'fuel price'].filter(Boolean);
+  const parts = withPay ? [c.driver_cost, c.lease_cost, c.hire_cost, c.fuel_cost] : [c.lease_cost, c.hire_cost, c.fuel_cost];
+  const missing = [withPay && c.driver_rate_missing && 'driver pay', c.lease_missing && 'lease or hire', c.mpg_missing && 'MPG', c.fuel_price_missing && 'fuel price'].filter(Boolean);
   return { total: parts.some((x) => x !== null) ? parts.reduce((t, x) => t + (x || 0), 0) : null,
-           ...(withPay ? { driver: c.driver_cost } : {}), lease: c.lease_cost, fuel: c.fuel_cost, fuel_miles: c.fuel_miles,
+           ...(withPay ? { driver: c.driver_cost } : {}), lease: c.lease_cost, hire: c.hire_cost, fuel: c.fuel_cost, fuel_miles: c.fuel_miles,
            fuel_on_actual: c.fuel_on_actual, includes_pay: Boolean(withPay), missing };
 }
 function addCosts(a, b) {
   if (!b) return a;
   if (!a) return { ...b, missing: [...b.missing] };
   const add = (x, y) => (x === null && y === null ? null : (x || 0) + (y || 0));
-  const out = { total: add(a.total, b.total), lease: add(a.lease, b.lease), fuel: add(a.fuel, b.fuel),
+  const out = { total: add(a.total, b.total), lease: add(a.lease, b.lease), hire: add(a.hire ?? null, b.hire ?? null), fuel: add(a.fuel, b.fuel),
                 fuel_miles: add(a.fuel_miles, b.fuel_miles), fuel_on_actual: a.fuel_on_actual && b.fuel_on_actual,
                 includes_pay: a.includes_pay, missing: [...new Set([...a.missing, ...b.missing])] };
   if ('driver' in a || 'driver' in b) out.driver = add(a.driver ?? null, b.driver ?? null);
@@ -431,10 +436,17 @@ function addCosts(a, b) {
 }
 
 // A whole day: vehicles, their runs (with live status as at `stamp`) and every stop on each run.
+const RUN_FINISH = `
+  select r.run_key, f.last_seen::text as finish_seen, f.left_at::text as finish_left, f.home_minutes::float8 as home_minutes
+  from transport.runs r cross join lateral transport.run_finish(r.run_key) f
+  where r.run_date = $1 and r.removed_at is null`;
+
 async function dayData(sql, date, stamp, withPay) {
-  const [runs, stops, costs] = await Promise.all([
-    sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date]), sql.query(RUN_COSTS, [date, date]),
+  const [runs, stops, costs, finish] = await Promise.all([
+    sql.query(LIVE_RUNS, [date]), sql.query(STOPS, [date]), sql.query(RUN_COSTS, [date, date]), sql.query(RUN_FINISH, [date]),
   ]);
+  const finishBy = new Map(finish.map((f) => [f.run_key, f]));
+  for (const r of runs) Object.assign(r, finishBy.get(r.run_key) || {});
   const built = buildLive(runs, stamp);
   const byRun = new Map();
   for (const st of stops) {
@@ -654,43 +666,52 @@ async function report(url, sql, user) {
     ]);
     external = { by_type: byType, by_reason: byReason };
   }
+  let oneOffs = [];
   {
-    const [plus, lease, salaries] = await Promise.all([
+    const [plus, fixed, idle, extras] = await Promise.all([
       sql.query(`
         select coalesce(v.display_name, v.maxoptra_name) as vehicle,
-          sum(c.driver_cost)::float8 as driver, sum(c.fuel_cost)::float8 as fuel, sum(c.fuel_miles)::float8 as fuel_miles,
+          sum(c.driver_cost)::float8 as driver, sum(c.hire_cost)::float8 as hire, sum(c.fuel_cost)::float8 as fuel, sum(c.fuel_miles)::float8 as fuel_miles,
           (count(*) filter (where c.fuel_on_actual))::int as runs_fuel_actual, count(*)::int as runs,
           (count(*) filter (where c.driver_rate_missing))::int as runs_no_driver_rate,
-          bool_or(c.mpg_missing) as mpg_missing, bool_or(c.fuel_price_missing) as fuel_price_missing
+          bool_or(c.mpg_missing) as mpg_missing, bool_or(c.fuel_price_missing) as fuel_price_missing,
+          bool_and(c.lease_missing) as lease_missing
         from transport.run_costs($1::date, $2::date) c join transport.vehicles v on v.id = c.vehicle_id
         group by 1`, [from, to]),
-      sql.query(`select coalesce(v.display_name, v.maxoptra_name) as vehicle, p.lease_cost::float8 as lease, p.weekdays
-                 from transport.period_lease($1::date, $2::date) p join transport.vehicles v on v.id = p.vehicle_id`, [from, to]),
-      // salaried drivers are paid every weekday; what isn't already in a run's cost is non-driving days
-      sql.query(`
-        with paid as (select driver_id, salary_cost from transport.period_salaries($1::date, $2::date)),
-             used as (select driver_id, sum(driver_cost) as allocated from transport.run_costs($1::date, $2::date)
-                      where driver_basis = 'salary_monthly' group by 1)
-        select coalesce(sum(greatest(p.salary_cost - coalesce(u.allocated, 0), 0)), 0)::float8 as idle_cost,
-               count(*)::int as salaried_drivers
-        from paid p left join used u using (driver_id)`, [from, to]).then((r) => (withPay ? r : [null])),
+      sql.query(`select coalesce(v.display_name, v.maxoptra_name) as vehicle, p.fixed_cost::float8 as fixed, p.weekdays
+                 from transport.period_vehicle_fixed($1::date, $2::date) p join transport.vehicles v on v.id = p.vehicle_id`, [from, to]),
+      // driver pay not in any run's cost: employees' weekdays not driving, part-timers' guaranteed days not worked
+      withPay ? sql.query(`select basis, sum(idle_cost)::float8 as idle_cost, count(*)::int as drivers
+                           from transport.period_driver_idle($1::date, $2::date) group by basis`, [from, to]) : Promise.resolve([]),
+      sql.query(`select c.id::int, c.cost_date::text as date, coalesce(v.display_name, v.maxoptra_name) as vehicle, c.category,
+                        c.amount::float8 as amount, c.description
+                 from transport.vehicle_costs c join transport.vehicles v on v.id = c.vehicle_id
+                 where c.cost_date between $1 and $2 order by c.cost_date desc, c.id desc`, [from, to]),
     ]);
-    salariesIdle = withPay ? salaries[0] : null;
+    oneOffs = extras;
+    if (withPay) {
+      const by = Object.fromEntries(idle.map((x) => [x.basis, x]));
+      salariesIdle = { idle_cost: idle.reduce((t, x) => t + (x.idle_cost || 0), 0),
+                       monthly: by.monthly ? by.monthly.idle_cost : 0, part_time: by.part_time ? by.part_time.idle_cost : 0 };
+    }
     const plusBy = Object.fromEntries(plus.map((c) => [c.vehicle, c]));
-    const leaseBy = Object.fromEntries(lease.map((c) => [c.vehicle, c]));
+    const fixedBy = Object.fromEntries(fixed.map((c) => [c.vehicle, c]));
+    const extraBy = {};
+    for (const e of extras) extraBy[e.vehicle] = (extraBy[e.vehicle] || 0) + e.amount;
     for (const v of vehicles) {
       const c = plusBy[v.vehicle];
-      const l = leaseBy[v.vehicle];
-      if (!c && !l) { v.cost = null; continue; }
+      const f = fixedBy[v.vehicle];
+      const one = extraBy[v.vehicle] ?? null;
+      if (!c && !f && one === null) { v.cost = null; continue; }
       const missing = [];
       if (withPay && c && c.runs_no_driver_rate) missing.push(`driver pay on ${c.runs_no_driver_rate} run${c.runs_no_driver_rate === 1 ? '' : 's'}`);
-      if (!l) missing.push('lease');
+      if (!f && !(c && c.hire)) missing.push('lease or hire');
       if (c && c.mpg_missing) missing.push('MPG');
       if (c && c.fuel_price_missing) missing.push('fuel price');
-      const parts = [withPay && c ? c.driver : null, l ? l.lease : null, c ? c.fuel : null];
+      const parts = [withPay && c ? c.driver : null, f ? f.fixed : null, c ? c.hire : null, c ? c.fuel : null, one];
       v.cost = { total: parts.some((x) => x !== null) ? parts.reduce((t, x) => t + (x || 0), 0) : null,
-                 ...(withPay ? { driver: c ? c.driver : null } : {}), lease: l ? l.lease : null, lease_weekdays: l ? l.weekdays : 0,
-                 fuel: c ? c.fuel : null, fuel_miles: c ? c.fuel_miles : null, includes_pay: Boolean(withPay),
+                 ...(withPay ? { driver: c ? c.driver : null } : {}), lease: f ? f.fixed : null, lease_weekdays: f ? f.weekdays : 0,
+                 hire: c ? c.hire : null, one_off: one, fuel: c ? c.fuel : null, fuel_miles: c ? c.fuel_miles : null, includes_pay: Boolean(withPay),
                  runs_fuel_actual: c ? c.runs_fuel_actual : 0, runs: c ? c.runs : 0, missing };
     }
   }
@@ -704,7 +725,7 @@ async function report(url, sql, user) {
       ? Math.round(((v.avg_day_minutes + (h.prep_minutes ?? 25) - h.break_minutes) / h.net_minutes) * 100) : null;
   }
   return json({ from, to, vehicles, drivers, failures, daily, vehicle_daily: vehicleDaily, missing_weekdays: missing.map((m) => m.date),
-                external, ...(withPay ? { salaries_idle: salariesIdle } : {}) });
+                external, one_offs: oneOffs, ...(withPay ? { salaries_idle: salariesIdle } : {}) });
 }
 
 // ---------------------------------------------------------------------------
@@ -712,7 +733,7 @@ async function report(url, sql, user) {
 // ---------------------------------------------------------------------------
 
 const RATE_TYPES = {
-  driver: ['day_rate', 'salary_monthly'], vehicle: ['lease_monthly', 'hire_daily', 'mpg'], fuel: ['price_per_litre'],
+  driver: ['day_rate', 'salary_monthly'], vehicle: ['lease_monthly', 'insurance_monthly', 'hire_daily', 'mpg'], fuel: ['price_per_litre'],
   external: ['same_day', 'overnight_parcel', 'overnight_pallet', 'other'],
 };
 const VEHICLE_TYPES = ['full_time_van', 'truck', 'support', 'temporary', 'excluded', 'unclassified'];
@@ -837,6 +858,69 @@ async function saveFuelPrice(request, sql, user) {
   return json({ saved: price, week_start: b.week_start });
 }
 
+async function updateFuelPrice(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  const price = Number(b.price);
+  if (!isDate(b.old_week_start) || !isDate(b.week_start)) return fail(400, 'Choose the week the price is for');
+  if (!(price > 0) || price > 10) return fail(400, 'Enter the price per litre in pounds, for example 1.429');
+  if (b.week_start !== b.old_week_start) {
+    const clash = await sql.query(`select 1 from transport.cost_rates where subject_type = 'fuel' and rate_type = 'price_per_litre' and effective_from = $1`, [b.week_start]);
+    if (clash.length) return fail(409, 'There is already a price for that week: change or delete that one instead');
+  }
+  const rows = await sql.query(
+    `update transport.cost_rates set effective_from = $2, value = $3, created_by = $4, created_at = now()
+     where subject_type = 'fuel' and rate_type = 'price_per_litre' and effective_from = $1 returning id`,
+    [b.old_week_start, b.week_start, price, user.email]);
+  return rows.length ? json({ saved: price }) : fail(404, 'That price no longer exists');
+}
+
+async function deleteFuelPrice(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  if (!isDate(b.week_start)) return fail(400, 'Not a fuel price');
+  const rows = await sql.query(`delete from transport.cost_rates where subject_type = 'fuel' and rate_type = 'price_per_litre' and effective_from = $1 returning id`, [b.week_start]);
+  return rows.length ? json({ deleted: b.week_start }) : fail(404, 'That price no longer exists');
+}
+
+// One-off vehicle costs: repairs, maintenance, one-off insurance and so on, entered one at a time.
+const COST_CATEGORIES = ['insurance', 'repair', 'maintenance', 'other'];
+async function vehicleCosts(url, sql) {
+  const from = url.searchParams.get('from'), to = url.searchParams.get('to');
+  if (!isDate(from) || !isDate(to)) return fail(400, 'Give from and to as YYYY-MM-DD');
+  const costs = await sql.query(`
+    select c.id::int, c.vehicle_id, coalesce(v.display_name, v.maxoptra_name) as vehicle, c.cost_date::text as date, c.category,
+           c.amount::float8 as amount, c.description, coalesce(c.updated_by, c.created_by) as by
+    from transport.vehicle_costs c join transport.vehicles v on v.id = c.vehicle_id
+    where c.cost_date between $1 and $2 order by c.cost_date desc, c.id desc limit 1000`, [from, to]);
+  return json({ from, to, costs });
+}
+
+async function saveVehicleCost(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  const amount = b.amount === '' || b.amount === null || b.amount === undefined ? NaN : Number(b.amount);
+  if (!Number.isInteger(b.vehicle_id)) return fail(400, 'Choose a vehicle');
+  if (!isDate(b.cost_date)) return fail(400, 'Choose the date of the cost');
+  if (!COST_CATEGORIES.includes(b.category)) return fail(400, 'Choose what the cost was for');
+  if (!(Number.isFinite(amount) && amount >= 0)) return fail(400, 'Enter the amount');
+  const desc = b.description ? String(b.description).slice(0, 300) : null;
+  if (Number.isInteger(b.id)) {
+    const rows = await sql.query(
+      `update transport.vehicle_costs set vehicle_id = $2, cost_date = $3, category = $4, amount = $5, description = $6, updated_by = $7, updated_at = now()
+       where id = $1 returning id`, [b.id, b.vehicle_id, b.cost_date, b.category, amount, desc, user.email]);
+    return rows.length ? json({ saved: b.id }) : fail(404, 'That cost no longer exists');
+  }
+  const rows = await sql.query(
+    `insert into transport.vehicle_costs (vehicle_id, cost_date, category, amount, description, created_by) values ($1, $2, $3, $4, $5, $6) returning id::int as id`,
+    [b.vehicle_id, b.cost_date, b.category, amount, desc, user.email]);
+  return json({ saved: rows[0].id });
+}
+
+async function deleteVehicleCost(request, sql) {
+  const b = await request.json().catch(() => ({}));
+  if (!Number.isInteger(b.id)) return fail(400, 'Not a cost');
+  const rows = await sql.query('delete from transport.vehicle_costs where id = $1 returning id', [b.id]);
+  return rows.length ? json({ deleted: b.id }) : fail(404, 'That cost no longer exists');
+}
+
 async function saveUser(request, sql) {
   const b = await request.json().catch(() => ({}));
   const email = String(b.email || '').trim().toLowerCase();
@@ -891,7 +975,7 @@ async function audit(sql, user, action, detail) {
 
 async function payState(sql, user) {
   await audit(sql, user, 'pay.view');
-  const [drivers, pay, history, people, log] = await Promise.all([
+  const [drivers, current, history, people, log] = await Promise.all([
     sql.query(`
       select d.id, d.name, d.driver_type, d.kpi_included,
         (select max(r.run_date)::text from transport.runs r where r.driver_id = d.id and r.removed_at is null) as last_run,
@@ -900,37 +984,74 @@ async function payState(sql, user) {
         (select count(*)::int from transport.runs r where r.driver_id = d.id and r.removed_at is null
            and r.run_date > (now() at time zone 'Europe/London')::date - 90) as runs_90
       from transport.drivers d order by d.name`),
-    sql.query(`select distinct on (subject_id) subject_id, rate_type as basis, value::float8, effective_from::text
-               from transport.cost_rates where subject_type = 'driver' and rate_type in ('day_rate', 'salary_monthly')
-               order by subject_id, effective_from desc, created_at desc`),
-    sql.query(`select c.subject_id, d.name, c.rate_type as basis, c.value::float8, c.effective_from::text, c.created_by, c.created_at
-               from transport.cost_rates c left join transport.drivers d on d.id = c.subject_id
-               where c.subject_type = 'driver' order by c.created_at desc limit 60`),
+    // the arrangement in force today, or else the next one to start
+    sql.query(`select distinct on (driver_id) id::int, driver_id, basis, day_rate::float8, monthly_amount::float8, guaranteed_days::float8,
+                 effective_from::text, effective_to::text
+               from transport.driver_pay
+               where effective_to is null or effective_to >= (now() at time zone 'Europe/London')::date
+               order by driver_id, (effective_from <= (now() at time zone 'Europe/London')::date) desc, effective_from desc, id desc`),
+    sql.query(`select p.id::int, p.driver_id, d.name, p.basis, p.day_rate::float8, p.monthly_amount::float8, p.guaranteed_days::float8,
+                 p.effective_from::text, p.effective_to::text, p.notes, coalesce(p.updated_by, p.created_by) as by,
+                 coalesce(p.updated_at, p.created_at) as at
+               from transport.driver_pay p join transport.drivers d on d.id = p.driver_id
+               order by d.name, p.effective_from desc, p.id desc`),
     sql.query(`select email, role, active from transport.app_users where pay_access order by email`),
     sql.query(`select at, email, action, detail from transport.audit_log where action like 'pay.%' order by at desc limit 40`),
   ]);
-  const payBy = Object.fromEntries(pay.map((p) => [p.subject_id, p]));
+  const payBy = Object.fromEntries(current.map((p) => [p.driver_id, p]));
   for (const d of drivers) d.pay = payBy[d.id] || null;
   return json({ drivers, history, people, log, today: londonNow().date, history_start: '2026-06-01' });
 }
 
-async function savePay(request, sql, user) {
+// One pay arrangement, checked: day rate, monthly or part-time, from a date and optionally until one.
+function payArrangement(b) {
+  const basis = b.basis;
+  if (!['day_rate', 'monthly', 'part_time'].includes(basis)) return { error: 'Choose how the driver is paid' };
+  if (!isDate(b.effective_from)) return { error: 'Choose the date this pay starts' };
+  if (b.effective_to && !isDate(b.effective_to)) return { error: 'The end date isn\'t a date' };
+  if (b.effective_to && b.effective_to < b.effective_from) return { error: 'The end date is before the start date' };
+  const num = (x) => (x === '' || x === null || x === undefined ? null : Number(x));
+  const ok = (n, max = Infinity) => n !== null && Number.isFinite(n) && n >= 0 && n <= max;
+  const dayRate = num(b.day_rate), monthly = num(b.monthly_amount), days = num(b.guaranteed_days);
+  if (basis === 'monthly' && !ok(monthly)) return { error: 'Enter the monthly cost' };
+  if (basis !== 'monthly' && !ok(dayRate)) return { error: 'Enter the day rate' };
+  if (basis === 'part_time' && !ok(days, 23)) return { error: 'Enter how many days a month are paid whatever (0 to 23)' };
+  return { row: [basis, basis === 'monthly' ? null : dayRate, basis === 'monthly' ? monthly : null, basis === 'part_time' ? days : null,
+                 b.effective_from, b.effective_to || null, b.notes ? String(b.notes).slice(0, 300) : null] };
+}
+
+async function addPay(request, sql, user) {
   const b = await request.json().catch(() => ({}));
-  if (!isDate(b.effective_from)) return fail(400, 'Choose the date the pay applies from');
-  const rows = Array.isArray(b.pay) ? b.pay : [];
-  for (const r of rows) {
-    if (!Number.isInteger(r.driver_id) || !['day_rate', 'salary_monthly'].includes(r.basis) || !(Number(r.value) >= 0)) return fail(400, 'Not a valid pay entry');
-  }
-  for (const r of rows) {
-    await sql.query(
-      `insert into transport.cost_rates (subject_type, subject_id, rate_type, value, effective_from, created_by)
-       values ('driver', $1, $2, $3, $4, $5)
-       on conflict (subject_type, coalesce(subject_id, 0), rate_type, effective_from)
-       do update set value = excluded.value, created_by = excluded.created_by, created_at = now()`,
-      [r.driver_id, r.basis, Number(r.value), b.effective_from, user.email]);
-  }
-  await audit(sql, user, 'pay.change', { effective_from: b.effective_from, drivers: rows.map((r) => r.driver_id) });
-  return json({ saved: rows.length });
+  if (!Number.isInteger(b.driver_id)) return fail(400, 'Choose a driver');
+  const a = payArrangement(b);
+  if (a.error) return fail(400, a.error);
+  const rows = await sql.query(
+    `insert into transport.driver_pay (driver_id, basis, day_rate, monthly_amount, guaranteed_days, effective_from, effective_to, notes, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id::int as id`, [b.driver_id, ...a.row, user.email]);
+  await audit(sql, user, 'pay.change', { driver: b.driver_id, added: rows[0].id, effective_from: b.effective_from });
+  return json({ saved: rows[0].id });
+}
+
+async function updatePay(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  if (!Number.isInteger(b.id)) return fail(400, 'Not a pay entry');
+  const a = payArrangement(b);
+  if (a.error) return fail(400, a.error);
+  const rows = await sql.query(
+    `update transport.driver_pay set basis = $2, day_rate = $3, monthly_amount = $4, guaranteed_days = $5, effective_from = $6, effective_to = $7,
+       notes = $8, updated_by = $9, updated_at = now() where id = $1 returning driver_id`, [b.id, ...a.row, user.email]);
+  if (!rows.length) return fail(404, 'That pay entry no longer exists');
+  await audit(sql, user, 'pay.change', { driver: rows[0].driver_id, edited: b.id, effective_from: b.effective_from });
+  return json({ saved: b.id });
+}
+
+async function deletePay(request, sql, user) {
+  const b = await request.json().catch(() => ({}));
+  if (!Number.isInteger(b.id)) return fail(400, 'Not a pay entry');
+  const rows = await sql.query('delete from transport.driver_pay where id = $1 returning driver_id, effective_from::text', [b.id]);
+  if (!rows.length) return fail(404, 'That pay entry no longer exists');
+  await audit(sql, user, 'pay.change', { driver: rows[0].driver_id, deleted: b.id, effective_from: rows[0].effective_from });
+  return json({ deleted: b.id });
 }
 
 async function savePayAccess(request, sql, user) {
@@ -1076,6 +1197,15 @@ export async function onRequest(context) {
   if (missing.length) return fail(500, 'The transport API is missing settings', `Add ${missing.join(', ')} in Pages > Settings > Variables and Secrets, then redeploy`);
 
   try {
+    return await routeRequest({ request, env, route, method, url });
+  } catch (e) {
+    return fail(500, 'The transport API hit an error', e && e.message ? e.message : String(e));
+  }
+}
+
+// All routes. Awaited by onRequest, so a database error in any of them becomes a proper error reply.
+async function routeRequest({ request, env, route, method, url }) {
+  {
     const sql = neon(env.TRANSPORT_DATABASE_URL);
     const { user, error } = await identify(request, env, sql);
     if (error) return error;
@@ -1091,7 +1221,9 @@ export async function onRequest(context) {
     if (route.startsWith('pay')) {
       if (!user.pay) return fail(403, 'Pay is restricted');
       if (method === 'GET' && route === 'pay/state') return payState(sql, user);
-      if (method === 'POST' && route === 'pay/rates') return savePay(request, sql, user);
+      if (method === 'POST' && route === 'pay/add') return addPay(request, sql, user);
+      if (method === 'POST' && route === 'pay/update') return updatePay(request, sql, user);
+      if (method === 'POST' && route === 'pay/delete') return deletePay(request, sql, user);
       if (method === 'POST' && route === 'pay/access') return savePayAccess(request, sql, user);
       return fail(404, `No pay route for ${method} /api/transport/${route}`);
     }
@@ -1099,6 +1231,8 @@ export async function onRequest(context) {
       if (method === 'GET' && route === 'fuel/state') return fuelState(sql, user);
       if (!user.couriers) return fail(403, 'Fuel prices are entered by Admins and people with courier access');
       if (method === 'POST' && route === 'fuel/price') return saveFuelPrice(request, sql, user);
+      if (method === 'POST' && route === 'fuel/price/update') return updateFuelPrice(request, sql, user);
+      if (method === 'POST' && route === 'fuel/price/delete') return deleteFuelPrice(request, sql);
       if (method === 'POST' && route === 'fuel/reminder') return saveReminder(request, sql);
       return fail(404, `No fuel route for ${method} /api/transport/${route}`);
     }
@@ -1116,6 +1250,9 @@ export async function onRequest(context) {
     if (route.startsWith('admin')) {
       if (!admin) return fail(403, 'Admins only');
       if (method === 'GET' && route === 'admin/state') return adminState(sql);
+      if (method === 'GET' && route === 'admin/vehicle-costs') return vehicleCosts(url, sql);
+      if (method === 'POST' && route === 'admin/vehicle-cost') return saveVehicleCost(request, sql, user);
+      if (method === 'POST' && route === 'admin/vehicle-cost/delete') return deleteVehicleCost(request, sql);
       if (method === 'POST' && route === 'admin/rates') return saveRates(request, sql, user, ['vehicle', 'fuel']);
       if (method === 'POST' && route === 'admin/user') return saveUser(request, sql);
       if (method === 'POST' && route === 'admin/vehicle') return saveVehicle(request, sql);
@@ -1127,7 +1264,5 @@ export async function onRequest(context) {
     if (method === 'POST' && route === 'import/log') return admin ? importLog(request, sql, user) : fail(403, 'Admins only');
 
     return fail(404, `No transport API route for ${method} /api/transport/${route}`);
-  } catch (e) {
-    return fail(500, 'The transport API hit an error', e && e.message ? e.message : String(e));
   }
 }

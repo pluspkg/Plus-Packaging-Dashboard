@@ -125,8 +125,9 @@
     $('fuel-entry').hidden = !s.can_edit;
     if (!$('fuel-date').value) $('fuel-date').value = s.week_start;
     $('fuel-history').innerHTML = s.prices.length
-      ? `<thead><tr><th>Week starting</th><th class="n">Price per litre</th><th>Entered by</th><th>When</th></tr></thead><tbody>` +
-        s.prices.map((f) => `<tr><td>${longDate(f.week_start)}</td><td class="n">${gbp(f.price, 3)}</td><td>${esc(f.created_by || '–')}</td><td>${when(f.created_at)}</td></tr>`).join('') + '</tbody>'
+      ? `<thead><tr><th>Week starting</th><th class="n">Price per litre</th><th>Entered by</th><th>When</th>${s.can_edit ? '<th></th>' : ''}</tr></thead><tbody>` +
+        s.prices.map((f) => `<tr data-week="${f.week_start}"><td>${longDate(f.week_start)}</td><td class="n">${gbp(f.price, 3)}</td><td>${esc(f.created_by || '–')}</td><td>${when(f.created_at)}</td>
+          ${s.can_edit ? '<td style="white-space:nowrap"><button class="ghost" data-edit>Change</button> <button class="ghost" data-delete>Delete</button></td>' : ''}</tr>`).join('') + '</tbody>'
       : '<tbody><tr><td class="muted">No fuel prices yet.</td></tr></tbody>';
     $('reminder').hidden = !s.reminder;
     if (s.reminder) {
@@ -142,6 +143,27 @@
     }
   }
   async function load() { try { state = await api('/fuel/state'); render(); $('error').hidden = true; } catch (e) { $('error').textContent = e.message; $('error').hidden = false; } }
+  // change or delete a past price
+  $('fuel-history').addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr[data-week]'); if (!tr) return;
+    const week = tr.dataset.week; const f = state.prices.find((x) => x.week_start === week);
+    if (e.target.closest('[data-delete]')) {
+      if (!confirm(`Delete the fuel price for the week starting ${longDate(week)}? That week will use the price before it.`)) return;
+      try { await api('/fuel/price/delete', { week_start: week }); await load(); say('fuel-status', 'Deleted'); } catch (err) { say('fuel-status', err.message, true); }
+      return;
+    }
+    if (e.target.closest('[data-edit]')) {
+      tr.innerHTML = `<td><input type="date" data-w value="${week}"></td><td class="n">£ <input type="number" min="0" step="0.001" data-p value="${f.price}" style="width:6em"></td>
+        <td colspan="2"></td><td style="white-space:nowrap"><button data-ok>Save</button> <button class="ghost" data-cancel>Cancel</button></td>`;
+      tr.querySelector('[data-p]').focus();
+      tr.querySelector('[data-cancel]').addEventListener('click', render);
+      tr.querySelector('[data-ok]').addEventListener('click', async () => {
+        try { await api('/fuel/price/update', { old_week_start: week, week_start: tr.querySelector('[data-w]').value, price: Number(tr.querySelector('[data-p]').value) });
+              await load(); say('fuel-status', 'Changed'); }
+        catch (err) { say('fuel-status', err.message, true); }
+      });
+    }
+  });
   $('fuel-save').addEventListener('click', async () => {
     const price = Number($('fuel-price').value), week = $('fuel-date').value;
     if (!week || !(price > 0)) { say('fuel-status', 'Enter the week and a price per litre', true); return; }

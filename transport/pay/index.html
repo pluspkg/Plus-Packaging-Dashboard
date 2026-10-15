@@ -62,6 +62,11 @@
   .gate { max-width: 40em; margin: 40px auto; text-align: center; }
   tr.group th { background: var(--white); color: var(--navy); font-size: 14px; padding-top: 14px; border-bottom: 2px solid var(--navy); }
   @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
+  tr.editor td { background: var(--light); }
+  tr.editor .row { margin: 4px 0; }
+  .editor input[type=number] { width: 7em; }
+  .actions { white-space: nowrap; }
+  .actions button { padding: 3px 10px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -73,6 +78,7 @@
 </header>
 <div class="gate" id="gate" hidden><h2>Driver pay</h2><p id="gate-text"></p></div>
 <div id="app" hidden>
+  <nav class="jump" aria-label="Sections"><a href="#pay">Drivers</a><a href="#history">Pay history</a><a href="#access">Who can see pay</a><a href="#log">Access log</a></nav>
   <main>
     <div class="banner" id="error" hidden></div>
     <section aria-labelledby="conf-title">
@@ -81,15 +87,20 @@
     </section>
 
     <section id="pay" aria-labelledby="pay-title">
-      <div class="head"><h2 id="pay-title">Drivers</h2>
-        <span class="note">Day rate: agency and temporary drivers, charged for each day they drive. Monthly cost: employees, charged every weekday whether or not they drive.</span></div>
+      <div class="head"><h2 id="pay-title">Drivers</h2></div>
       <div class="pad">
-        <div class="row"><label>Changes apply from <input type="date" id="pay-from"></label>
-          <span class="note">Earlier days keep the pay they had. Leave the amount empty to keep the current pay.</span></div>
+        <p class="note" style="margin-top:0"><b>Monthly cost</b>: employees, charged every weekday whether or not they drive. A full month comes to exactly the monthly cost; a part month is shared by weekdays, so give someone who starts or leaves mid-month a start or end date.
+          <b>Part-time</b>: a set number of days a month paid whatever, at a day rate, plus the day rate for any extra days.
+          <b>Day rate</b>: agency and temporary drivers, charged only for days they drive.</p>
         <div class="table-wrap"><table id="pay-table"></table></div>
-        <div class="row"><button id="pay-save">Save pay</button><span class="status" id="pay-status" aria-live="polite"></span></div>
         <p class="note" id="pay-gaps"></p>
+        <span class="status" id="pay-status" aria-live="polite"></span>
       </div>
+    </section>
+
+    <section id="history" aria-labelledby="hist-title">
+      <div class="head"><h2 id="hist-title">Pay history</h2><span class="note">Every pay entry, newest first for each driver. Change or delete any of them.</span></div>
+      <div class="pad"><div class="table-wrap"><table id="hist-table"></table></div><span class="status" id="hist-status" aria-live="polite"></span></div>
     </section>
 
     <section id="access" aria-labelledby="access-title">
@@ -101,12 +112,7 @@
       </div>
     </section>
 
-    <section aria-labelledby="hist-title">
-      <div class="head"><h2 id="hist-title">Pay changes</h2></div>
-      <div class="pad"><div class="table-wrap"><table id="hist-table"></table></div></div>
-    </section>
-
-    <section aria-labelledby="log-title">
+    <section id="log" aria-labelledby="log-title">
       <div class="head"><h2 id="log-title">Access log</h2><span class="note">Latest 40</span></div>
       <div class="pad"><div class="table-wrap"><table id="log-table"></table></div></div>
     </section>
@@ -116,10 +122,10 @@
 (() => {
   const API = '/api/transport';
   const $ = (id) => document.getElementById(id);
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const longDate = (iso) => iso ? new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '–';
   const when = (ts) => ts ? new Date(ts).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' }) : '–';
-  const gbp = (n, dp = 2) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  const gbp = (n) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   async function api(path, body) {
     const res = await fetch(API + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' } : { credentials: 'same-origin' });
     let data = null; try { data = await res.json(); } catch { /* not JSON */ }
@@ -128,51 +134,120 @@
   }
   function say(id, text, bad) { const el = $(id); el.textContent = text; el.className = 'status ' + (bad ? 'bad' : 'good'); if (!bad) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 5000); }
 
+  const BASIS = { monthly: 'Monthly cost', part_time: 'Part-time', day_rate: 'Day rate' };
+  const payText = (p) => {
+    if (!p) return '';
+    const amount = p.basis === 'monthly' ? `${gbp(p.monthly_amount)} a month`
+      : p.basis === 'part_time' ? `${Number(p.guaranteed_days)} days a month paid whatever, ${gbp(p.day_rate)} a day`
+      : `${gbp(p.day_rate)} a day`;
+    return amount;
+  };
+  const span = (p) => `from ${longDate(p.effective_from)}${p.effective_to ? ` until ${longDate(p.effective_to)}` : ''}`;
   let state = null;
-  const BASIS = { day_rate: 'Day rate', salary_monthly: 'Monthly cost' };
-  const payText = (p) => p ? `${p.basis === 'day_rate' ? `${gbp(p.value)} a day` : `${gbp(p.value)} a month`} from ${longDate(p.effective_from)}` : '';
+
+  // The fields for one pay entry: which show depends on how the driver is paid
+  function editor(p, today, saveLabel) {
+    const basis = p ? p.basis : 'day_rate';
+    return `<div class="row">
+      <label>Paid by <select data-e="basis">${Object.entries(BASIS).map(([k, v]) => `<option value="${k}"${k === basis ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label data-for="monthly">£ a month <input type="number" min="0" step="0.01" data-e="monthly_amount" value="${p && p.monthly_amount !== null ? p.monthly_amount : ''}"></label>
+      <label data-for="day_rate part_time">£ a day <input type="number" min="0" step="0.01" data-e="day_rate" value="${p && p.day_rate !== null ? p.day_rate : ''}"></label>
+      <label data-for="part_time">Days a month paid whatever <input type="number" min="0" max="23" step="0.5" data-e="guaranteed_days" value="${p && p.guaranteed_days !== null ? p.guaranteed_days : ''}" style="width:5em"></label>
+    </div><div class="row">
+      <label>From <input type="date" data-e="effective_from" value="${p ? p.effective_from : today}"></label>
+      <label>Until <input type="date" data-e="effective_to" value="${p && p.effective_to ? p.effective_to : ''}"></label>
+      <span class="note">Leave Until empty if it carries on.</span>
+      <label>Note <input type="text" data-e="notes" value="${esc(p && p.notes ? p.notes : '')}" size="22"></label>
+      <button data-e-save>${saveLabel}</button> <button class="ghost" data-e-cancel>Cancel</button>
+    </div>`;
+  }
+  function showFields(box) {
+    const basis = box.querySelector('[data-e=basis]').value;
+    box.querySelectorAll('[data-for]').forEach((l) => { l.hidden = !l.dataset.for.split(' ').includes(basis); });
+  }
+  function readEditor(box) {
+    const v = (k) => box.querySelector(`[data-e=${k}]`).value;
+    return { basis: v('basis'), monthly_amount: v('monthly_amount'), day_rate: v('day_rate'), guaranteed_days: v('guaranteed_days'),
+             effective_from: v('effective_from'), effective_to: v('effective_to') || null, notes: v('notes') };
+  }
 
   function render() {
     const s = state;
-    if (!$('pay-from').value) $('pay-from').value = s.drivers.some((d) => d.pay) ? s.today : s.history_start;
-    // monthly cost (employees) first, then day rate (agency and temporary), then anyone without pay set
-    const GROUPS = [['salary_monthly', 'Monthly cost'], ['day_rate', 'Day rate'], [null, 'Pay not set']];
-    const rowsHtml = (d) => `<tr data-id="${d.id}">
+    const GROUPS = [['monthly', 'Monthly cost'], ['part_time', 'Part-time'], ['day_rate', 'Day rate'], [null, 'Pay not set']];
+    const row = (d) => `<tr data-id="${d.id}">
         <td><b>${esc(d.name)}</b></td>
         <td>${d.last_run ? longDate(d.last_run) : '<span class="muted">Never</span>'}</td>
         <td>${d.last_vehicle ? esc(d.last_vehicle) : '<span class="muted">–</span>'}</td>
-        <td><select data-f="basis" aria-label="How ${esc(d.name)} is paid">${Object.entries(BASIS).map(([k, v]) => `<option value="${k}"${(d.pay ? d.pay.basis : 'day_rate') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
-        <td class="n"><input type="number" min="0" step="0.01" data-f="value" aria-label="Pay for ${esc(d.name)}"></td>
-        <td>${d.pay ? esc(payText(d.pay)) : '<span class="bad">Not set</span>'}</td></tr>`;
-    $('pay-table').innerHTML = `<thead><tr><th>Driver</th><th>Last drove</th><th>Last vehicle</th><th>Paid by</th><th class="n">Amount £</th><th>Now</th></tr></thead><tbody>` +
+        <td>${d.pay ? `${esc(payText(d.pay))} <span class="current">${esc(span(d.pay))}</span>` : '<span class="bad">Not set</span>'}</td>
+        <td class="actions"><button class="ghost" data-change>${d.pay ? 'Change pay' : 'Set pay'}</button></td></tr>`;
+    $('pay-table').innerHTML = `<thead><tr><th>Driver</th><th>Last drove</th><th>Last vehicle</th><th>Pay now</th><th></th></tr></thead><tbody>` +
       GROUPS.map(([basis, label]) => {
         const list = s.drivers.filter((d) => (d.pay ? d.pay.basis : null) === basis).sort((a, b) => a.name.localeCompare(b.name));
-        return list.length ? `<tr class="group"><th colspan="6" scope="rowgroup">${label} <span class="note">${list.length}</span></th></tr>` + list.map(rowsHtml).join('') : '';
+        return list.length ? `<tr class="group"><th colspan="5" scope="rowgroup">${label} <span class="note">${list.length}</span></th></tr>` + list.map(row).join('') : '';
       }).join('') + '</tbody>';
     const missing = s.drivers.filter((d) => d.runs_90 > 0 && d.kpi_included && !d.pay);
     $('pay-gaps').innerHTML = missing.length ? `<span class="bad">${missing.length} driver${missing.length > 1 ? 's' : ''} who drove in the last 90 days ha${missing.length > 1 ? 've' : 's'} no pay set:</span> ${esc(missing.map((d) => d.name).join(', '))}` : '';
+
+    $('hist-table').innerHTML = s.history.length
+      ? `<thead><tr><th>Driver</th><th>Paid by</th><th>Pay</th><th>From</th><th>Until</th><th>Note</th><th>Last changed</th><th></th></tr></thead><tbody>` +
+        s.history.map((h) => `<tr data-pay="${h.id}"><td><b>${esc(h.name)}</b></td><td>${BASIS[h.basis]}</td><td>${esc(payText(h))}</td>
+          <td>${longDate(h.effective_from)}</td><td>${h.effective_to ? longDate(h.effective_to) : '<span class="muted">carries on</span>'}</td><td>${esc(h.notes || '')}</td>
+          <td><span class="current">${esc(h.by || '–')}, ${when(h.at)}</span></td>
+          <td class="actions"><button class="ghost" data-edit>Change</button> <button class="ghost" data-delete>Delete</button></td></tr>`).join('') + '</tbody>'
+      : '<tbody><tr><td class="muted">No pay entered yet.</td></tr></tbody>';
+
     $('people-table').innerHTML = `<thead><tr><th>Email</th><th></th></tr></thead><tbody>` +
       s.people.map((p) => `<tr data-email="${esc(p.email)}"><td>${esc(p.email)}${p.active ? '' : ' <span class="muted">(inactive)</span>'}</td><td><button class="ghost" data-remove>Remove access</button></td></tr>`).join('') + '</tbody>';
-    $('hist-table').innerHTML = s.history.length
-      ? `<thead><tr><th>When</th><th>Who</th><th>Driver</th><th>Paid by</th><th class="n">Amount</th><th>Applies from</th></tr></thead><tbody>` +
-        s.history.map((h) => `<tr><td>${when(h.created_at)}</td><td>${esc(h.created_by || '–')}</td><td>${esc(h.name || '–')}</td><td>${BASIS[h.basis] || esc(h.basis)}</td><td class="n">${gbp(h.value)}</td><td>${longDate(h.effective_from)}</td></tr>`).join('') + '</tbody>'
-      : '<tbody><tr><td class="muted">No pay entered yet.</td></tr></tbody>';
     const ACT = { 'pay.view': 'Opened this page', 'pay.change': 'Changed pay', 'pay.access_given': 'Gave access', 'pay.access_removed': 'Removed access' };
+    const names = Object.fromEntries(s.drivers.map((d) => [d.id, d.name]));
+    const detail = (l) => {
+      const d = l.detail || {};
+      if (d.email) return `: ${esc(d.email)}`;
+      const who = d.driver ? esc(names[d.driver] || `driver ${d.driver}`) : '';
+      if (d.deleted) return `: deleted an entry for ${who}`;
+      if (d.edited) return `: changed an entry for ${who}`;
+      if (d.added) return `: added pay for ${who} from ${longDate(d.effective_from)}`;
+      if (d.drivers) return `: ${d.drivers.length} driver${d.drivers.length > 1 ? 's' : ''}, from ${longDate(d.effective_from)}`;
+      return '';
+    };
     $('log-table').innerHTML = `<thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead><tbody>` +
-      s.log.map((l) => `<tr><td>${when(l.at)}</td><td>${esc(l.email)}</td><td>${esc(ACT[l.action] || l.action)}${l.detail && l.detail.email ? `: ${esc(l.detail.email)}` : ''}${l.detail && l.detail.drivers ? `: ${l.detail.drivers.length} driver${l.detail.drivers.length > 1 ? 's' : ''}, from ${longDate(l.detail.effective_from)}` : ''}</td></tr>`).join('') + '</tbody>';
+      s.log.map((l) => `<tr><td>${when(l.at)}</td><td>${esc(l.email)}</td><td>${esc(ACT[l.action] || l.action)}${detail(l)}</td></tr>`).join('') + '</tbody>';
   }
   async function load() { try { state = await api('/pay/state'); render(); $('error').hidden = true; } catch (e) { $('error').textContent = e.message; $('error').hidden = false; } }
 
-  document.addEventListener('input', (e) => { const tr = e.target.closest('#pay-table tr'); if (tr) tr.classList.add('changed'); });
-  document.addEventListener('change', (e) => { const tr = e.target.closest('#pay-table tr'); if (tr) tr.classList.add('changed'); });
-  $('pay-save').addEventListener('click', async () => {
-    const from = $('pay-from').value;
-    const pay = [...document.querySelectorAll('#pay-table tbody tr.changed')].map((tr) => ({ driver_id: Number(tr.dataset.id), basis: tr.querySelector('[data-f=basis]').value, value: tr.querySelector('[data-f=value]').value }))
-      .filter((p) => p.value !== '').map((p) => ({ ...p, value: Number(p.value) }));
-    if (!pay.length) { say('pay-status', 'Enter an amount to change someone\'s pay', true); return; }
-    if (!from) { say('pay-status', 'Choose the date the pay applies from', true); return; }
-    try { await api('/pay/rates', { effective_from: from, pay }); await load(); say('pay-status', `Saved pay for ${pay.length} driver${pay.length > 1 ? 's' : ''}`); }
-    catch (e) { say('pay-status', e.message, true); }
+  function openEditor(afterRow, entry, colspan, saveLabel, onSave) {
+    document.querySelectorAll('tr.editor').forEach((r) => r.remove());
+    const tr = document.createElement('tr'); tr.className = 'editor';
+    tr.innerHTML = `<td colspan="${colspan}">${editor(entry, state.today, saveLabel)}</td>`;
+    afterRow.after(tr);
+    showFields(tr);
+    tr.querySelector('[data-e=basis]').addEventListener('change', () => showFields(tr));
+    tr.querySelector('[data-e-cancel]').addEventListener('click', () => tr.remove());
+    tr.querySelector('[data-e-save]').addEventListener('click', () => onSave(readEditor(tr)));
+    tr.querySelector('input:not([hidden]), select').focus();
+  }
+  $('pay-table').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-change]'); if (!b) return;
+    const tr = b.closest('tr'); const id = Number(tr.dataset.id); const d = state.drivers.find((x) => x.id === id);
+    const seed = d.pay ? { ...d.pay, effective_from: state.today, effective_to: null, notes: '' } : null;
+    openEditor(tr, seed, 5, 'Save new pay', async (v) => {
+      try { await api('/pay/add', { driver_id: id, ...v }); await load(); say('pay-status', `Saved new pay for ${d.name}`); }
+      catch (err) { say('pay-status', err.message, true); }
+    });
+  });
+  $('hist-table').addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr[data-pay]'); if (!tr) return;
+    const id = Number(tr.dataset.pay); const h = state.history.find((x) => x.id === id);
+    if (e.target.closest('[data-delete]')) {
+      if (!confirm(`Delete ${h.name}'s ${BASIS[h.basis].toLowerCase()} entry from ${longDate(h.effective_from)}? Costs from that date will use whichever entry is left.`)) return;
+      try { await api('/pay/delete', { id }); await load(); say('hist-status', 'Deleted'); } catch (err) { say('hist-status', err.message, true); }
+    }
+    if (e.target.closest('[data-edit]')) {
+      openEditor(tr, h, 8, 'Save changes', async (v) => {
+        try { await api('/pay/update', { id, ...v }); await load(); say('hist-status', `Changed ${h.name}'s entry`); }
+        catch (err) { say('hist-status', err.message, true); }
+      });
+    }
   });
   $('people-table').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-remove]'); if (!b) return;

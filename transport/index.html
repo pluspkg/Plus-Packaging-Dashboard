@@ -259,6 +259,10 @@
       <div class="table-wrap"><table class="cards" id="vans"></table></div>
       <p class="note pad-note" id="cost-note" hidden>Cost is Plus's own: driver pay (a day rate for each day driven, or a monthly salary spread over every weekday), lease (every weekday, whether or not the vehicle ran) and fuel from each vehicle's MPG and the week's fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Hover a cost for its breakdown; * means a rate is missing.</p>
     </div>
+    <div class="panel" id="one-offs-panel" hidden>
+      <div class="panel-head"><h2>One-off vehicle costs</h2><span class="note" id="one-offs-note"></span></div>
+      <div class="table-wrap"><table class="cards" id="one-offs"></table></div>
+    </div>
     <div class="panel" id="couriers-panel" hidden>
       <div class="panel-head"><h2>Couriers and pallets</h2><span class="note">Unallocated orders: work that didn't go on a Plus vehicle</span></div>
       <div class="split">
@@ -328,7 +332,9 @@
                                  : 'Running cost: vehicle lease or hire, and fuel from MPG and the week’s fuel price. Driver pay is not included.';
   function costTitle(c, maxoptra) {
     if (!c) return '';
-    const parts = [...('driver' in c ? [`Driver ${money2(c.driver)}`] : []), `lease ${money2(c.lease)}`, `fuel ${money2(c.fuel)}${c.fuel_miles ? ` on ${fmtInt(c.fuel_miles)} miles` : ''}`];
+    const parts = [...('driver' in c ? [`Driver ${money2(c.driver)}`] : []), `lease and insurance ${money2(c.lease)}`,
+      ...(c.hire ? [`hire ${money2(c.hire)}`] : []), ...(c.one_off ? [`one-off costs ${money2(c.one_off)}`] : []),
+      `fuel ${money2(c.fuel)}${c.fuel_miles ? ` on ${fmtInt(c.fuel_miles)} miles` : ''}`];
     let t = parts.join(', ') + '.' + ('driver' in c ? '' : ' Driver pay not included.');
     if (c.missing && c.missing.length) t += ` Missing: ${c.missing.join(', ')}.`;
     if (maxoptra !== undefined && maxoptra !== null) t += ` MaxOptra's own estimate: ${money(maxoptra)}.`;
@@ -900,7 +906,7 @@
         const total = fleet + idle;
         const drops = sum(r.vehicles, 'completed_drops');
         return `<div class="kpi" title="${esc(costNote())}"><div class="label">${seesPay ? 'Fleet cost' : 'Running cost'}</div><div class="value">${any ? money(total) : '–'}${gaps ? '<span class="cost-flag">*</span>' : ''}</div>
-          <div class="sub">${any && drops ? `${money2(total / drops)} per completed drop` : 'Rates not set yet'}${idle > 0 ? `; includes ${money(idle)} salaried pay on days not driving` : ''}${seesPay ? '' : '; excludes driver pay'}</div></div>`;
+          <div class="sub">${any && drops ? `${money2(total / drops)} per completed drop` : 'Rates not set yet'}${idle > 0 ? `; includes ${money(idle)} pay for days not driven` : ''}${seesPay ? '' : '; excludes driver pay'}</div></div>`;
       })() : ''}
       ${canSeeCouriers && r.external ? (() => {
         const ext = r.external.by_type.reduce((t, x) => t + (x.cost || 0), 0), jobs = r.external.by_type.reduce((t, x) => t + x.jobs, 0);
@@ -939,9 +945,19 @@
         <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
 
     $('cost-note').hidden = false;
+    const runningBits = 'lease and insurance (spread over each month\'s weekdays, whether or not the vehicle ran), day hire on days used, one-off vehicle costs, and fuel from each vehicle\'s MPG and the week\'s fuel price on actual miles where MaxOptra recorded at least half the planned distance';
     $('cost-note').textContent = seesPay
-      ? 'Cost is Plus\'s own: driver pay (a day rate for each day driven, or a monthly cost spread over every weekday), lease (every weekday, whether or not the vehicle ran) and fuel from each vehicle\'s MPG and the week\'s fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Hover a cost for its breakdown; * means a rate is missing.'
-      : 'Running cost is lease or hire (every weekday, whether or not the vehicle ran) and fuel from each vehicle\'s MPG and the week\'s fuel price, on actual miles where MaxOptra recorded at least half the planned distance. Driver pay is not included. Hover a cost for its breakdown; * means a rate is missing.';
+      ? `Cost is Plus's own: driver pay (day rate for days driven; monthly cost every weekday; part-time guaranteed days whether worked or not, plus extra days), ${runningBits}. Hover a cost for its breakdown; * means a rate is missing.`
+      : `Running cost is ${runningBits}. Driver pay is not included. Hover a cost for its breakdown; * means a rate is missing.`;
+    const ones = r.one_offs || [];
+    $('one-offs-panel').hidden = !ones.length;
+    if (ones.length) {
+      const CAT = { repair: 'Repair', maintenance: 'Maintenance', insurance: 'Insurance', other: 'Other' };
+      $('one-offs-note').textContent = `${ones.length} in this period, ${money(ones.reduce((t, x) => t + x.amount, 0))}, included in the vehicles' costs above`;
+      $('one-offs').innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Vehicle</th><th scope="col">For</th><th scope="col">Details</th><th class="n" scope="col">Cost</th></tr></thead><tbody>` +
+        ones.map((x) => `<tr><td data-label="Date">${shortDate(x.date)}</td><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(x.vehicle)}</span></td>
+          <td data-label="For">${CAT[x.category] || esc(x.category)}</td><td data-label="Details">${esc(x.description || '')}</td><td class="n" data-label="Cost">${money2(x.amount)}</td></tr>`).join('') + '</tbody>';
+    }
     const ext = r.external && r.external.by_type.length ? r.external : null;
     $('couriers-panel').hidden = !ext;
     if (ext) {
