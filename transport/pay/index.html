@@ -60,6 +60,7 @@
   .status { font-size: 14px; margin-left: 6px; }
   .big { font-size: 26px; font-weight: 900; color: var(--blue); }
   .gate { max-width: 40em; margin: 40px auto; text-align: center; }
+  tr.group th { background: var(--white); color: var(--navy); font-size: 14px; padding-top: 14px; border-bottom: 2px solid var(--navy); }
   @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
 </style>
 </head>
@@ -134,13 +135,20 @@
   function render() {
     const s = state;
     if (!$('pay-from').value) $('pay-from').value = s.drivers.some((d) => d.pay) ? s.today : s.history_start;
-    $('pay-table').innerHTML = `<thead><tr><th>Driver</th><th>Last drove</th><th>Paid by</th><th class="n">Amount £</th><th>Now</th></tr></thead><tbody>` +
-      s.drivers.map((d) => `<tr data-id="${d.id}">
+    // monthly cost (employees) first, then day rate (agency and temporary), then anyone without pay set
+    const GROUPS = [['salary_monthly', 'Monthly cost'], ['day_rate', 'Day rate'], [null, 'Pay not set']];
+    const rowsHtml = (d) => `<tr data-id="${d.id}">
         <td><b>${esc(d.name)}</b></td>
         <td>${d.last_run ? longDate(d.last_run) : '<span class="muted">Never</span>'}</td>
+        <td>${d.last_vehicle ? esc(d.last_vehicle) : '<span class="muted">–</span>'}</td>
         <td><select data-f="basis" aria-label="How ${esc(d.name)} is paid">${Object.entries(BASIS).map(([k, v]) => `<option value="${k}"${(d.pay ? d.pay.basis : 'day_rate') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
         <td class="n"><input type="number" min="0" step="0.01" data-f="value" aria-label="Pay for ${esc(d.name)}"></td>
-        <td>${d.pay ? esc(payText(d.pay)) : '<span class="bad">Not set</span>'}</td></tr>`).join('') + '</tbody>';
+        <td>${d.pay ? esc(payText(d.pay)) : '<span class="bad">Not set</span>'}</td></tr>`;
+    $('pay-table').innerHTML = `<thead><tr><th>Driver</th><th>Last drove</th><th>Last vehicle</th><th>Paid by</th><th class="n">Amount £</th><th>Now</th></tr></thead><tbody>` +
+      GROUPS.map(([basis, label]) => {
+        const list = s.drivers.filter((d) => (d.pay ? d.pay.basis : null) === basis).sort((a, b) => a.name.localeCompare(b.name));
+        return list.length ? `<tr class="group"><th colspan="6" scope="rowgroup">${label} <span class="note">${list.length}</span></th></tr>` + list.map(rowsHtml).join('') : '';
+      }).join('') + '</tbody>';
     const missing = s.drivers.filter((d) => d.runs_90 > 0 && d.kpi_included && !d.pay);
     $('pay-gaps').innerHTML = missing.length ? `<span class="bad">${missing.length} driver${missing.length > 1 ? 's' : ''} who drove in the last 90 days ha${missing.length > 1 ? 've' : 's'} no pay set:</span> ${esc(missing.map((d) => d.name).join(', '))}` : '';
     $('people-table').innerHTML = `<thead><tr><th>Email</th><th></th></tr></thead><tbody>` +

@@ -895,6 +895,8 @@ async function payState(sql, user) {
     sql.query(`
       select d.id, d.name, d.driver_type, d.kpi_included,
         (select max(r.run_date)::text from transport.runs r where r.driver_id = d.id and r.removed_at is null) as last_run,
+        (select coalesce(v.display_name, v.maxoptra_name) from transport.runs r join transport.vehicles v on v.id = r.vehicle_id
+          where r.driver_id = d.id and r.removed_at is null order by r.run_date desc, r.run_number desc limit 1) as last_vehicle,
         (select count(*)::int from transport.runs r where r.driver_id = d.id and r.removed_at is null
            and r.run_date > (now() at time zone 'Europe/London')::date - 90) as runs_90
       from transport.drivers d order by d.name`),
