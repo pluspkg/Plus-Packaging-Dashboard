@@ -67,7 +67,7 @@
   #jobs-table input[data-f=cost] { width: 4.8em; }
   #jobs-table input[data-f=notes] { width: 7.5em; }
   #jobs-table .cust { max-width: 11em; overflow: hidden; text-overflow: ellipsis; }
-  #jobs-table .reqs { max-width: 7.5em; overflow: hidden; text-overflow: ellipsis; }
+  #jobs-table .reqs { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
   #jobs-table .x { padding: 2px 7px; }
   @media (max-width: 1340px) { #jobs-table .ord { display: none; } }   /* smaller screens: the order date moves into the delivery date's tooltip */
   #jobs-table .muted { color: var(--muted); }
@@ -210,7 +210,7 @@
       $('jobs-total').textContent = r.jobs.length ? `${r.jobs.length} order${r.jobs.length > 1 ? 's' : ''}, ${gbp(total)}${waiting ? `; ${waiting} still need a reason or cost` : ''}` : '';
       const need = (n) => (n.length === 2 ? 'Reason, cost' : n[0] === 'reason' ? 'Reason' : 'Cost');
       $('jobs-table').innerHTML = `<thead><tr><th title="The day MaxOptra had the order down for delivery">Delivery</th><th class="ord">Ordered</th><th>Order</th><th>Customer</th><th>Postcode</th>
-        <th>Requirements</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th title="What the order still needs">Needs</th><th class="edit-only"></th></tr></thead><tbody>` +
+        <th title="Vehicle requirements, as MaxOptra's short references">Reqs</th><th>Type</th><th>Reason</th><th class="n">Cost £</th><th>Notes</th><th title="What the order still needs">Needs</th><th class="edit-only"></th></tr></thead><tbody>` +
         (r.jobs.length ? r.jobs.map((j) => {
           const customer = j.client_name || (j.customer_no ? `Customer ${j.customer_no}` : '–');
           const costHint = j.cost_is_default ? (j.job_cost !== null ? `Default price for this type: ${gbp(j.job_cost)}` : 'No default price for this type: enter a cost') : 'Cost entered for this order';
@@ -220,7 +220,7 @@
           <td title="${esc(j.source === 'manual' ? 'Added by hand' : `From MaxOptra${j.depot ? `, ${j.depot}` : ''}`)}"><b>${esc(j.order_ref)}</b>${j.source === 'manual' ? '<span class="tag">by hand</span>' : ''}</td>
           <td class="cust" title="${esc(customer)}${j.client_name && j.customer_no ? ` (${esc(j.customer_no)})` : ''}">${esc(customer)}</td>
           <td>${esc(j.location_postcode || '–')}</td>
-          <td class="reqs" title="${esc(j.vehicle_requirements || '')}">${j.vehicle_requirements === '' ? '<span class="muted">None</span>' : esc(j.vehicle_requirements || '–')}</td>
+          <td class="reqs" title="${esc(j.vehicle_requirements || '')}">${j.vehicle_requirements === '' ? '<span class="muted">None</span>' : esc(j.requirement_codes || j.vehicle_requirements || '–')}</td>
           <td><select data-f="job_type" aria-label="Type for ${esc(j.order_ref)}">${typeOptions(j.job_type, true)}</select></td>
           <td><select data-f="reason_code" aria-label="Reason for ${esc(j.order_ref)}">${reasonOptions(j.reason_code)}</select></td>
           <td class="n"><input type="number" min="0" step="0.01" data-f="cost" value="${j.cost ?? ''}" placeholder="${j.job_cost ?? ''}" title="${esc(costHint)}" aria-label="Cost for ${esc(j.order_ref)}"></td>
