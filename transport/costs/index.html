@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Transport costs | Plus Packaging</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #003da5; --navy: #002b75; --grey: #9ea2a2; --light: #eaf2ff; --bg: #f4f7fb; --white: #ffffff;
+    --ink: #1c2733; --muted: #5d6566; --line: #d9dee3; --bad: #b42318; --bad-bg: #fdecea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Lato, "Segoe UI", Arial, sans-serif; }
+  a { color: var(--blue); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  header { background: var(--navy); color: var(--white); }
+  .bar { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .brand { font-weight: 900; font-size: 18px; }
+  .brand span { font-weight: 400; opacity: .85; margin-left: 10px; }
+  .tools { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 14px; flex-wrap: wrap; }
+  .tools a { color: var(--white); }
+  .role { border: 1px solid rgba(255,255,255,.55); border-radius: 3px; padding: 0 6px; font-size: 12px; font-weight: 700; }
+  nav.jump { max-width: 1280px; margin: 0 auto; padding: 12px 20px 0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 12px 20px 48px; }
+  section { background: var(--white); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; scroll-margin-top: 12px; }
+  .head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 18px 4px; }
+  h2 { margin: 0; font-size: 17px; font-weight: 900; color: var(--navy); }
+  h3 { margin: 18px 0 6px; font-size: 15px; color: var(--navy); }
+  .pad { padding: 8px 18px 16px; }
+  .note { font-size: 13px; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .bad { color: var(--bad); font-weight: 700; }
+  .good { color: var(--blue); font-weight: 700; }
+  .banner { background: var(--bad-bg); color: var(--bad); border-left: 4px solid var(--bad); padding: 10px 14px; margin-bottom: 16px; }
+  ul.gaps { margin: 0; padding: 0 0 0 18px; }
+  ul.gaps li { margin: 3px 0; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 6px 9px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { background: var(--light); color: var(--navy); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.changed td { background: #fffbe6; }
+  input, select, textarea, button { font: inherit; }
+  input[type=number], input[type=text], input[type=email], input[type=date], select, textarea {
+    border: 1px solid var(--grey); border-radius: 3px; padding: 4px 7px; background: var(--white); color: var(--ink); }
+  input[type=number] { width: 7em; text-align: right; }
+  textarea { width: 100%; max-width: 30em; min-height: 5.5em; }
+  button { border: 1px solid var(--blue); background: var(--blue); color: var(--white); border-radius: 3px; padding: 6px 14px; font-weight: 700; cursor: pointer; }
+  button.ghost { background: var(--white); color: var(--blue); }
+  button:disabled { background: var(--grey); border-color: var(--grey); cursor: default; }
+  .row { display: flex; gap: 12px 18px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .row label { display: flex; gap: 6px; align-items: center; }
+  .current { display: block; font-size: 12px; color: var(--muted); }
+  .status { font-size: 14px; margin-left: 6px; }
+  .big { font-size: 26px; font-weight: 900; color: var(--blue); }
+  .gate { max-width: 40em; margin: 40px auto; text-align: center; }
+  tr.group th { background: var(--white); color: var(--navy); font-size: 14px; padding-top: 14px; border-bottom: 2px solid var(--navy); }
+  @media (max-width: 720px) { .tools { margin-left: 0; } input[type=number] { width: 5.5em; } }
+  tr.editor td { background: var(--light); }
+  tr.editor .row { margin: 4px 0; }
+  .editor input[type=number] { width: 7em; }
+  .actions { white-space: nowrap; }
+  .actions button { padding: 3px 10px; font-size: 13px; }
+  main { max-width: 1600px; }
+  .seg { display: inline-flex; border: 1px solid var(--blue); border-radius: 3px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: var(--white); color: var(--blue); }
+  .seg button[aria-pressed="true"] { background: var(--blue); color: var(--white); }
+  #pl td.n, #pl th.n { white-space: nowrap; }
+  #pl td.code, #pl td.type { color: var(--muted); white-space: nowrap; }
+  #pl td.name { white-space: nowrap; font-weight: 700; }
+  #pl button.cell { font: inherit; background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
+  #pl button.cell:hover { color: var(--blue); text-decoration: underline; }
+  #pl td.sel { background: var(--light); }
+  #pl tr.total td { border-top: 2px solid var(--navy); font-weight: 900; }
+  #pl tr.total button.cell { font-weight: 900; }
+  #pl th.n.now { color: var(--blue); }
+  .detail-sum { font-size: 22px; font-weight: 900; color: var(--blue); }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Plus Transport<span>Transport costs</span></div>
+    <div class="tools"><span id="who"></span><a href="/transport/">Transport</a><a href="/transport/pay/">Pay</a><a href="/">Dashboards</a></div>
+  </div>
+</header>
+<div class="gate" id="gate" hidden><h2>Transport costs</h2><p id="gate-text"></p></div>
+<div id="app" hidden>
+  <main>
+    <div class="banner" id="error" hidden></div>
+    <section aria-labelledby="pl-title">
+      <div class="head"><h2 id="pl-title">Transport costs by P&amp;L line</h2>
+        <span class="note">Estimated from what's entered in the dashboard, so close to the P&amp;L rather than exact. Costs run up to today. Click any figure to see what's in it.</span></div>
+      <div class="pad">
+        <div class="row">
+          <div class="seg" role="group" aria-label="View by"><button id="by-month" aria-pressed="true">Months</button><button id="by-week" aria-pressed="false">Weeks</button></div>
+          <label id="year-box">Year <select id="year"></select></label>
+          <span id="week-box" hidden><label>From <input type="date" id="w-from"></label> <label>to <input type="date" id="w-to"></label></span>
+          <button class="ghost" id="show">Show</button><span class="status" id="status" aria-live="polite"></span>
+        </div>
+        <div class="table-wrap"><table id="pl"></table></div>
+      </div>
+    </section>
+
+    <section id="detail" aria-labelledby="detail-title" hidden>
+      <div class="head"><h2 id="detail-title"></h2><span class="detail-sum" id="detail-sum"></span><button class="close ghost" id="detail-close" style="margin-left:auto">Close</button></div>
+      <div class="pad">
+        <p class="note" id="detail-from"></p>
+        <div class="table-wrap"><table id="detail-groups"></table></div>
+        <h3 id="entries-title" hidden></h3>
+        <div class="table-wrap"><table id="detail-entries"></table></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="src-title">
+      <div class="head"><h2 id="src-title">What's in each line</h2></div>
+      <div class="pad"><div class="table-wrap"><table id="sources"></table></div>
+        <p class="note">Not included: anything that isn't entered in the dashboard, such as transport office salaries. Lease, insurance and monthly pay are spread over each month's weekdays, so a full month comes to exactly the monthly amount.</p></div>
+    </section>
+  </main>
+</div>
+<script>
+(() => {
+  const API = '/api/transport';
+  const $ = (id) => document.getElementById(id);
+  const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const gbp0 = (n) => (n === null || n === undefined || Math.abs(n) < 0.5) ? '–' : '£' + Math.round(n).toLocaleString('en-GB');
+  const gbp2 = (n) => (n === null || n === undefined) ? '–' : '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dt = (iso, o) => new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
+  const addDays = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  async function api(path) {
+    const res = await fetch(API + path, { credentials: 'same-origin' });
+    let data = null; try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) throw new Error((data && (data.error + (data.detail ? `: ${data.detail}` : ''))) || `Error ${res.status}`);
+    return data;
+  }
+  let grain = 'month', data = null, today = null;
+
+  // a period's start and end, and its name
+  function periodRange(p) {
+    if (grain === 'month') { const d = new Date(p + 'T12:00:00Z'); const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)); return [p, end.toISOString().slice(0, 10)]; }
+    return [p, addDays(p, 6)];
+  }
+  const periodName = (p) => grain === 'month' ? dt(p, { month: 'short' }) : `w/c ${dt(p, { day: 'numeric', month: 'short' })}`;
+  const periodLong = (p) => grain === 'month' ? dt(p, { month: 'long', year: 'numeric' }) : `the week starting ${dt(p, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+  function render() {
+    const d = data;
+    const ps = d.periods;
+    const sum = (code) => ps.reduce((t, p) => t + ((d.values[code] || {})[p] || 0), 0);
+    const col = (p) => d.lines.reduce((t, l) => t + ((d.values[l.code] || {})[p] || 0), 0);
+    const thisPeriod = grain === 'month' ? today.slice(0, 8) + '01' : ps.find((p) => p <= today && addDays(p, 6) >= today);
+    const cell = (code, p, v) => `<td class="n"><button class="cell" data-line="${code}" data-p="${p}" title="See what's in this">${gbp0(v)}</button></td>`;
+    $('pl').innerHTML = `<thead><tr><th>GL</th><th>Line</th><th>Type</th>${ps.map((p) => `<th class="n${p === thisPeriod ? ' now' : ''}">${periodName(p)}${p === thisPeriod ? '<span class="current">to date</span>' : ''}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>` +
+      d.lines.map((l) => `<tr><td class="code">${l.code}</td><td class="name">${esc(l.name)}</td><td class="type">${l.type}</td>${ps.map((p) => cell(l.code, p, (d.values[l.code] || {})[p])).join('')}
+        <td class="n"><button class="cell" data-line="${l.code}" data-p="all">${gbp0(sum(l.code))}</button></td></tr>`).join('') +
+      `<tr class="total"><td></td><td class="name">Transport planning costs</td><td></td>${ps.map((p) => cell('total', p, col(p))).join('')}
+        <td class="n"><button class="cell" data-line="total" data-p="all">${gbp0(d.lines.reduce((t, l) => t + sum(l.code), 0))}</button></td></tr></tbody>`;
+    $('sources').innerHTML = `<thead><tr><th>GL</th><th>Line</th><th>From the dashboard</th></tr></thead><tbody>` +
+      d.lines.map((l) => `<tr><td>${l.code}</td><td><b>${esc(l.name)}</b></td><td>${esc(l.from)}</td></tr>`).join('') + '</tbody>';
+  }
+
+  async function load() {
+    $('status').textContent = 'Loading';
+    let from, to;
+    if (grain === 'month') { const y = $('year').value; from = `${y}-01-01`; to = `${y}-12-31` < today ? `${y}-12-31` : today; }
+    else { from = $('w-from').value; to = $('w-to').value; }
+    try { data = await api(`/pay/costs?grain=${grain}&from=${from}&to=${to}`); render(); $('status').textContent = ''; $('detail').hidden = true; }
+    catch (e) { $('status').textContent = e.message; $('status').className = 'status bad'; }
+  }
+
+  async function openDetail(line, p) {
+    const meta = line === 'total' ? { name: 'Transport planning costs', from: 'All the lines above' } : data.lines.find((l) => l.code === line);
+    const [from, to] = p === 'all' ? [data.from, data.to] : periodRange(p);
+    document.querySelectorAll('#pl td.sel').forEach((td) => td.classList.remove('sel'));
+    const btn = [...document.querySelectorAll('#pl button.cell')].find((b) => b.dataset.line === line && b.dataset.p === p);
+    if (btn) btn.parentElement.classList.add('sel');
+    $('detail').hidden = false;
+    $('detail-title').textContent = `${meta.name}, ${p === 'all' ? `${dt(from, { day: 'numeric', month: 'short' })} to ${dt(to, { day: 'numeric', month: 'short', year: 'numeric' })}` : periodLong(p)}`;
+    $('detail-sum').textContent = btn ? btn.textContent : '';
+    $('detail-from').textContent = meta.from;
+    $('detail-groups').innerHTML = '<tbody><tr><td class="muted">Loading</td></tr></tbody>';
+    $('detail-entries').innerHTML = ''; $('entries-title').hidden = true;
+    try {
+      const r = await api(`/pay/costs/detail?line=${line}&from=${from}&to=${to}`);
+      const NAMES = Object.fromEntries(data.lines.map((l) => [l.code, l.name]));
+      $('detail-groups').innerHTML = r.groups.length
+        ? `<thead><tr>${line === 'total' ? '<th>Line</th>' : ''}<th>What</th><th>Vehicle</th><th>Driver</th><th class="n">Days</th><th class="n">Cost</th></tr></thead><tbody>` +
+          r.groups.map((g) => `<tr>${line === 'total' ? `<td>${esc(NAMES[g.line] || g.line)}</td>` : ''}<td>${esc(g.part)}</td><td>${esc(g.vehicle || '–')}</td><td>${esc(g.driver || '–')}</td>
+            <td class="n">${g.days}</td><td class="n">${gbp2(g.amount)}</td></tr>`).join('') + '</tbody>'
+        : '<tbody><tr><td class="muted">Nothing in this line for these dates.</td></tr></tbody>';
+      if (r.entries.length) {
+        $('entries-title').hidden = false; $('entries-title').textContent = 'Entries';
+        $('detail-entries').innerHTML = `<thead><tr><th>Date</th><th>Vehicle</th><th>For</th><th>Details</th><th class="n">Cost</th></tr></thead><tbody>` +
+          r.entries.map((e) => `<tr><td>${dt(e.date, { day: 'numeric', month: 'short' })}</td><td>${esc(e.vehicle || '–')}</td><td>${esc(e.category)}</td><td>${esc(e.description || '')}</td><td class="n">${gbp2(e.amount)}</td></tr>`).join('') + '</tbody>';
+      } else if (r.jobs.length) {
+        const JOB = { same_day: 'Same day', overnight_parcel: 'Parcel', overnight_pallet: 'Pallet', other: 'Other' };
+        $('entries-title').hidden = false; $('entries-title').textContent = `Orders (${r.jobs.length})`;
+        $('detail-entries').innerHTML = `<thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Type</th><th>Reason</th><th class="n">Cost</th></tr></thead><tbody>` +
+          r.jobs.map((j) => `<tr><td>${dt(j.date, { day: 'numeric', month: 'short' })}</td><td>${esc(j.order_ref)}</td><td>${esc(j.customer || '–')}</td><td>${JOB[j.job_type] || '–'}</td>
+            <td>${j.reason_code ? `${esc(j.reason_code)} ${esc(j.reason || '')}` : '<span class="muted">none</span>'}</td><td class="n">${gbp2(j.cost)}</td></tr>`).join('') + '</tbody>';
+      }
+      if ($('detail').scrollIntoView) $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { $('detail-groups').innerHTML = `<tbody><tr><td class="bad">${esc(e.message)}</td></tr></tbody>`; }
+  }
+
+  $('pl').addEventListener('click', (e) => { const b = e.target.closest('button.cell'); if (b) openDetail(b.dataset.line, b.dataset.p); });
+  $('detail-close').addEventListener('click', () => { $('detail').hidden = true; document.querySelectorAll('#pl td.sel').forEach((td) => td.classList.remove('sel')); });
+  const setGrain = (g) => { grain = g; $('by-month').setAttribute('aria-pressed', String(g === 'month')); $('by-week').setAttribute('aria-pressed', String(g === 'week'));
+    $('year-box').hidden = g !== 'month'; $('week-box').hidden = g !== 'week'; load(); };
+  $('by-month').addEventListener('click', () => setGrain('month'));
+  $('by-week').addEventListener('click', () => setGrain('week'));
+  $('show').addEventListener('click', load);
+
+  (async () => {
+    let me;
+    try { me = await api('/me'); } catch (e) { $('gate').hidden = false; $('gate-text').textContent = e.message; return; }
+    $('who').textContent = me.email;
+    if (!me.pay) { $('gate').hidden = false; $('gate-text').textContent = 'Transport costs include driver pay, so only the people with pay access can see them.'; return; }
+    $('app').hidden = false;
+    const now = new Date();
+    today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const y = Number(today.slice(0, 4));
+    $('year').innerHTML = [y, y - 1].map((v) => `<option value="${v}">${v}</option>`).join('');
+    const monday = addDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7));
+    $('w-from').value = addDays(monday, -12 * 7); $('w-to').value = today;
+    await load();
+  })();
+})();
+</script>
+</body>
+</html>

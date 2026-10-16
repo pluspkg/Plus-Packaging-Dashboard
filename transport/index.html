@@ -207,6 +207,7 @@
       <a href="/transport/fuel/">Fuel</a>
       <a href="/transport/couriers/">Couriers</a>
       <a href="/transport/pay/" id="pay-link" hidden>Pay</a>
+      <a href="/transport/costs/" id="costs-link" hidden>Costs</a>
       <a href="/transport/setup/" id="setup-link" hidden>Setup</a>
       <a href="/">Dashboards</a>
     </div>
@@ -952,10 +953,10 @@
     const ones = r.one_offs || [];
     $('one-offs-panel').hidden = !ones.length;
     if (ones.length) {
-      const CAT = { repair: 'Repair', maintenance: 'Maintenance', insurance: 'Insurance', other: 'Other' };
+      const CAT = { repair: 'Repair', maintenance: 'Maintenance', insurance: 'Insurance', uniforms: 'Uniforms', other: 'Misc' };
       $('one-offs-note').textContent = `${ones.length} in this period, ${money(ones.reduce((t, x) => t + x.amount, 0))}, included in the vehicles' costs above`;
       $('one-offs').innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Vehicle</th><th scope="col">For</th><th scope="col">Details</th><th class="n" scope="col">Cost</th></tr></thead><tbody>` +
-        ones.map((x) => `<tr><td data-label="Date">${shortDate(x.date)}</td><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(x.vehicle)}</span></td>
+        ones.map((x) => `<tr><td data-label="Date">${shortDate(x.date)}</td><td class="lead-cell" data-label="Vehicle"><span class="veh">${esc(x.vehicle || 'Not a vehicle')}</span></td>
           <td data-label="For">${CAT[x.category] || esc(x.category)}</td><td data-label="Details">${esc(x.description || '')}</td><td class="n" data-label="Cost">${money2(x.amount)}</td></tr>`).join('') + '</tbody>';
     }
     const ext = r.external && r.external.by_type.length ? r.external : null;
@@ -1059,6 +1060,7 @@
       $('setup-link').hidden = me.role !== 'admin';
       $('admin-link').hidden = me.role !== 'admin';
       $('pay-link').hidden = !me.pay;
+      $('costs-link').hidden = !me.pay;
       seesPay = Boolean(me.pay);                      // only driver pay is restricted; everyone sees running costs
       $('cost-head').textContent = seesPay ? 'Cost' : 'Running cost';
       $('cost-head-day').textContent = seesPay ? 'Cost' : 'Running cost';

@@ -685,7 +685,7 @@ async function report(url, sql, user) {
                            from transport.period_driver_idle($1::date, $2::date) group by basis`, [from, to]) : Promise.resolve([]),
       sql.query(`select c.id::int, c.cost_date::text as date, coalesce(v.display_name, v.maxoptra_name) as vehicle, c.category,
                         c.amount::float8 as amount, c.description
-                 from transport.vehicle_costs c join transport.vehicles v on v.id = c.vehicle_id
+                 from transport.vehicle_costs c left join transport.vehicles v on v.id = c.vehicle_id
                  where c.cost_date between $1 and $2 order by c.cost_date desc, c.id desc`, [from, to]),
     ]);
     oneOffs = extras;
@@ -733,7 +733,7 @@ async function report(url, sql, user) {
 // ---------------------------------------------------------------------------
 
 const RATE_TYPES = {
-  driver: ['day_rate', 'salary_monthly'], vehicle: ['lease_monthly', 'insurance_monthly', 'hire_daily', 'mpg'], fuel: ['price_per_litre'],
+  driver: ['day_rate', 'salary_monthly'], vehicle: ['lease_monthly', 'insurance_monthly', 'hire_daily', 'insurance_daily', 'mpg'], fuel: ['price_per_litre'],
   external: ['same_day', 'overnight_parcel', 'overnight_pallet', 'other'],
 };
 const VEHICLE_TYPES = ['full_time_van', 'truck', 'support', 'temporary', 'excluded', 'unclassified'];
@@ -882,14 +882,14 @@ async function deleteFuelPrice(request, sql) {
 }
 
 // One-off vehicle costs: repairs, maintenance, one-off insurance and so on, entered one at a time.
-const COST_CATEGORIES = ['insurance', 'repair', 'maintenance', 'other'];
+const COST_CATEGORIES = ['insurance', 'repair', 'maintenance', 'uniforms', 'other'];
 async function vehicleCosts(url, sql) {
   const from = url.searchParams.get('from'), to = url.searchParams.get('to');
   if (!isDate(from) || !isDate(to)) return fail(400, 'Give from and to as YYYY-MM-DD');
   const costs = await sql.query(`
     select c.id::int, c.vehicle_id, coalesce(v.display_name, v.maxoptra_name) as vehicle, c.cost_date::text as date, c.category,
            c.amount::float8 as amount, c.description, coalesce(c.updated_by, c.created_by) as by
-    from transport.vehicle_costs c join transport.vehicles v on v.id = c.vehicle_id
+    from transport.vehicle_costs c left join transport.vehicles v on v.id = c.vehicle_id
     where c.cost_date between $1 and $2 order by c.cost_date desc, c.id desc limit 1000`, [from, to]);
   return json({ from, to, costs });
 }
@@ -897,7 +897,8 @@ async function vehicleCosts(url, sql) {
 async function saveVehicleCost(request, sql, user) {
   const b = await request.json().catch(() => ({}));
   const amount = b.amount === '' || b.amount === null || b.amount === undefined ? NaN : Number(b.amount);
-  if (!Number.isInteger(b.vehicle_id)) return fail(400, 'Choose a vehicle');
+  const vehicle = Number.isInteger(b.vehicle_id) ? b.vehicle_id : null;          // uniforms and misc needn't have one
+  if (vehicle === null && !['uniforms', 'other'].includes(b.category)) return fail(400, 'Choose a vehicle');
   if (!isDate(b.cost_date)) return fail(400, 'Choose the date of the cost');
   if (!COST_CATEGORIES.includes(b.category)) return fail(400, 'Choose what the cost was for');
   if (!(Number.isFinite(amount) && amount >= 0)) return fail(400, 'Enter the amount');
@@ -905,12 +906,12 @@ async function saveVehicleCost(request, sql, user) {
   if (Number.isInteger(b.id)) {
     const rows = await sql.query(
       `update transport.vehicle_costs set vehicle_id = $2, cost_date = $3, category = $4, amount = $5, description = $6, updated_by = $7, updated_at = now()
-       where id = $1 returning id`, [b.id, b.vehicle_id, b.cost_date, b.category, amount, desc, user.email]);
+       where id = $1 returning id`, [b.id, vehicle, b.cost_date, b.category, amount, desc, user.email]);
     return rows.length ? json({ saved: b.id }) : fail(404, 'That cost no longer exists');
   }
   const rows = await sql.query(
     `insert into transport.vehicle_costs (vehicle_id, cost_date, category, amount, description, created_by) values ($1, $2, $3, $4, $5, $6) returning id::int as id`,
-    [b.vehicle_id, b.cost_date, b.category, amount, desc, user.email]);
+    [vehicle, b.cost_date, b.category, amount, desc, user.email]);
   return json({ saved: rows[0].id });
 }
 
@@ -1052,6 +1053,71 @@ async function deletePay(request, sql, user) {
   if (!rows.length) return fail(404, 'That pay entry no longer exists');
   await audit(sql, user, 'pay.change', { driver: rows[0].driver_id, deleted: b.id, effective_from: rows[0].effective_from });
   return json({ deleted: b.id });
+}
+
+// ---------------------------------------------------------------------------
+// Transport costs in the P&L's lines, by month or week, with what's inside each figure. Includes driver pay, so
+// only people with pay access can see it.
+// ---------------------------------------------------------------------------
+const PL_LINES = [
+  { code: '5100', name: 'Carriage Out', type: 'Variable', from: 'Courier and pallet jobs: unallocated orders and ones added by hand' },
+  { code: '5101', name: 'Fuel for Carriage', type: 'Variable', from: 'Fuel on each run: miles x the week\'s fuel price / the vehicle\'s MPG' },
+  { code: '5102', name: 'Truck Hire Costs', type: 'Fixed', from: 'Lease, every weekday, and day hire on days used' },
+  { code: '5104', name: 'Truck repairs & servicing', type: 'Variable', from: 'One-off costs marked repair or maintenance' },
+  { code: '5105', name: 'Truck misc expenses', type: 'Variable', from: 'One-off costs marked other' },
+  { code: '5106', name: 'Truck insurance', type: 'Fixed', from: 'Monthly insurance every weekday, daily insurance on hired vehicles on days used, one-off insurance' },
+  { code: '6005', name: 'Temp drivers', type: 'Variable', from: 'Day-rate drivers, for days driven' },
+  { code: '6010', name: 'Ops - employee uniforms', type: 'Variable', from: 'One-off costs marked uniforms' },
+  { code: '7011', name: 'Transport Salaries', type: 'Fixed', from: 'Monthly and part-time drivers, whether or not they drive (drivers only)' },
+];
+
+async function costLines(url, sql) {
+  const grain = url.searchParams.get('grain') === 'week' ? 'week' : 'month';
+  const from = url.searchParams.get('from'), to = url.searchParams.get('to');
+  if (!isDate(from) || !isDate(to) || from > to) return fail(400, 'Give from and to as YYYY-MM-DD');
+  const days = (Date.parse(to) - Date.parse(from)) / 86400000;
+  if (days > 400) return fail(400, 'Choose up to about a year');
+  const [rows, periods] = await Promise.all([
+    sql.query(`select line, date_trunc($3, day)::date::text as period, sum(amount)::float8 as amount
+               from transport.cost_components($1::date, $2::date) group by 1, 2 order by 1, 2`, [from, to, grain]),
+    sql.query(`select distinct date_trunc($3, d)::date::text as period
+               from generate_series($1::date, $2::date, interval '1 day') d order by 1`, [from, to, grain]),
+  ]);
+  const values = {};
+  for (const r of rows) (values[r.line] = values[r.line] || {})[r.period] = r.amount;
+  return json({ grain, from, to, today: londonNow().date, periods: periods.map((p) => p.period), lines: PL_LINES, values });
+}
+
+// What's in one figure: by part (lease, day hire, fuel...), vehicle and driver, plus the entries behind it.
+async function costDetail(url, sql) {
+  const line = url.searchParams.get('line');
+  const from = url.searchParams.get('from'), to = url.searchParams.get('to');
+  if (!PL_LINES.some((l) => l.code === line) && line !== 'total') return fail(400, 'Not a cost line');
+  if (!isDate(from) || !isDate(to) || from > to) return fail(400, 'Give from and to as YYYY-MM-DD');
+  const [groups, entries, jobs] = await Promise.all([
+    sql.query(`
+      select c.line, c.part, coalesce(v.display_name, v.maxoptra_name) as vehicle, d.name as driver,
+             count(distinct c.day)::int as days, sum(c.amount)::float8 as amount
+      from transport.cost_components($2::date, $3::date) c
+      left join transport.vehicles v on v.id = c.vehicle_id
+      left join transport.drivers d on d.id = c.driver_id
+      where ($1 = 'total' or c.line = $1)
+      group by 1, 2, 3, 4 order by sum(c.amount) desc nulls last`, [line, from, to]),
+    ['5104', '5105', '5106', '6010'].includes(line) ? sql.query(`
+      select c.cost_date::text as date, coalesce(v.display_name, v.maxoptra_name) as vehicle, c.category, c.amount::float8 as amount, c.description
+      from transport.vehicle_costs c left join transport.vehicles v on v.id = c.vehicle_id
+      where c.cost_date between $2 and least($3::date, (now() at time zone 'Europe/London')::date)
+        and c.category = any (case $1 when '5104' then array['repair', 'maintenance'] when '5105' then array['other']
+                                       when '5106' then array['insurance'] else array['uniforms'] end)
+      order by c.cost_date desc`, [line, from, to]) : Promise.resolve([]),
+    line === '5100' ? sql.query(`
+      select j.job_date::text as date, j.order_ref, coalesce(j.client_name, case when j.customer_no is not null then 'Customer ' || j.customer_no end) as customer,
+             j.job_type, j.reason_code, r.description as reason, j.job_cost::float8 as cost
+      from transport.v_external_jobs j left join transport.reason_codes r on r.code = j.reason_code
+      where j.job_date between $1 and least($2::date, (now() at time zone 'Europe/London')::date) and j.job_cost is not null
+      order by j.job_date desc, j.order_ref limit 500`, [from, to]) : Promise.resolve([]),
+  ]);
+  return json({ line, from, to, groups, entries, jobs });
 }
 
 async function savePayAccess(request, sql, user) {
@@ -1221,6 +1287,8 @@ async function routeRequest({ request, env, route, method, url }) {
     if (route.startsWith('pay')) {
       if (!user.pay) return fail(403, 'Pay is restricted');
       if (method === 'GET' && route === 'pay/state') return payState(sql, user);
+      if (method === 'GET' && route === 'pay/costs') return costLines(url, sql);
+      if (method === 'GET' && route === 'pay/costs/detail') return costDetail(url, sql);
       if (method === 'POST' && route === 'pay/add') return addPay(request, sql, user);
       if (method === 'POST' && route === 'pay/update') return updatePay(request, sql, user);
       if (method === 'POST' && route === 'pay/delete') return deletePay(request, sql, user);
