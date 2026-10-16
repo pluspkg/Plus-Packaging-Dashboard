@@ -129,16 +129,17 @@
       </div>
     </div>
 
-    <div class="slbl"><span>By Person</span><div class="slbll"></div></div>
+    <div class="slbl"><span id="byPersonLbl">By Person</span><div class="slbll"></div></div>
     <div class="card" style="padding:4px 6px">
       <table>
         <thead><tr>
           <th class="rank"></th><th>Agent</th><th>Ext</th>
-          <th class="num">Calls</th><th class="num">Total time</th><th class="num">Avg</th>
+          <th class="num">Outbound</th><th class="num">Inbound</th><th class="num">Outbound time</th><th class="num">Avg out</th>
         </tr></thead>
         <tbody id="peopleBody"></tbody>
       </table>
     </div>
+    <div class="note" id="inboundNote" style="display:none"></div>
 
     <div class="slbl"><span>Validation &mdash; is 15s the right threshold?</span><div class="slbll"></div></div>
     <div class="grid" style="grid-template-columns:1fr 1fr">
@@ -247,10 +248,23 @@ function render(d){
         <td style="font-weight:600">${esc(p.name)}</td>
         <td style="color:var(--mu)">${esc(p.ext||"—")}</td>
         <td class="num" style="font-weight:800;color:var(--gr)">${INT(p.count)}</td>
+        <td class="num" style="font-weight:800;color:var(--cy)">${INT(p.inbound)}</td>
         <td class="num" style="color:var(--mu)">${fmtDur(p.seconds)}</td>
         <td class="num" style="color:var(--mu)">${fmtDur(p.avgSeconds)}</td>
       </tr>`).join("")
-    :`<tr><td colspan="6" style="color:var(--mu);font-style:italic;padding:16px 10px">No qualifying calls in this range</td></tr>`;
+    :`<tr><td colspan="7" style="color:var(--mu);font-style:italic;padding:16px 10px">No qualifying calls in this range</td></tr>`;
+
+  document.getElementById("byPersonLbl").textContent=`By Person — calls over ${d.minSeconds}s`;
+
+  // Inbound totals and anything that couldn't be attributed. Shown rather
+  // than hidden: an unattributed call is a gap in the per-person figures.
+  const inNote=document.getElementById("inboundNote");
+  if(d.inboundQualifying!=null){
+    const parts=[`Inbound over ${d.minSeconds}s: <strong>${INT(d.inboundQualifying)}</strong> — ${INT(d.inboundMain)} via the main line, ${INT(d.inboundDirect)} direct dials.`];
+    if(d.inboundUnattributed>0)parts.push(`${INT(d.inboundUnattributed)} connected inbound call${d.inboundUnattributed===1?"":"s"} couldn't be tied to a person and aren't in the table.`);
+    inNote.innerHTML=parts.join(" ");
+    inNote.style.display="block";
+  }else inNote.style.display="none";
 
   // Duration buckets — the threshold sanity check
   const buckets=d.durationBuckets||{};
