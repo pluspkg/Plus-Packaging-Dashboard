@@ -279,6 +279,10 @@
       <div class="panel-head"><h2>Trucks</h2><span class="note">Day length and utilisation show whether work is balanced across the trucks</span></div>
       <div class="table-wrap"><table class="cards" id="trucks"></table></div>
     </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Truck drivers</h2><span class="note">Completed drops per day driven</span></div>
+      <div class="table-wrap"><table class="cards" id="truck-drivers"></table></div>
+    </div>
     <div class="two">
       <div class="panel">
         <div class="panel-head"><h2>Other vehicles</h2><span class="note">Not in the van or truck KPIs</span></div>
@@ -938,12 +942,22 @@
         <td class="n cost-col" data-label="Cost">${vans.some((v) => v.cost && v.cost.total !== null) ? money(vans.reduce((t, v) => t + (v.cost && v.cost.total || 0), 0)) : '–'}</td>
         <td class="n cost-col" data-label="Cost per drop">${vans.some((v) => v.cost && v.cost.total !== null) ? money2(per(vans.reduce((t, v) => t + (v.cost && v.cost.total || 0), 0), vanDrops)) : '–'}</td><td colspan="2"></td></tr></tbody>`;
 
-    const drivers = r.drivers.map((d) => ({ ...d, pd: per(d.completed_drops, d.days) })).sort((a, b) => b.pd - a.pd || b.days - a.days);
-    $('drivers').innerHTML = `<thead><tr><th class="n" scope="col">#</th><th scope="col">Driver</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th><th class="n" scope="col">Against target</th><th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th scope="col">Vans</th></tr></thead><tbody>` +
-      (drivers.length ? drivers.map((d, i) => `<tr><td class="n" data-label="Rank">${i + 1}</td><td class="lead-cell" data-label="Driver"><b>${esc(d.driver)}</b></td>
-        <td class="n" data-label="Days">${d.days}</td><td class="n" data-label="Runs">${fmtInt(d.runs)}</td><td class="n" data-label="Completed drops">${fmtInt(d.completed_drops)}</td><td class="n" data-label="Per day"><b>${fmt1(d.pd)}</b></td>
-        <td class="n" data-label="Against target">${vsT(d.pd)}</td><td class="n" data-label="Failed">${d.failed_drops || 0}</td><td class="n" data-label="Second runs">${d.second_runs || 0}</td>
-        <td data-label="Vans">${esc(d.vehicles)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">No van runs in this period.</td></tr>') + '</tbody>';
+    // drivers: vans (against the target) and trucks, ranked by completed drops per day driven, with actual miles
+    const driverMiles = (d) => d.runs_tracked
+      ? `${fmtInt(d.actual_miles)} <span class="small">vs ${fmtInt(d.planned_miles_tracked)} planned on ${d.runs_tracked} of ${d.runs} run${d.runs === 1 ? '' : 's'}</span>`
+      : '<span class="small">Not tracked</span>';
+    const driverTable = (kind, id, vehiclesLabel, withTarget) => {
+      const list = r.drivers.filter((d) => d.kind === kind).map((d) => ({ ...d, pd: per(d.completed_drops, d.days) })).sort((a, b) => b.pd - a.pd || b.days - a.days);
+      const cols = withTarget ? 11 : 10;
+      $(id).innerHTML = `<thead><tr><th class="n" scope="col">#</th><th scope="col">Driver</th><th class="n" scope="col">Days</th><th class="n" scope="col">Runs</th><th class="n" scope="col">Completed drops</th><th class="n" scope="col">Per day</th>${withTarget ? '<th class="n" scope="col">Against target</th>' : ''}<th class="n" scope="col">Failed</th><th class="n" scope="col">Second runs</th><th scope="col">Actual miles</th><th scope="col">${vehiclesLabel}</th></tr></thead><tbody>` +
+        (list.length ? list.map((d, i) => `<tr><td class="n" data-label="Rank">${i + 1}</td><td class="lead-cell" data-label="Driver"><b>${esc(d.driver)}</b></td>
+          <td class="n" data-label="Days">${d.days}</td><td class="n" data-label="Runs">${fmtInt(d.runs)}</td><td class="n" data-label="Completed drops">${fmtInt(d.completed_drops)}</td><td class="n" data-label="Per day"><b>${fmt1(d.pd)}</b></td>
+          ${withTarget ? `<td class="n" data-label="Against target">${vsT(d.pd)}</td>` : ''}<td class="n" data-label="Failed">${d.failed_drops || 0}</td><td class="n" data-label="Second runs">${d.second_runs || 0}</td>
+          <td data-label="Actual miles">${driverMiles(d)}</td><td data-label="${vehiclesLabel}">${esc(d.vehicles)}</td></tr>`).join('')
+          : `<tr><td colspan="${cols}" class="muted">No ${kind} runs in this period.</td></tr>`) + '</tbody>';
+    };
+    driverTable('van', 'drivers', 'Vans', true);
+    driverTable('truck', 'truck-drivers', 'Trucks', false);
 
     $('cost-note').hidden = false;
     const runningBits = 'lease and insurance (spread over each month\'s weekdays, whether or not the vehicle ran), day hire on days used, one-off vehicle costs, and fuel from each vehicle\'s MPG and the week\'s fuel price on actual miles where MaxOptra recorded at least half the planned distance';

@@ -594,16 +594,32 @@ async function report(url, sql, user) {
       where run_date between $1 and $2
       group by vehicle, maxoptra_name, vehicle_type, hours_profile
       order by vehicle`, [from, to]),
+    // drivers of full-time vans and of trucks, each with their actual miles (runs where MaxOptra recorded them)
     sql.query(`
-      select s.driver_id, d.name as driver, (count(distinct s.run_date))::int as days, (count(distinct s.run_key))::int as runs,
-        (count(*) filter (where s.completed))::int as completed_drops, (count(*) filter (where s.failed))::int as failed_drops,
-        (count(distinct s.run_key) filter (where s.run_number >= 2))::int as second_runs,
-        string_agg(distinct coalesce(v.display_name, v.maxoptra_name), ', ') as vehicles
-      from transport.v_drop_stops s
-      join transport.drivers d on d.id = s.driver_id
-      join transport.vehicles v on v.id = s.vehicle_id
-      where s.run_date between $1 and $2 and v.vehicle_type = 'full_time_van' and d.kpi_included
-      group by s.driver_id, d.name`, [from, to]),
+      with stops as (
+        select s.driver_id, d.name as driver, case when v.vehicle_type = 'truck' then 'truck' else 'van' end as kind,
+          s.run_date, s.run_key, s.run_number, s.completed, s.failed, coalesce(v.display_name, v.maxoptra_name) as vehicle
+        from transport.v_drop_stops s
+        join transport.drivers d on d.id = s.driver_id
+        join transport.vehicles v on v.id = s.vehicle_id
+        where s.run_date between $1 and $2 and v.vehicle_type in ('full_time_van', 'truck') and d.kpi_included
+      ), miles as (
+        select r.driver_id, case when v.vehicle_type = 'truck' then 'truck' else 'van' end as kind,
+          sum(r.actual_distance) filter (where r.actual_distance is not null) as actual_miles,
+          sum(r.planned_distance) filter (where r.actual_distance is not null) as planned_miles_tracked,
+          count(*) filter (where r.actual_distance is not null) as runs_tracked
+        from transport.v_runs_clean r join transport.vehicles v on v.id = r.vehicle_id
+        where r.run_date between $1 and $2 and v.vehicle_type in ('full_time_van', 'truck') and r.driver_id is not null
+        group by 1, 2
+      )
+      select st.driver_id, st.driver, st.kind, (count(distinct st.run_date))::int as days, (count(distinct st.run_key))::int as runs,
+        (count(*) filter (where st.completed))::int as completed_drops, (count(*) filter (where st.failed))::int as failed_drops,
+        (count(distinct st.run_key) filter (where st.run_number >= 2))::int as second_runs,
+        string_agg(distinct st.vehicle, ', ') as vehicles,
+        round(max(m.actual_miles), 1)::float8 as actual_miles, round(max(m.planned_miles_tracked), 1)::float8 as planned_miles_tracked,
+        coalesce(max(m.runs_tracked), 0)::int as runs_tracked
+      from stops st left join miles m on m.driver_id = st.driver_id and m.kind = st.kind
+      group by st.driver_id, st.driver, st.kind`, [from, to]),
     sql.query(`
       select s.run_date::text as date, coalesce(v.display_name, v.maxoptra_name) as vehicle, d.name as driver,
              s.client_name, s.fail_reasons
