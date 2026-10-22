@@ -457,14 +457,17 @@ async function getDynToken(){
     })});
   const j=await r.json();
   if(j.error){
-    // If consent required, redirect user to consent screen then return
+    // Token can't be refreshed — send the user back through a normal sign-in.
+    // Do NOT add prompt:"consent" here. It forces a fresh per-user consent
+    // check that ignores the tenant-wide admin consent, so staff get an
+    // "Approval required" screen even though the app is fully approved.
     if(j.error==="invalid_grant"||j.error==="interaction_required"||j.error==="consent_required"){
       const ver=rnd(43),ch=b64url(await sha256(ver)),st=rnd(16);
       sessionStorage.setItem("pkce_ver",ver);sessionStorage.setItem("pkce_st",st);
       const allScopes=[...CFG.scopes,...CFG.dynamicsScopes].join(" ")+" offline_access";
       const p=new URLSearchParams({client_id:CFG.clientId,response_type:"code",redirect_uri:REDIRECT_URI,
         scope:allScopes,code_challenge:ch,code_challenge_method:"S256",
-        state:st,response_mode:"query",prompt:"consent"});
+        state:st,response_mode:"query"});
       location.href="https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/authorize?"+p;
       throw new Error("Redirecting for consent...");
     }
