@@ -284,7 +284,8 @@
               <div class="kico">&#128222;</div>
               <div>
                 <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
-                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div id="k5sub" style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
+                <div id="k5ans" style="font-size:11px;color:var(--mu);margin-top:4px;">Avg answer <strong style="color:var(--ow);">&#8212;</strong></div>
               </div>
             </div>
             
@@ -295,7 +296,8 @@
               <div class="kico" style="color:var(--cy)">&#128222;</div>
               <div>
                 <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
-                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div id="k5wsub" style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
+                <div id="k5wans" style="font-size:11px;color:var(--mu);margin-top:4px;">Avg answer <strong style="color:var(--ow);">&#8212;</strong></div>
               </div>
             </div>
             
@@ -390,6 +392,45 @@ async function downloadAndParse(driveId,itemId){
   if(!r.ok)throw new Error("Download failed: "+r.status);
   return XLSX.read(await r.arrayBuffer(),{type:"array"});
 }
+// ── RINGCENTRAL CALLS ────────────────────────────────────────────────────────
+// Outbound calls and answer time come from RingCentral, not CRM. The old MSI
+// figure depended on someone ticking a box in CRM; these are recorded by the
+// phone system itself.
+const RC_WORKER_URL    = "https://rc-answer-time.darren-clayson.workers.dev";
+const MIN_CALL_SECONDS = 15;
+
+// Counts every outbound call in RingCentral, not just the sales team. The
+// leaderboards show the top six callers.
+
+async function readRC(){
+  try{
+    // UK local midnight, sent as an exact instant — so an early call is counted
+    // on the right day whether the clocks are on GMT or BST.
+    const now=new Date();
+    const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
+    const weekStart=new Date(todayStart);
+    const day=weekStart.getDay();
+    weekStart.setDate(weekStart.getDate()-(day===0?6:day-1)); // back to Monday
+    const url=`${RC_WORKER_URL}/sales-calls?from=${encodeURIComponent(weekStart.toISOString())}`+
+              `&today=${encodeURIComponent(todayStart.toISOString())}&min=${MIN_CALL_SECONDS}`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(45000)});
+    const j=await r.json();
+    if(!r.ok||j.error)throw new Error(j.error||("RingCentral "+r.status));
+    return{
+      callsToday:      j.today?.count ?? 0,
+      top6Callers:     (j.today?.byPerson || []).slice(0,6),
+      callsWeek:       j.week?.count ?? 0,
+      top6CallersWeek: (j.week?.byPerson || []).slice(0,6),
+      answerToday:     j.today?.answerSeconds ?? null,
+      answerWeek:      j.week?.answerSeconds  ?? null,
+    };
+  }catch(e){
+    console.warn("RingCentral:",e.message);
+    return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],
+           answerToday:null,answerWeek:null,rcError:e.message};
+  }
+}
+
 // ── NAV CONFIGURATION ────────────────────────────────────────────────────────
 // Set NAV_ENABLED to true after IT meeting when Worker is deployed
 // Replace NAV_WORKER_URL with the actual Worker URL
@@ -463,14 +504,17 @@ async function getDynToken(){
     })});
   const j=await r.json();
   if(j.error){
-    // If consent required, redirect user to consent screen then return
+    // Token can't be refreshed — send the user back through a normal sign-in.
+    // Do NOT add prompt:"consent" here. It forces a fresh per-user consent
+    // check that ignores the tenant-wide admin consent, so staff get an
+    // "Approval required" screen even though the app is fully approved.
     if(j.error==="invalid_grant"||j.error==="interaction_required"||j.error==="consent_required"){
       const ver=rnd(43),ch=b64url(await sha256(ver)),st=rnd(16);
       sessionStorage.setItem("pkce_ver",ver);sessionStorage.setItem("pkce_st",st);
       const allScopes=[...CFG.scopes,...CFG.dynamicsScopes].join(" ")+" offline_access";
       const p=new URLSearchParams({client_id:CFG.clientId,response_type:"code",redirect_uri:REDIRECT_URI,
         scope:allScopes,code_challenge:ch,code_challenge_method:"S256",
-        state:st,response_mode:"query",prompt:"consent"});
+        state:st,response_mode:"query"});
       location.href="https://login.microsoftonline.com/"+CFG.tenantId+"/oauth2/v2.0/authorize?"+p;
       throw new Error("Redirecting for consent...");
     }
@@ -503,58 +547,7 @@ async function readCRM(){
     const from=todayStart.toISOString();
     const to=todayEnd.toISOString();
 
-    // Week start = Monday
-    const weekStart=new Date(todayStart);
-    const day=weekStart.getDay();
-    const diff=day===0?6:day-1;
-    weekStart.setDate(weekStart.getDate()-diff);
-    const weekFrom=weekStart.toISOString();
-
-    const MEANINGFUL_FIELD = "new_meaningfulsalesinteraction";
-
-    // Fetch today's AND this week's calls in parallel
-    const [todayRes, weekRes] = await Promise.all([
-      dynFetch(
-        `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
-        `&$filter=directioncode eq true`+
-        ` and actualend ge ${from} and actualend le ${to}`+
-        ` and statecode eq 1`+
-        ` and ${MEANINGFUL_FIELD} eq true`
-      ),
-      dynFetch(
-        `/phonecalls?$select=activityid,${MEANINGFUL_FIELD},_ownerid_value`+
-        `&$filter=directioncode eq true`+
-        ` and actualend ge ${weekFrom} and actualend le ${to}`+
-        ` and statecode eq 1`+
-        ` and ${MEANINGFUL_FIELD} eq true`
-      ),
-    ]);
-
-    // Today
-    const callRecords = todayRes.value || [];
-    const callsToday = callRecords.length;
-    const callerCounts = {};
-    for(const c of callRecords){
-      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"] || c._ownerid_value || "Unknown";
-      callerCounts[name] = (callerCounts[name]||0) + 1;
-    }
-    const top6Callers = Object.entries(callerCounts)
-      .map(([name,count])=>({name,count}))
-      .sort((a,b)=>b.count-a.count)
-      .slice(0,6);
-
-    // This week
-    const weekRecords = weekRes.value || [];
-    const callsWeek = weekRecords.length;
-    const weekCounts = {};
-    for(const c of weekRecords){
-      const name = c["_ownerid_value@OData.Community.Display.V1.FormattedValue"] || c._ownerid_value || "Unknown";
-      weekCounts[name] = (weekCounts[name]||0) + 1;
-    }
-    const top6CallersWeek = Object.entries(weekCounts)
-      .map(([name,count])=>({name,count}))
-      .sort((a,b)=>b.count-a.count)
-      .slice(0,6);
+    // Phone calls now come from RingCentral (readRC); CRM supplies deals and appointments only.
 
     // ── DEALS (Opportunities) ──
     // Filter: created today
@@ -573,17 +566,12 @@ async function readCRM(){
     );
     const apptToday = apptRes.value?.length??0;
 
-    return{callsToday,top6Callers,callsWeek,top6CallersWeek,dealsToday,apptToday};
+    return{dealsToday,apptToday};
   }catch(e){
     console.warn("Dynamics CRM:",e.message);
-    const lbList=document.getElementById("callsLbList");
-    if(lbList){
-      const noAccess=e.message.includes("401")||e.message.includes("403")||e.message.includes("auth")||e.message.includes("consent");
-      lbList.innerHTML=`<div style="font-size:11px;color:var(--mu);font-style:italic;">${noAccess?"CRM access not available for this account":"No calls recorded yet today"}</div>`;
-    }
     document.getElementById("k6").textContent="—";
     document.getElementById("k7").textContent="—";
-    return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};
+    return{dealsToday:null,apptToday:null};
   }
 }
 async function readNPS(){
@@ -615,7 +603,13 @@ function render(d){
   const marginPct=(d.sales&&d.pm)?((d.pm/d.sales)*100):null;
   document.getElementById("marginPctCard").classList.add("vis");
   document.getElementById("marginPctScore").textContent=marginPct!=null?marginPct.toFixed(1)+"%":"—";
-  document.getElementById("k5").textContent=d.callsToday??0;
+  // "—" rather than 0 when RingCentral can't be reached: 0 reads as "no calls made"
+  document.getElementById("k5").textContent=d.rcError?"—":(d.callsToday??0);
+  document.getElementById("k5sub").textContent=`Today · over ${MIN_CALL_SECONDS}s`;
+  document.getElementById("k5wsub").textContent=`This Week · over ${MIN_CALL_SECONDS}s`;
+  const fmtSecs=s=>s==null?"—":(s>=60?`${Math.floor(s/60)}m ${String(s%60).padStart(2,"0")}s`:`${s}s`);
+  document.getElementById("k5ans").innerHTML=`Avg answer <strong style="color:var(--ow);">${fmtSecs(d.answerToday)}</strong>`;
+  document.getElementById("k5wans").innerHTML=`Avg answer <strong style="color:var(--ow);">${fmtSecs(d.answerWeek)}</strong>`;
   const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣"];
   const lbList=document.getElementById("callsLbList");
   const callers=d.top6Callers||[];
@@ -638,9 +632,13 @@ function render(d){
       ${[0,1,2].map(i=>makeRow(right[i],i,3)).join("")}
     </div>
   </div>`;
+  if(d.rcError){
+    const msg=`<div style="font-size:11px;color:var(--am);font-style:italic;">RingCentral unavailable — ${d.rcError}</div>`;
+    lbList.innerHTML=msg;weekLbList.innerHTML=msg;
+  }
   document.getElementById("k6").textContent=INT(d.apptToday);
   // Weekly calls leaderboard
-  document.getElementById("k5w").textContent=d.callsWeek??0;
+  document.getElementById("k5w").textContent=d.rcError?"—":(d.callsWeek??0);
   const weekLbList=document.getElementById("callsWeekLbList");
   const weekCallers=d.top6CallersWeek||[];
   const weekLeft=weekCallers.slice(0,3);
@@ -673,10 +671,10 @@ async function fetchData(){
   if(firstLoad){setStatus("ld");document.getElementById("btnr").disabled=true;document.getElementById("btnr").textContent="Loading…";}
   if(firstLoad){document.getElementById("lwrap").style.display="flex";document.getElementById("content").style.display="none";document.querySelectorAll(".hero-card,.nps-card,.kcard,.ocard").forEach(c=>c.classList.remove("vis"));}
   try{
-    const[dd,crm]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{callsToday:null,top6Callers:[],callsWeek:null,top6CallersWeek:[],dealsToday:null,apptToday:null};})]);
+    const[dd,crm,rc]=await Promise.all([readDataDump(),readCRM().catch(e=>{console.warn("CRM failed:",e.message);return{dealsToday:null,apptToday:null};}),readRC()]);
     // Merge NAV data over Data Dump values when NAV is enabled
     const navData = NAV_ENABLED ? await readNAV(dd) : {};
-    render({...dd,...crm,...navData});setStatus("ok");document.getElementById("errb").style.display="none";firstLoad=false;
+    render({...dd,...crm,...rc,...navData});setStatus("ok");document.getElementById("errb").style.display="none";firstLoad=false;
   }catch(e){
     setStatus("er");document.getElementById("lwrap").style.display="none";document.getElementById("content").style.display="block";
     const eb=document.getElementById("errb");eb.style.display="block";
