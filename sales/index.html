@@ -280,27 +280,31 @@
         <div class="kgrid">
           <div class="kcard calls-lb" id="kc0">
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-              <div class="kico">&#128222;</div>
+              <div class="kico">&#9201;</div>
               <div>
-                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
-                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div id="k5sub" style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
-                <div id="k5ans" style="font-size:11px;color:var(--mu);margin-top:4px;">Avg answer <strong style="color:var(--ow);">&#8212;</strong></div>
+                <div style="font-size:60px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5">&#8212;</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Avg Time to Answer</div><div id="k5sub" style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">Today</div>
               </div>
             </div>
             
-            <div id="callsLbList" style="flex:1;padding-left:12px;"></div>
+            <div style="flex:1;padding-left:12px;min-width:0;">
+              <div id="k5lbh" style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);line-height:1;margin-bottom:6px;">Top outbound callers</div>
+              <div id="callsLbList"></div>
+            </div>
           </div>
           <div class="kcard calls-lb" id="kc0w">
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-              <div class="kico" style="color:var(--cy)">&#128222;</div>
+              <div class="kico" style="color:var(--cy)">&#9201;</div>
               <div>
-                <div style="font-size:48px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
-                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Outbound Calls</div><div id="k5wsub" style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
-                <div id="k5wans" style="font-size:11px;color:var(--mu);margin-top:4px;">Avg answer <strong style="color:var(--ow);">&#8212;</strong></div>
+                <div style="font-size:60px;font-weight:800;letter-spacing:-2px;line-height:1;color:var(--or);" id="k5w">&#8212;</div>
+                <div class="klbl" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;">Avg Time to Answer</div><div id="k5wsub" style="font-size:11px;font-weight:600;color:var(--mu);margin-top:2px;">This Week</div>
               </div>
             </div>
             
-            <div id="callsWeekLbList" style="flex:1;padding-left:12px;"></div>
+            <div style="flex:1;padding-left:12px;min-width:0;">
+              <div id="k5wlbh" style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);line-height:1;margin-bottom:6px;">Top outbound callers</div>
+              <div id="callsWeekLbList"></div>
+            </div>
           </div>
           <div class="kcard"    id="kc1"><div class="kico">&#128197;</div><div class="kinfo"><div class="kval" id="k6">&#8212;</div><div class="klbl">Appointments Today</div></div></div>
           <div class="kcard ac" id="kc2"><div class="kico">&#129309;</div><div class="kinfo"><div class="kval" id="k7">&#8212;</div><div class="klbl">Deals Opened Today</div></div></div>
@@ -598,12 +602,20 @@ function render(d){
   document.getElementById("marginPctCard").classList.add("vis");
   document.getElementById("marginPctScore").textContent=marginPct!=null?marginPct.toFixed(1)+"%":"—";
   // "—" rather than 0 when RingCentral can't be reached: 0 reads as "no calls made"
-  document.getElementById("k5").textContent=d.rcError?"—":(d.callsToday??0);
-  document.getElementById("k5sub").textContent=`Today · over ${MIN_CALL_SECONDS}s`;
-  document.getElementById("k5wsub").textContent=`This Week · over ${MIN_CALL_SECONDS}s`;
-  const fmtSecs=s=>s==null?"—":(s>=60?`${Math.floor(s/60)}m ${String(s%60).padStart(2,"0")}s`:`${s}s`);
-  document.getElementById("k5ans").innerHTML=`Avg answer <strong style="color:var(--ow);">${fmtSecs(d.answerToday)}</strong>`;
-  document.getElementById("k5wans").innerHTML=`Avg answer <strong style="color:var(--ow);">${fmtSecs(d.answerWeek)}</strong>`;
+  // Hero number: average time to answer the main line. The leaderboard beside
+  // it is outbound calls over the threshold, so it carries its own heading.
+  const fmtBig=s=>{
+    if(s==null)return"—";
+    const u=t=>`<span style="font-size:.5em;font-weight:700;opacity:.75;margin-left:2px;">${t}</span>`;
+    return s>=60?`${Math.floor(s/60)}${u("m")} ${String(s%60).padStart(2,"0")}${u("s")}`:`${s}${u("s")}`;
+  };
+  document.getElementById("k5").innerHTML=fmtBig(d.answerToday);
+  document.getElementById("k5w").innerHTML=fmtBig(d.answerWeek);
+  document.getElementById("k5sub").textContent="Today";
+  document.getElementById("k5wsub").textContent="This Week";
+  const lbHead=`Top outbound callers · over ${MIN_CALL_SECONDS}s`;
+  document.getElementById("k5lbh").textContent=lbHead;
+  document.getElementById("k5wlbh").textContent=lbHead;
   const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣"];
   const lbList=document.getElementById("callsLbList");
   const callers=d.top6Callers||[];
@@ -627,7 +639,6 @@ function render(d){
     </div>
   </div>`;
   // Weekly calls leaderboard
-  document.getElementById("k5w").textContent=d.rcError?"—":(d.callsWeek??0);
   const weekLbList=document.getElementById("callsWeekLbList");
   const weekCallers=d.top6CallersWeek||[];
   const weekLeft=weekCallers.slice(0,3);
